@@ -1,0 +1,112 @@
+{
+  "name": "dontbesilent-skills",
+  "owner": {
+    "name": "dontbesilent2025"
+  },
+  "metadata": {
+    "description": "dontbesilent 商业诊断工具箱 — 从 12,307 条推文中提炼方法论，做成 10 个 Claude Code skill",
+    "version": "2.3.0"
+  },
+  "plugins": [
+    {
+      "name": "dbs",
+      "description": "dontbesilent 商业工具箱主入口。根据你的问题自动路由到最合适的诊断工具。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "business-diagnostics",
+      "keywords": ["business", "router", "diagnosis", "toolkit", "chinese"],
+      "skills": ["./skills/dbs"]
+    },
+    {
+      "name": "dbs-diagnosis",
+      "description": "dontbesilent 商业模式诊断。两种模式：问诊（消解你的问题）和体检（拆解你的商业模式）。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "business-diagnostics",
+      "keywords": ["business-model", "diagnosis", "consulting", "problem-dissolution", "chinese"],
+      "skills": ["./skills/dbs-diagnosis"]
+    },
+    {
+      "name": "dbs-benchmark",
+      "description": "dontbesilent 对标分析。用五重过滤法帮你找到值得模仿的对标，排除一切关于「我」的噪音。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "business-diagnostics",
+      "keywords": ["benchmark", "competitive-analysis", "imitation", "strategy", "chinese"],
+      "skills": ["./skills/dbs-benchmark"]
+    },
+    {
+      "name": "dbs-action",
+      "description": "dontbesilent 执行力诊断。用阿德勒心理学框架诊断你「知道该做什么但就是不做」的真正原因。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "business-diagnostics",
+      "keywords": ["psychology", "execution", "procrastination", "adler", "chinese"],
+      "skills": ["./skills/dbs-action"]
+    },
+    {
+      "name": "dbs-content",
+      "description": "dontbesilent 内容创作诊断。选题通过后，诊断怎么把这个选题做成好内容。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": ["content", "creation", "copywriting", "social-media", "chinese"],
+      "skills": ["./skills/dbs-content"]
+    },
+    {
+      "name": "dbs-hook",
+      "description": "dontbesilent 短视频开头优化。诊断开头问题 + 生成优化方案。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": ["video", "hook", "opening", "short-video", "douyin", "chinese"],
+      "skills": ["./skills/dbs-hook"]
+    },
+    {
+      "name": "dbs-xhs-title",
+      "description": "小红书标题公式工具。从 75 个验证过的爆款公式中，帮你挑对的、用对的、理解为什么用这个。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": ["xiaohongshu", "RED", "title", "formula", "social-media", "chinese"],
+      "skills": ["./skills/dbs-xhs-title"]
+    },
+    {
+      "name": "dbs-deconstruct",
+      "description": "dontbesilent 概念拆解。用维特根斯坦 + 奥派经济学的方法，把模糊的商业概念拆到原子级别。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "thinking-tools",
+      "keywords": ["wittgenstein", "concepts", "deconstruction", "philosophy", "chinese"],
+      "skills": ["./skills/dbs-deconstruct"]
+    },
+    {
+      "name": "chatroom-austrian",
+      "description": "哈耶克 × 米塞斯 × Claude 三人对话。奥派经济学视角的多角色讨论。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "thinking-tools",
+      "keywords": ["austrian-economics", "hayek", "mises", "debate", "philosophy", "chinese"],
+      "skills": ["./skills/chatroom-austrian"]
+    },
+    {
+      "name": "dbskill-upgrade",
+      "description": "升级 dbskill 到最新版本",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "utilities",
+      "keywords": ["upgrade", "update", "version"],
+      "skills": ["./skills/dbskill-upgrade"]
+    }
+  ]
+}

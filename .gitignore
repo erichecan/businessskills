@@ -1,0 +1,14 @@
+# 不发 GitHub
+chatbot/
+plans/
+skills 版本管理/
+社媒推广/
+.DS_Store
+.obsidian/
+CLAUDE.md
+SOURCE_OF_TRUTH.md
+
+# 知识库：只发 Skill 需要的部分
+知识库/legacy/
+知识库/主题索引/
+知识库/_预处理/
