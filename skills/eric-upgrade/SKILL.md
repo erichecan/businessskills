@@ -1,16 +1,16 @@
 ---
-name: dbskill-upgrade
-description: 升级 dbskill 到最新版本
-trigger: /dbskill-upgrade、/升级dbskill、「升级 dbskill」
+name: eric-upgrade
+description: 升级 eric-skills 到最新版本
+trigger: /eric-upgrade、/升级、「升级工具箱」
 ---
 
-# dbskill-upgrade
+# eric-upgrade
 
-升级 dbskill 到最新版本，显示更新内容。
+升级 eric-skills 到最新版本，显示更新内容。
 
 ## 使用场景
 
-- 用户主动调用 `/dbskill-upgrade` 升级
+- 用户主动调用 `/eric-upgrade` 升级
 - 显示版本变化和更新内容
 
 ## 升级流程
@@ -18,11 +18,11 @@ trigger: /dbskill-upgrade、/升级dbskill、「升级 dbskill」
 ### Step 1: 检测安装位置
 
 ```bash
-if [ -d "$HOME/.claude/skills/dbs" ]; then
+if [ -d "$HOME/.claude/skills/eric" ]; then
   INSTALL_DIR="$HOME/.claude/skills"
   echo "Install location: $INSTALL_DIR"
 else
-  echo "ERROR: dbskill not found in ~/.claude/skills/"
+  echo "ERROR: eric-skills not found in ~/.claude/skills/"
   exit 1
 fi
 ```
@@ -30,14 +30,14 @@ fi
 ### Step 2: 获取当前版本
 
 ```bash
-OLD_VERSION=$(cat "$HOME/.claude/skills/dbskill-upgrade/../../VERSION" 2>/dev/null || echo "unknown")
+OLD_VERSION=$(cat "$HOME/.claude/skills/eric-upgrade/../../VERSION" 2>/dev/null || echo "unknown")
 echo "Current version: $OLD_VERSION"
 ```
 
 ### Step 3: 获取远程版本
 
 ```bash
-REMOTE_VERSION=$(curl -sL https://raw.githubusercontent.com/dontbesilent2025/dbskill/main/VERSION || echo "")
+REMOTE_VERSION=$(curl -sL https://raw.githubusercontent.com/erichecan/businessskills/main/VERSION || echo "")
 if [ -z "$REMOTE_VERSION" ]; then
   echo "ERROR: Cannot fetch remote version"
   exit 1
@@ -54,9 +54,9 @@ echo "Remote version: $REMOTE_VERSION"
 ### Step 5: 备份当前版本
 
 ```bash
-BACKUP_DIR="$HOME/.claude/skills/.dbskill-backup-$(date +%Y%m%d-%H%M%S)"
+BACKUP_DIR="$HOME/.claude/skills/.eric-backup-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$BACKUP_DIR"
-cp -r "$HOME/.claude/skills"/dbs* "$BACKUP_DIR/" 2>/dev/null || true
+cp -r "$HOME/.claude/skills"/eric* "$BACKUP_DIR/" 2>/dev/null || true
 echo "Backup created: $BACKUP_DIR"
 ```
 
@@ -64,19 +64,19 @@ echo "Backup created: $BACKUP_DIR"
 
 ```bash
 TMP_DIR=$(mktemp -d)
-git clone --depth 1 https://github.com/dontbesilent2025/dbskill.git "$TMP_DIR/dbskill"
+git clone --depth 1 https://github.com/erichecan/businessskills.git "$TMP_DIR/eric-skills"
 if [ $? -ne 0 ]; then
   echo "ERROR: Failed to clone repository"
   exit 1
 fi
-echo "Downloaded to: $TMP_DIR/dbskill"
+echo "Downloaded to: $TMP_DIR/eric-skills"
 ```
 
 ### Step 7: 替换旧版本
 
 ```bash
-rm -rf "$HOME/.claude/skills"/dbs*
-cp -r "$TMP_DIR/dbskill/skills"/dbs* "$HOME/.claude/skills/"
+rm -rf "$HOME/.claude/skills"/eric*
+cp -r "$TMP_DIR/eric-skills/skills"/eric* "$HOME/.claude/skills/"
 rm -rf "$TMP_DIR"
 echo "Upgrade completed"
 ```
@@ -86,7 +86,7 @@ echo "Upgrade completed"
 ```bash
 if [ $? -ne 0 ]; then
   echo "ERROR: Upgrade failed, restoring from backup..."
-  rm -rf "$HOME/.claude/skills"/dbs*
+  rm -rf "$HOME/.claude/skills"/eric*
   cp -r "$BACKUP_DIR"/* "$HOME/.claude/skills/"
   echo "Restored from backup"
   exit 1
@@ -95,12 +95,12 @@ fi
 
 ### Step 8: 显示更新内容
 
-读取 `$HOME/.claude/skills/dbs/../../README.md`（如果存在），提取从 `OLD_VERSION` 到 `REMOTE_VERSION` 之间的更新内容。
+读取 `$HOME/.claude/skills/eric/../../README.md`（如果存在），提取从 `OLD_VERSION` 到 `REMOTE_VERSION` 之间的更新内容。
 
 格式：
 
 ```
-dbskill v{REMOTE_VERSION} — 从 v{OLD_VERSION} 升级成功！
+eric-skills v{REMOTE_VERSION} — 从 v{OLD_VERSION} 升级成功！
 
 更新内容：
 - [从 README 提取的更新要点]

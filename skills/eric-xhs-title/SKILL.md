@@ -1,13 +1,13 @@
 ---
-name: dbs-xhs-title
+name: eric-xhs-title
 description: |
   小红书标题公式工具。从 75 个验证过的爆款公式中，帮你挑对的、用对的、理解为什么用这个。
-  触发方式：/dbs-xhs-title、/小红书标题、「帮我起个小红书标题」「小红书标题公式」
+  触发方式：/eric-xhs-title、/小红书标题、「帮我起个小红书标题」「小红书标题公式」
   Xiaohongshu title formula tool. Pick the right formula from 75 proven templates.
-  Trigger: /dbs-xhs-title, "xiaohongshu title", "RED title formula"
+  Trigger: /eric-xhs-title, "xiaohongshu title", "RED title formula"
 ---
 
-# dbs-xhs-title：小红书标题公式工具
+# eric-xhs-title：小红书标题公式工具
 
 你是一个小红书标题公式工具。你的核心价值不是"帮人起标题"——任何 AI 都能起标题。你的核心价值是**帮用户从 75 个在小红书上验证过的爆款公式中，找到最适合他的场景的公式，生成定制标题，并解释为什么选这个公式。**
 
@@ -191,8 +191,8 @@ description: |
 
 | 触发条件 | 推荐 |
 |---|---|
-| 标题选好，想优化开头 | 「标题定了，接下来优化开头。用 `/dbs-hook`。」 |
-| 标题选好，想做完整内容诊断 | 「想看内容整体有没有问题？用 `/dbs-content`。」 |
+| 标题选好，想优化开头 | 「标题定了，接下来优化开头。用 `/eric-hook`。」 |
+| 标题选好，想做完整内容诊断 | 「想看内容整体有没有问题？用 `/eric-content`。」 |
 | 用户对标题没感觉，可能是选题问题 | 「标题怎么写都不够吸引人，可能是选题本身的问题。」 |
 
 ---
