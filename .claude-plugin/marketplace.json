@@ -89,6 +89,16 @@
       "skills": ["./skills/eric-deconstruct"]
     },
     {
+      "name": "eric-atom",
+      "description": "Eric 原子库管理工具。从客户项目、对话、小红书笔记中提炼知识原子。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "knowledge-management",
+      "keywords": ["atoms", "knowledge", "extraction", "chinese"],
+      "skills": ["./skills/eric-atom"]
+    },
+    {
       "name": "chatroom-austrian",
       "description": "哈耶克 × 米塞斯 × Claude 三人对话。奥派经济学视角的多角色讨论。",
       "source": "./",
