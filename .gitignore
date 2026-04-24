@@ -12,3 +12,21 @@ SOURCE_OF_TRUTH.md
 知识库/legacy/
 知识库/主题索引/
 知识库/_预处理/
+
+# Node / 前端依赖（任何位置的 node_modules 都忽略）
+node_modules/
+*.log
+npm-debug.log*
+.env
+.env.local
+
+# 构建产物
+.next/
+dist/
+build/
+
+# 编辑器 / OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
