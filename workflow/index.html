@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eric 内容生产工作流</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface2: #1e1e1e;
+    --border: #2a2a2a;
+    --border-active: #404040;
+    --text: #e0e0e0;
+    --text-dim: #888;
+    --text-dimmer: #555;
+    --accent: #f59e0b;
+    --accent-dim: rgba(245,158,11,0.15);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.15);
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.15);
+    --purple: #a855f7;
+    --purple-dim: rgba(168,85,247,0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+  }
+
+  /* --- Sidebar --- */
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-header h1 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .sidebar-header .product-def {
+    font-size: 11px;
+    color: var(--accent);
+    line-height: 1.5;
+    background: var(--accent-dim);
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-top: 8px;
+  }
+
+  .phase-list { flex: 1; padding: 12px; }
+  .phase-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 2px;
+    transition: background 0.15s;
+  }
+  .phase-item:hover { background: var(--surface2); }
+  .phase-item.active { background: var(--surface2); }
+  .phase-item.active .phase-num { background: var(--accent); color: #000; }
+  .phase-item.done .phase-num { background: var(--green); color: #000; }
+  .phase-item.done .phase-num::after { content: "\2713"; font-size: 10px; }
+  .phase-item.done .phase-num span { display: none; }
+  .phase-num {
+    width: 22px; height: 22px; min-width: 22px;
+    border-radius: 50%; background: var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; margin-top: 1px;
+  }
+  .phase-info h3 { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+  .phase-info p { font-size: 11px; color: var(--text-dim); line-height: 1.4; }
+  .phase-skill-tag {
+    font-size: 10px; color: var(--blue); background: var(--blue-dim);
+    padding: 1px 6px; border-radius: 3px; margin-top: 4px; display: inline-block;
+  }
+
+  .sidebar-section { padding: 12px; border-top: 1px solid var(--border); }
+  .sidebar-section h4 {
+    font-size: 11px; color: var(--text-dimmer);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+  .tool-btn {
+    display: block; width: 100%; padding: 8px 12px;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-size: 12px; cursor: pointer; text-align: left; margin-bottom: 4px;
+  }
+  .tool-btn:hover { border-color: var(--border-active); }
+  .tool-btn .tool-name { font-weight: 500; }
+  .tool-btn .tool-desc { color: var(--text-dim); font-size: 11px; }
+
+  /* --- Main area --- */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .phase-header {
+    padding: 20px 28px 16px; border-bottom: 1px solid var(--border); background: var(--surface);
+  }
+  .phase-header h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .phase-header .desc { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+  .phase-header .tip {
+    font-size: 12px; color: var(--accent); background: var(--accent-dim);
+    padding: 8px 12px; border-radius: 6px; margin-top: 10px; line-height: 1.5;
+  }
+
+  .phase-body {
+    flex: 1; overflow-y: auto; padding: 24px 28px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  .prev-context {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 16px; font-size: 12px; max-height: 120px; overflow-y: auto;
+    color: var(--text-dim); line-height: 1.6;
+  }
+  .prev-context summary { cursor: pointer; color: var(--text); font-weight: 500; margin-bottom: 6px; }
+
+  .input-section { display: flex; flex-direction: column; gap: 8px; }
+  .input-section label { font-size: 12px; font-weight: 500; color: var(--text-dim); }
+  .input-section textarea {
+    width: 100%; min-height: 120px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px;
+    color: var(--text); font-size: 14px; line-height: 1.7; resize: vertical; font-family: inherit;
+  }
+  .input-section textarea:focus { outline: none; border-color: var(--accent); }
+  .input-section textarea::placeholder { color: var(--text-dimmer); }
+
+  .btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .btn-primary {
+    padding: 10px 24px; background: var(--accent); color: #000; border: none;
+    border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary {
+    padding: 10px 18px; background: transparent; color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  .btn-secondary:hover { border-color: var(--border-active); color: var(--text); }
+  .btn-paste {
+    padding: 10px 24px; background: var(--purple); color: #fff; border: none;
+    border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .btn-paste:hover { opacity: 0.9; }
+  .btn-skip {
+    margin-left: auto; padding: 8px 14px; background: transparent;
+    color: var(--text-dimmer); border: none; font-size: 12px; cursor: pointer;
+  }
+  .btn-skip:hover { color: var(--text-dim); }
+  .status-text { font-size: 12px; color: var(--text-dim); }
+
+  /* Prompt preview box */
+  .prompt-box {
+    background: var(--surface2); border: 1px solid var(--accent);
+    border-radius: 8px; padding: 16px; position: relative;
+  }
+  .prompt-box-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+  }
+  .prompt-box-header span { font-size: 12px; color: var(--accent); font-weight: 600; }
+  .prompt-box pre {
+    font-size: 13px; line-height: 1.6; color: var(--text);
+    white-space: pre-wrap; word-break: break-word; max-height: 200px; overflow-y: auto;
+  }
+  .prompt-box .copy-hint {
+    margin-top: 10px; font-size: 11px; color: var(--text-dimmer); line-height: 1.5;
+  }
+
+  /* Steps indicator */
+  .relay-steps {
+    display: flex; gap: 12px; align-items: center; padding: 12px 0;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .relay-step {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 20px; background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .relay-step.active { border-color: var(--accent); color: var(--accent); }
+  .relay-step.done { border-color: var(--green); color: var(--green); }
+  .relay-arrow { color: var(--text-dimmer); }
+
+  /* Output area */
+  .output-section {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 20px; line-height: 1.8; font-size: 14px; white-space: pre-wrap; overflow-x: auto;
+  }
+  .output-section strong { color: var(--accent); }
+  .output-section em { color: var(--text-dim); }
+  .output-section h1 { font-size: 18px; margin: 16px 0 8px; }
+  .output-section h2 { font-size: 16px; margin: 16px 0 8px; }
+  .output-section h3 { font-size: 14px; margin: 12px 0 6px; }
+  .output-section code { background: var(--surface2); padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+  .output-empty {
+    color: var(--text-dimmer); font-style: italic; text-align: center; padding: 40px; font-size: 13px;
+  }
+
+  /* Atoms drawer */
+  .atoms-drawer {
+    position: fixed; right: 0; top: 0; height: 100vh; z-index: 100;
+    width: 0; overflow: hidden; border-left: 1px solid var(--border);
+    background: var(--surface); transition: width 0.2s; display: flex; flex-direction: column;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+  }
+  .atoms-drawer.open { width: 380px; }
+  .atoms-drawer-header {
+    padding: 16px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .atoms-drawer-header h3 { font-size: 14px; }
+  .atoms-drawer-body { flex: 1; overflow-y: auto; padding: 12px; }
+  .atom-card {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; margin-bottom: 8px; font-size: 12px; line-height: 1.6; cursor: pointer;
+  }
+  .atom-card:hover { border-color: var(--border-active); }
+  .atom-card .atom-id { color: var(--text-dimmer); font-size: 10px; }
+  .atom-card .atom-knowledge { margin-top: 4px; }
+  .atom-card .atom-tags { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .atom-card .atom-tag {
+    font-size: 10px; padding: 1px 6px; background: var(--accent-dim); color: var(--accent); border-radius: 3px;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex; align-items: center; gap: 8px; padding: 8px 28px;
+    border-top: 1px solid var(--border); background: var(--surface);
+  }
+  .toolbar button {
+    padding: 6px 12px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text-dim); font-size: 11px; cursor: pointer;
+  }
+  .toolbar button:hover { border-color: var(--border-active); color: var(--text); }
+  .toolbar .spacer { flex: 1; }
+
+  /* Toast notification */
+  .toast {
+    position: fixed; top: 20px; right: 20px; padding: 12px 20px;
+    background: var(--green); color: #000; border-radius: 8px;
+    font-size: 13px; font-weight: 600; z-index: 200;
+    animation: toastIn 0.3s ease, toastOut 0.3s ease 1.7s forwards;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(-10px); } }
+  @keyframes toastOut { to { opacity: 0; transform: translateY(-10px); } }
+
+  /* Paste result modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100;
+    display: flex; align-items: center; justify-content: center; padding: 40px;
+  }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    max-width: 700px; width: 100%; max-height: 80vh; display: flex; flex-direction: column;
+  }
+  .modal-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-header h3 { font-size: 14px; }
+  .modal-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .modal-body textarea {
+    width: 100%; min-height: 300px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px; color: var(--text); font-size: 14px;
+    line-height: 1.7; resize: vertical; font-family: inherit;
+  }
+  .modal-body textarea:focus { outline: none; border-color: var(--purple); }
+  .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+  @media (max-width: 900px) {
+    .sidebar { width: 60px; min-width: 60px; }
+    .phase-info p, .phase-skill-tag, .sidebar-section, .sidebar-header .product-def { display: none; }
+    .phase-info h3 { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>Eric 工作流</h1>
+    <div class="product-def">
+      帮 40 岁的人用 6 个月找到一个值得投入 10 年的方向<br>
+      产品 = 诊断框架 + 陪跑过程
+    </div>
+  </div>
+  <div class="phase-list" id="phaseList"></div>
+  <div class="sidebar-section">
+    <h4>随时可用（不在主流程）</h4>
+    <button class="tool-btn" onclick="copyToolPrompt('eric-diagnosis')">
+      <div class="tool-name">/eric-diagnosis</div>
+      <div class="tool-desc">商业模式诊断（有困惑时用）</div>
+    </button>
+    <button class="tool-btn" onclick="copyToolPrompt('eric-benchmark')">
+      <div class="tool-name">/eric-benchmark</div>
+      <div class="tool-desc">对标分析（需要手动粘贴真笔记）</div>
+    </button>
+    <button class="tool-btn" onclick="copyToolPrompt('eric-hook')">
+      <div class="tool-name">/eric-hook</div>
+      <div class="tool-desc">视频开头优化（仅视频）</div>
+    </button>
+    <button class="tool-btn" onclick="copyToolPrompt('eric-action')">
+      <div class="tool-name">/eric-action</div>
+      <div class="tool-desc">执行障碍自检</div>
+    </button>
+    <button class="tool-btn" onclick="copyToolPrompt('eric-deconstruct')">
+      <div class="tool-name">/eric-deconstruct</div>
+      <div class="tool-desc">概念拆解</div>
+    </button>
+    <button class="tool-btn" onclick="copyToolPrompt('eric-atom')">
+      <div class="tool-name">/eric-atom</div>
+      <div class="tool-desc">提炼知识原子</div>
+    </button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="phase-header" id="phaseHeader"></div>
+  <div class="phase-body" id="phaseBody"></div>
+  <div class="toolbar">
+    <button onclick="toggleAtoms()">📦 原子库</button>
+    <button onclick="clearCurrentPhase()">🗑 清空本阶段</button>
+    <button onclick="resetWorkflow()">🔄 新建工作流</button>
+    <button onclick="exportSession()">💾 导出记录</button>
+    <div class="spacer"></div>
+    <span style="font-size:11px;color:var(--text-dimmer)" id="atomCount"></span>
+  </div>
+</div>
+
+<!-- Atoms drawer -->
+<div class="atoms-drawer" id="atomsDrawer">
+  <div class="atoms-drawer-header">
+    <h3>原子库</h3>
+    <button class="btn-secondary" style="padding:4px 10px;font-size:11px" onclick="toggleAtoms()">关闭</button>
+  </div>
+  <div style="padding:8px 12px; border-bottom:1px solid var(--border); display:flex; gap:6px; align-items:center;">
+    <input id="atomSearch" type="text" placeholder="搜索原子（关键词/标签）..." oninput="renderAtoms()"
+      style="flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:6px 10px; color:var(--text); font-size:12px; outline:none;" />
+    <select id="atomSourceFilter" onchange="renderAtoms()"
+      style="background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:6px; color:var(--text); font-size:11px; outline:none;">
+      <option value="all">全部</option>
+      <option value="eric">我的</option>
+      <option value="upstream">上游库</option>
+    </select>
+  </div>
+  <div style="padding:4px 12px; font-size:11px; color:var(--text-dimmer);" id="atomFilterInfo"></div>
+  <div class="atoms-drawer-body" id="atomsBody"></div>
+</div>
+
+<script>
+// --- Phase definitions ---
+const PHASES = [
+  {
+    id: "topic-gen", num: 1, title: "素材 → 选题",
+    skill: "eric-content",
+    desc: "把任何原始素材（情绪/观察/金句/反馈）转成 5 个有爆款基因的选题。",
+    tip: "三段链：① 原子库真金句检索 → ② 匹配 75 个爆款标题公式 → ③ 过内容 5 原则筛选",
+    inputTypes: [
+      { value: "情绪/碎片想法", label: "💭 情绪 / 碎片想法" },
+      { value: "别人说的话", label: "💬 别人说的话（客户/读者原话）" },
+      { value: "观察/现象", label: "👀 观察 / 现象" },
+      { value: "一句金句", label: "✨ 一句金句 / 有感觉的话" },
+      { value: "新闻/热点", label: "📰 新闻 / 热点" }
+    ],
+    questions: [
+      { id: "reader", label: "目标读者是谁？（越具体越好）", placeholder: "例：42 岁刚被裁、不敢跟老婆说的中年男人" },
+      { id: "emotion_core", label: "一句话概括素材的感觉", placeholder: "例：不是被磨平，是觉得自己根本不存在" },
+      { id: "hook_phrase", label: "最戳你的词 / 句", placeholder: "例：\"什么都不是\"" }
+    ],
+    mainLabel: "素材原文",
+    placeholder: "把原始素材粘贴到这里（情绪、观察、对话、金句都可以）..."
+  },
+  {
+    id: "diagnose", num: 2, title: "选题诊断",
+    skill: "eric-content", mode: "诊断模式",
+    desc: "从 Phase 1 的 5 个选题里挑 1 个，用 /eric-content 诊断：能不能写？痛不痛？值不值得写？",
+    tip: "一篇好选题 > 三篇烂选题。过不了诊断就换下一个，不要硬写。",
+    questions: [
+      { id: "chosen_topic", label: "挑中的选题（从 Phase 1 粘贴过来）", placeholder: "标题 + 钩子 + 读者画像" },
+      { id: "why_you", label: "为什么是你写这个？亲身经历/独特视角是什么？", placeholder: "例：我是 44 岁从大厂出来的，去年..." }
+    ],
+    mainLabel: "补充信息（可选）",
+    placeholder: "任何能支撑这个选题的素材、经历、数据、对话..."
+  },
+  {
+    id: "draft", num: 3, title: "写初稿",
+    skill: "eric-content", mode: "代写模式",
+    desc: "基于诊断通过的选题写初稿。图文 300-800 字，短视频 150-300 字。",
+    tip: "必须有 2-3 条原子库真金句做骨架，不能全靠 AI 生成。",
+    questions: [
+      { id: "format", label: "笔记形态", placeholder: "图文 / 图集 / 短视频" },
+      { id: "atoms_used", label: "用了哪几条原子？（从右下「原子库」搜出来粘过来）", placeholder: "原子库真金句 2-3 条" },
+      { id: "personal_story", label: "你亲身经历的故事 / 案例（真实细节）", placeholder: "具体时间、地点、人物、对话..." }
+    ],
+    mainLabel: "其他补充素材（可选）",
+    placeholder: "还有什么想加进去的..."
+  },
+  {
+    id: "title", num: 4, title: "标题",
+    skill: "eric-xhs-title",
+    desc: "用 75 个爆款公式生成 5 个备选标题，并解释为什么选这个公式。",
+    tip: "先有内容再起标题，不要先想标题再凑内容。",
+    questions: [
+      { id: "content_core", label: "这篇内容的核心观点是什么？（一句话）", placeholder: "..." },
+      { id: "trigger_preference", label: "想触发什么心理？（可选，AI 会自动选）", placeholder: "认知冲突 / 好奇 / 恐惧 / 身份代入 / 数字 / 结果承诺 ..." }
+    ],
+    mainLabel: "完整初稿",
+    placeholder: "粘贴 Phase 3 的完整初稿..."
+  },
+  {
+    id: "aicheck", num: 5, title: "AI 检测",
+    skill: "eric-ai-check",
+    desc: "扫描 22 个 AI 指纹。发布前最后一关。",
+    tip: "不是\"去 AI 味\"，是\"找到你自己的写法\"。",
+    questions: [],
+    mainLabel: "完整稿件（含标题）",
+    placeholder: "粘贴含标题的完整稿件..."
+  }
+];
+
+// --- State ---
+let currentPhase = 0;
+let phaseData = {};
+let atoms = [];
+
+PHASES.forEach(p => { phaseData[p.id] = { input: "", output: "", done: false, answers: {}, inputType: "" }; });
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem("eric-workflow-state");
+    if (saved) {
+      const s = JSON.parse(saved);
+      // Merge to ensure new phases exist with defaults
+      PHASES.forEach(p => {
+        const existing = (s.phaseData || {})[p.id] || {};
+        phaseData[p.id] = {
+          input: existing.input || "",
+          output: existing.output || "",
+          done: existing.done || false,
+          answers: existing.answers || {},
+          inputType: existing.inputType || ""
+        };
+      });
+      currentPhase = Math.min(s.currentPhase || 0, PHASES.length - 1);
+    }
+  } catch(e) {}
+}
+function saveState() {
+  localStorage.setItem("eric-workflow-state", JSON.stringify({ phaseData, currentPhase }));
+}
+
+// --- Phase-specific task & output format ---
+const PHASE_TASKS = {
+  "topic-gen": {
+    task: `把素材转成 5 个小红书选题。必须按三段链执行，不要跳步、不要瞎编：
+
+1. **原子库检索**：调用 Read/Grep 工具，从以下两个文件实际读取与素材主题/情绪/读者相关的原子：
+   - /Volumes/datacenter/ericworkspace/xhs/知识库/原子库/atoms.jsonl（4176 条上游原子）
+   - /Volumes/datacenter/ericworkspace/xhs/知识库/Eric原子库/atoms.jsonl（Eric 自己的原子）
+   挑 5-10 条最相关的原子，每条引用时带上 id。
+
+2. **75 公式匹配**：加载 /Volumes/datacenter/ericworkspace/xhs/skills/eric-xhs-title/SKILL.md，从 75 个公式（12 类心理触发器）里挑 5 个最匹配"素材情绪 + 目标读者"的公式编号。
+
+3. **内容原则过滤**：加载 /Volumes/datacenter/ericworkspace/xhs/skills/eric-content/SKILL.md，用它的 5 条核心原则检验每个选题。`,
+    output: `## 素材分类
+{一句话：这是什么类型的素材，适合什么内容方向}
+
+## 原子库检索结果
+列出挑中的 5-10 条原子（id + 原文），说明每条为什么相关。
+
+## 5 个选题（每个必须对应 1 个公式编号 + 至少 1 条原子）
+
+### 选题 ① 【公式 #{编号} · {公式名}】【心理触发：{类别}】
+- **3 个备选标题**（都必须符合公式结构）
+- **钩子句**（引用原子 id #{xxx}）
+- **目标读者共鸣点**
+- **笔记形态**：图文 / 图集 / 短视频
+- **过原则检验**：对照 eric-content 5 原则，哪条通过、哪条需要注意
+
+（② ③ ④ ⑤ 同结构）
+
+## 推荐
+5 个里面先写哪个？为什么？（基于爆款基因 + 你能写、不是我编）`
+  },
+  "diagnose": {
+    task: `用 eric-content 的诊断模式评估这个选题。严格按以下维度打分，每项给"通过 / 不通过 / 需调整"并说理由：
+
+1. 产品相关性：这个选题是否服务于"帮 40 岁的人找方向"这个产品？还是自嗨？
+2. 读者真实度：目标读者是真实的活人，还是编出来的？
+3. 痛点强度：读者看到会不会停下来？还是划过去？
+4. 亲历性：用户有亲身经历吗？还是在"演"？
+5. 变现链路：这篇内容最终怎么导向产品？`,
+    output: `## 选题诊断报告
+
+### 产品相关性：{通过/不通过/需调整}
+...
+
+### 读者真实度：...
+
+### 痛点强度：...
+
+### 亲历性：...
+
+### 变现链路：...
+
+## 总判断
+{通过 → 可以去 Phase 3 写}
+{不通过 → 具体换哪个方向}
+{需调整 → 具体改什么}
+
+## 明天第一件事
+{一个具体的可执行动作，不是"继续思考"}`
+  },
+  "draft": {
+    task: `用 eric-content 代写模式写小红书初稿。严格要求：
+
+1. **骨架必须是原子**：开头、中间高光、结尾至少各用 1 条用户提供的原子原文（不能改写破坏）
+2. **亲身经历具体化**：引用用户的真实故事时，要保留原始细节（时间/地点/人物对话）
+3. **符合形态限制**：图文 300-800 字；图集每张 100-150 字 × 5-9 张；短视频 150-300 字
+4. **过 eric-content 5 原则**：写完自己检查一遍
+
+不要加任何 AI 套话（"总而言之""希望对你有帮助"）`,
+    output: `## 初稿
+
+{完整正文}
+
+## 结构说明
+- 开头用了原子 #{id}：{原子原文}
+- 中间高光用了原子 #{id}：...
+- 结尾用了原子 #{id}：...
+- 亲身经历段：{引用了哪段}
+
+## 自检
+对照 eric-content 5 原则各打一次分。`
+  },
+  "title": {
+    task: `加载 /Volumes/datacenter/ericworkspace/xhs/skills/eric-xhs-title/SKILL.md 的完整 75 公式库，为这篇稿件生成 5 个备选标题。
+
+每个标题必须：
+- 对应 1 个具体公式编号
+- 标明心理触发类别（12 类之一）
+- 标明字符数（小红书标题建议 20 字内）`,
+    output: `## 5 个备选标题
+
+### 标题 ① 【公式 #{编号} · {公式名}】【{心理类别}】
+**{标题文本}** （{N} 字）
+- 为什么选这个公式：{理由}
+- 在这篇内容的什么位置它最有力
+
+（② ③ ④ ⑤ 同结构）
+
+## 推荐
+选 {编号}，因为 ...`
+  },
+  "aicheck": {
+    task: `加载 /Volumes/datacenter/ericworkspace/xhs/skills/eric-ai-check/SKILL.md，扫描稿件的 22 个 AI 指纹。`,
+    output: `## AI 指纹扫描报告
+
+### 命中的指纹（列出具体原文）
+1. {指纹名}：{原文} → {建议改法}
+2. ...
+
+### 风险评级
+{低 / 中 / 高}
+
+### 改后版本
+{给出一份改干净的完整版}`
+  }
+};
+
+// --- Build the XML prompt ---
+function buildPrompt(phase, input) {
+  let xml = "";
+
+  xml += `<role>你是 Eric 的小红书爆款笔记教练。本次任务阶段：Phase ${phase.num} - ${phase.title}${phase.mode ? " ("+phase.mode+")" : ""}</role>\n\n`;
+
+  xml += `<product>\n帮 40 岁的人用 6 个月找到一个值得投入 10 年的方向。\n产品 = 诊断框架（帮人搞清楚卡在哪里）+ 陪跑过程（帮人在执行中不放弃）。\n内容是产品的广告，不是独立存在的。\n</product>\n\n`;
+
+  // Input type
+  const typeEl = document.getElementById("inputType");
+  if (typeEl && typeEl.value) {
+    xml += `<input_type>${typeEl.value}</input_type>\n\n`;
+  }
+
+  // Guided question answers
+  if (phase.questions && phase.questions.length) {
+    phase.questions.forEach(q => {
+      const el = document.getElementById(`q_${q.id}`);
+      const v = (el?.value || "").trim();
+      if (v) xml += `<${q.id}>\n${v}\n</${q.id}>\n\n`;
+    });
+  }
+
+  // Previous context
+  let prev = "";
+  for (let i = 0; i < PHASES.indexOf(phase); i++) {
+    const p = PHASES[i];
+    const d = phaseData[p.id];
+    if (d.output) prev += `【Phase ${p.num} ${p.title} 输出】\n${d.output}\n\n`;
+  }
+  if (prev) xml += `<previous_phases>\n${prev.trim()}\n</previous_phases>\n\n`;
+
+  // Raw material
+  if (input) xml += `<raw_material>\n${input}\n</raw_material>\n\n`;
+
+  // Task & output format
+  const pt = PHASE_TASKS[phase.id];
+  if (pt) {
+    xml += `<task>\n${pt.task}\n</task>\n\n`;
+    xml += `<output_format>\n${pt.output}\n</output_format>\n`;
+  }
+
+  return xml;
+}
+
+function buildSkillCommand(phase, input) {
+  const prompt = buildPrompt(phase, input);
+  return `/${phase.skill}\n\n${prompt}`;
+}
+
+// --- Render ---
+function renderSidebar() {
+  document.getElementById("phaseList").innerHTML = PHASES.map((p, i) => {
+    const data = phaseData[p.id];
+    const cls = ["phase-item", i === currentPhase ? "active" : "", data.done ? "done" : ""].filter(Boolean).join(" ");
+    return `
+      <div class="${cls}" onclick="goPhase(${i})">
+        <div class="phase-num"><span>${p.num}</span></div>
+        <div class="phase-info">
+          <h3>${p.title}</h3>
+          <p>${p.desc.slice(0, 30)}...</p>
+          <span class="phase-skill-tag">/${p.skill}</span>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function renderMain() {
+  const phase = PHASES[currentPhase];
+  const data = phaseData[phase.id];
+  const phaseIdx = PHASES.indexOf(phase);
+
+  // Header
+  document.getElementById("phaseHeader").innerHTML = `
+    <h2>Phase ${phase.num}: ${phase.title}</h2>
+    <div class="desc">${phase.desc}</div>
+    <div class="tip">💡 ${phase.tip}</div>`;
+
+  let html = "";
+
+  // Previous phase context (collapsed)
+  if (phaseIdx > 0) {
+    const prevPhase = PHASES[phaseIdx - 1];
+    const prevData = phaseData[prevPhase.id];
+    if (prevData.output) {
+      const preview = prevData.output.length > 300 ? prevData.output.slice(0, 300) + "..." : prevData.output;
+      html += `<details class="prev-context"><summary>📋 上一步（${prevPhase.title}）的输出 — 会自动包含在 Prompt 中</summary><div>${esc(preview)}</div></details>`;
+    }
+  }
+
+  // Mode badge
+  if (phase.mode) {
+    html += `<div style="font-size:12px;color:var(--blue);background:var(--blue-dim);padding:6px 12px;border-radius:6px;display:inline-block;margin-bottom:12px">📌 ${phase.mode}</div>`;
+  }
+
+  const savedAnswers = data.answers || {};
+  const savedType = data.inputType || "";
+
+  // Input type selector (if phase has inputTypes)
+  if (phase.inputTypes && phase.inputTypes.length) {
+    html += `
+      <div class="input-section">
+        <label>第 1 步：我扔进来的是什么？</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
+          ${phase.inputTypes.map(t => `
+            <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px">
+              <input type="radio" name="inputType_radio" value="${esc(t.value)}" ${savedType===t.value?'checked':''} onchange="document.getElementById('inputType').value=this.value;phaseData[PHASES[currentPhase].id].inputType=this.value;saveState()">
+              ${t.label}
+            </label>`).join("")}
+        </div>
+        <input type="hidden" id="inputType" value="${esc(savedType)}">
+      </div>`;
+  }
+
+  // Guided questions
+  if (phase.questions && phase.questions.length) {
+    const stepNum = phase.inputTypes ? 2 : 1;
+    html += `
+      <div class="input-section">
+        <label>第 ${stepNum} 步：快速回答这些问题（帮 AI 更懂你）</label>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px">
+          ${phase.questions.map(q => `
+            <div>
+              <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">${esc(q.label)}</div>
+              <input id="q_${q.id}" type="text" value="${esc(savedAnswers[q.id] || "")}" placeholder="${esc(q.placeholder)}"
+                oninput="phaseData[PHASES[currentPhase].id].answers=phaseData[PHASES[currentPhase].id].answers||{};phaseData[PHASES[currentPhase].id].answers['${q.id}']=this.value;saveState()"
+                style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none" />
+            </div>`).join("")}
+        </div>
+      </div>`;
+  }
+
+  // Main input textarea
+  const mainStepNum = (phase.inputTypes ? 1 : 0) + (phase.questions && phase.questions.length ? 1 : 0) + 1;
+  html += `
+    <div class="input-section">
+      <label>第 ${mainStepNum} 步：${esc(phase.mainLabel || "输入内容")}</label>
+      <textarea id="phaseInput" placeholder="${esc(phase.placeholder)}">${esc(data.input)}</textarea>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="generatePrompt()">📋 生成 Prompt 并复制</button>
+        ${phase.optional ? '<button class="btn-skip" onclick="skipPhase()">跳过此步 →</button>' : ''}
+        <span class="status-text" id="statusText"></span>
+      </div>
+    </div>`;
+
+  // Step 2: Prompt preview (shown after clicking generate)
+  html += `<div id="promptPreview"></div>`;
+
+  // Paste result area (step number is dynamic based on above sections)
+  const pasteStepNum = mainStepNum + 2; // +1 for "copy to Claude Code" hidden step, +1 for this
+  html += `
+    <div class="input-section">
+      <label>第 ${pasteStepNum} 步：粘贴 Claude Code 的输出</label>
+      <textarea id="resultInput" placeholder="把 Claude Code 的回复粘贴到这里...">${esc(data.output)}</textarea>
+      <div class="btn-row">
+        <button class="btn-paste" onclick="saveResult()">💾 保存结果</button>
+        ${phaseIdx < PHASES.length - 1 ? '<button class="btn-secondary" onclick="saveAndNext()">保存并下一步 →</button>' : '<button class="btn-secondary" style="border-color:var(--green);color:var(--green)" onclick="saveResult();finishWorkflow()">保存并完成 ✅</button>'}
+      </div>
+    </div>`;
+
+  // Relay steps indicator
+  html += `
+    <div class="relay-steps">
+      <div class="relay-step ${!data.output ? 'active' : 'done'}">① 写输入</div>
+      <span class="relay-arrow">→</span>
+      <div class="relay-step">② 复制 Prompt → 粘贴到 Claude Code</div>
+      <span class="relay-arrow">→</span>
+      <div class="relay-step ${data.output ? 'done' : ''}">③ 粘贴结果回来</div>
+    </div>`;
+
+  document.getElementById("phaseBody").innerHTML = html;
+}
+
+// --- Actions ---
+function generatePrompt() {
+  const phase = PHASES[currentPhase];
+  const textarea = document.getElementById("phaseInput");
+  const input = textarea.value.trim();
+  if (!input) { document.getElementById("statusText").textContent = "请先输入内容"; return; }
+
+  phaseData[phase.id].input = input;
+  saveState();
+
+  const command = buildSkillCommand(phase, input);
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(command).then(() => {
+    showToast("✅ 已复制到剪贴板！去 Claude Code 粘贴吧");
+  });
+
+  // Show preview
+  const preview = document.getElementById("promptPreview");
+  preview.innerHTML = `
+    <div class="prompt-box">
+      <div class="prompt-box-header">
+        <span>第 2 步：以下内容已复制，粘贴到 Claude Code</span>
+        <button class="btn-secondary" style="padding:4px 10px;font-size:11px" onclick="navigator.clipboard.writeText(this.closest('.prompt-box').querySelector('pre').textContent);showToast('✅ 再次复制成功')">再次复制</button>
+      </div>
+      <pre>${esc(command)}</pre>
+      <div class="copy-hint">
+        💡 粘贴到 Claude Code 后，等它回复完，复制回复内容，粘贴到下面的「第 3 步」框里
+      </div>
+    </div>`;
+}
+
+function saveResult() {
+  const phase = PHASES[currentPhase];
+  const resultArea = document.getElementById("resultInput");
+  const result = resultArea.value.trim();
+  if (!result) { document.getElementById("statusText").textContent = "请先粘贴结果"; return; }
+
+  phaseData[phase.id].output = result;
+  phaseData[phase.id].done = true;
+  saveState();
+  renderSidebar();
+  showToast("✅ 结果已保存");
+}
+
+function saveAndNext() {
+  saveResult();
+  if (phaseData[PHASES[currentPhase].id].done) {
+    nextPhase();
+  }
+}
+
+function copyToolPrompt(skillName) {
+  const input = prompt(`输入要发送给 /${skillName} 的内容：`);
+  if (!input) return;
+
+  // Build context
+  let context = "";
+  PHASES.forEach(p => {
+    const d = phaseData[p.id];
+    if (d.output) context += `【Phase ${p.num} ${p.title}】\n${d.output}\n\n`;
+  });
+
+  const command = `/${skillName}\n\n${context ? "以下是工作流中已有的上下文：\n\n" + context + "---\n\n" : ""}${input}`;
+  navigator.clipboard.writeText(command).then(() => {
+    showToast(`✅ /${skillName} prompt 已复制，去 Claude Code 粘贴`);
+  });
+}
+
+// --- Navigation ---
+function goPhase(i) {
+  const textarea = document.getElementById("phaseInput");
+  if (textarea) { phaseData[PHASES[currentPhase].id].input = textarea.value; }
+  const resultArea = document.getElementById("resultInput");
+  if (resultArea && resultArea.value.trim()) { phaseData[PHASES[currentPhase].id].output = resultArea.value.trim(); }
+  saveState();
+  currentPhase = i;
+  saveState();
+  renderSidebar();
+  renderMain();
+}
+
+function nextPhase() { if (currentPhase < PHASES.length - 1) goPhase(currentPhase + 1); }
+function skipPhase() { phaseData[PHASES[currentPhase].id].done = true; saveState(); nextPhase(); }
+
+function finishWorkflow() {
+  showModal("🎉 工作流完成",
+    "所有阶段已完成！\n\n你可以：\n1. 复制最终稿件到小红书发布\n2. 点击左侧任意阶段回看或修改\n3. 点底部「💾 导出记录」保存本次完整创作过程\n4. 点左下角 /eric-atom 把好观点提炼成原子\n\n下次创作点「🔄 新建工作流」重新开始。");
+}
+
+function clearCurrentPhase() {
+  if (!confirm("确定清空本阶段的输入和输出？")) return;
+  phaseData[PHASES[currentPhase].id] = { input: "", output: "", done: false };
+  saveState(); renderMain(); renderSidebar();
+}
+
+function resetWorkflow() {
+  if (!confirm("确定新建工作流？当前所有阶段的数据会被清空。\n\n建议先「导出记录」保存。")) return;
+  PHASES.forEach(p => { phaseData[p.id] = { input: "", output: "", done: false }; });
+  currentPhase = 0;
+  saveState(); renderSidebar(); renderMain();
+}
+
+// --- Atoms ---
+async function loadAtoms() {
+  try {
+    const resp = await fetch("/api/atoms");
+    atoms = await resp.json();
+    document.getElementById("atomCount").textContent = `原子库: ${atoms.length} 条`;
+  } catch(e) {
+    document.getElementById("atomCount").textContent = "原子库: 加载失败";
+  }
+}
+function toggleAtoms() {
+  const d = document.getElementById("atomsDrawer");
+  d.classList.toggle("open");
+  if (d.classList.contains("open")) renderAtoms();
+}
+function renderAtoms() {
+  const query = (document.getElementById("atomSearch").value || "").trim().toLowerCase();
+  const source = document.getElementById("atomSourceFilter").value;
+  const MAX = 50;
+
+  let filtered = atoms.slice().reverse();
+
+  // 来源过滤
+  if (source !== "all") {
+    filtered = filtered.filter(a => a._source === source);
+  }
+
+  // 关键词搜索（匹配 knowledge、topics、type、id）
+  if (query) {
+    filtered = filtered.filter(a => {
+      const text = [a.knowledge, a.type, a.id, ...(a.topics || [])].join(" ").toLowerCase();
+      return query.split(/\s+/).every(w => text.includes(w));
+    });
+  }
+
+  const total = filtered.length;
+  const showing = filtered.slice(0, MAX);
+
+  document.getElementById("atomFilterInfo").textContent =
+    total > MAX ? `显示前 ${MAX} 条 / 共 ${total} 条匹配` : `共 ${total} 条匹配`;
+
+  document.getElementById("atomsBody").innerHTML = showing.map(a => {
+    const sourceLabel = a._source === "eric"
+      ? '<span style="color:var(--accent);font-size:9px;margin-left:4px">★ 我的</span>'
+      : '<span style="color:var(--text-dimmer);font-size:9px;margin-left:4px">上游</span>';
+    return `
+    <div class="atom-card" onclick="insertAtom(\`${esc(a.knowledge).replace(/`/g,'\\`')}\`)">
+      <div class="atom-id">${a.id} · ${a.date || ""} · ${a.type || ""}${sourceLabel}</div>
+      <div class="atom-knowledge">${esc(a.knowledge)}</div>
+      <div class="atom-tags">${(a.topics||[]).map(t=>`<span class="atom-tag">${t}</span>`).join("")}</div>
+    </div>`;
+  }).join("");
+}
+function insertAtom(text) {
+  const ta = document.getElementById("phaseInput");
+  if (ta) { ta.value += (ta.value ? "\n\n" : "") + "【原子】" + text; ta.focus(); }
+}
+
+// --- Export ---
+function exportSession() {
+  const lines = ["# Eric 内容生产记录", `导出时间: ${new Date().toLocaleString("zh-CN")}\n`];
+  PHASES.forEach(p => {
+    const d = phaseData[p.id];
+    if (d.input || d.output) {
+      lines.push(`## Phase ${p.num}: ${p.title} (/${p.skill})`);
+      if (d.input) lines.push(`### 输入\n${d.input}`);
+      if (d.output) lines.push(`### 输出\n${d.output}`);
+      lines.push("");
+    }
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = `workflow-${new Date().toISOString().slice(0,10)}.md`; a.click();
+}
+
+// --- UI helpers ---
+function esc(s) {
+  if (!s) return "";
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function showToast(msg) {
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2000);
+}
+function showModal(title, content) {
+  const o = document.createElement("div"); o.className = "modal-overlay";
+  o.innerHTML = `
+    <div class="modal">
+      <div class="modal-header"><h3>${title}</h3>
+        <button onclick="this.closest('.modal-overlay').remove()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:18px">✕</button>
+      </div>
+      <div class="modal-body"><div style="white-space:pre-wrap;line-height:1.8;font-size:14px">${esc(content)}</div></div>
+    </div>`;
+  o.addEventListener("click", e => { if (e.target === o) o.remove(); });
+  document.body.appendChild(o);
+}
+
+// --- Init ---
+loadState(); loadAtoms(); renderSidebar(); renderMain();
+
+// Auto-save on input
+document.addEventListener("input", e => {
+  if (e.target.id === "phaseInput") { phaseData[PHASES[currentPhase].id].input = e.target.value; saveState(); }
+});
+</script>
+</body>
+</html>
