@@ -99,14 +99,44 @@
       "skills": ["./skills/eric-atom"]
     },
     {
-      "name": "chatroom-austrian",
+      "name": "eric-chatroom-austrian",
       "description": "哈耶克 × 米塞斯 × Claude 三人对话。奥派经济学视角的多角色讨论。",
       "source": "./",
       "strict": false,
       "version": "1.0.0",
       "category": "thinking-tools",
       "keywords": ["austrian-economics", "hayek", "mises", "debate", "philosophy", "chinese"],
-      "skills": ["./skills/chatroom-austrian"]
+      "skills": ["./skills/eric-chatroom-austrian"]
+    },
+    {
+      "name": "eric-chatroom",
+      "description": "定向聊天室。根据话题推荐或指定专家，模拟多角色对话。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "thinking-tools",
+      "keywords": ["chatroom", "multi-agent", "debate", "experts", "chinese"],
+      "skills": ["./skills/eric-chatroom"]
+    },
+    {
+      "name": "eric-slowisfast",
+      "description": "慢就是快诊断。帮创业者找到看起来更慢但长期更快的方法，用摩擦建造资产。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "business-diagnostics",
+      "keywords": ["slow", "friction", "assets", "long-term", "chinese"],
+      "skills": ["./skills/eric-slowisfast"]
+    },
+    {
+      "name": "eric-agent-migration",
+      "description": "Agent 工作台迁移。把项目整理成 Claude Code / Codex 双端一致、可长期维护的 Agent 工作台。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "utilities",
+      "keywords": ["agent", "migration", "claude-code", "codex", "workspace", "chinese"],
+      "skills": ["./skills/eric-agent-migration"]
     },
     {
       "name": "eric-upgrade",
