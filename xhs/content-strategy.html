@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>小红书内容战略 · Eric</title>
+  <style>
+    :root {
+      --red: #ff2442;
+      --red-light: #fff0f2;
+      --red-mid: #ffccd4;
+      --gray-0: #fafafa;
+      --gray-1: #f4f4f5;
+      --gray-2: #e4e4e7;
+      --gray-3: #a1a1aa;
+      --gray-4: #52525b;
+      --gray-5: #18181b;
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+      --green: #16a34a;
+      --green-light: #f0fdf4;
+      --amber: #d97706;
+      --amber-light: #fffbeb;
+      --radius: 12px;
+      --shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.05);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+      background: var(--gray-0);
+      color: var(--gray-5);
+      line-height: 1.75;
+      font-size: 15px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #ff2442 0%, #ff6b6b 100%);
+      color: #fff;
+      padding: 48px 32px 40px;
+      text-align: center;
+    }
+    header .label {
+      display: inline-block;
+      background: rgba(255,255,255,.2);
+      border: 1px solid rgba(255,255,255,.4);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 12px;
+      letter-spacing: .08em;
+      margin-bottom: 16px;
+    }
+    header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    header p { opacity: .85; font-size: 14px; }
+    header .meta {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      font-size: 13px;
+      opacity: .8;
+    }
+
+    /* ── Layout ── */
+    main {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 32px 16px 64px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    /* ── Section card ── */
+    .card {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--gray-2);
+    }
+    .card-header .icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .card-header h2 { font-size: 16px; font-weight: 600; }
+    .card-header .sub { font-size: 12px; color: var(--gray-3); margin-top: 2px; }
+    .card-body { padding: 20px 24px; }
+
+    /* ── Persona ── */
+    .persona-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .persona-item {
+      background: var(--gray-1);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .persona-item .pi-label {
+      font-size: 11px;
+      color: var(--gray-3);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .persona-item .pi-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gray-5);
+      line-height: 1.5;
+    }
+    .persona-tagline {
+      margin-top: 16px;
+      padding: 14px 18px;
+      background: var(--red-light);
+      border-left: 3px solid var(--red);
+      border-radius: 0 8px 8px 0;
+      font-size: 14px;
+      color: var(--gray-5);
+    }
+    .persona-tagline strong { color: var(--red); }
+
+    /* ── Constraint notice ── */
+    .constraint {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      background: var(--amber-light);
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--amber);
+    }
+    .constraint .ci { flex-shrink: 0; margin-top: 1px; }
+
+    /* ── Pillars ── */
+    .pillars { display: flex; flex-direction: column; gap: 16px; }
+    .pillar {
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .pillar-1 { background: var(--accent-light); border: 1px solid #bfdbfe; }
+    .pillar-2 { background: var(--green-light); border: 1px solid #bbf7d0; }
+    .pillar-3 { background: var(--amber-light); border: 1px solid #fde68a; }
+    .pillar-head {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 10px;
+    }
+    .pillar-num {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .p1 .pillar-num { background: var(--accent); }
+    .p2 .pillar-num { background: var(--green); }
+    .p3 .pillar-num { background: var(--amber); }
+    .pillar-title { font-weight: 600; font-size: 15px; }
+    .pillar-sub { font-size: 12px; color: var(--gray-3); margin-left: 32px; margin-top: -6px; margin-bottom: 8px; }
+    .pillar-topics {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin-left: 32px;
+    }
+    .tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      background: rgba(255,255,255,.7);
+      color: var(--gray-4);
+    }
+
+    /* ── Funnel ── */
+    .funnel { display: flex; flex-direction: column; gap: 0; }
+    .funnel-row {
+      display: grid;
+      grid-template-columns: 120px 1fr auto;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 0;
+      border-bottom: 1px dashed var(--gray-2);
+    }
+    .funnel-row:last-child { border-bottom: none; }
+    .funnel-tier {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 8px;
+      border-radius: 8px;
+    }
+    .t-free { background: var(--gray-1); color: var(--gray-4); }
+    .t-low { background: #eff6ff; color: #1d4ed8; }
+    .t-mid { background: var(--green-light); color: #15803d; }
+    .t-high { background: var(--amber-light); color: #92400e; }
+    .t-vip { background: #fdf4ff; color: #7e22ce; }
+    .funnel-desc { font-size: 14px; color: var(--gray-5); }
+    .funnel-desc .fd-name { font-weight: 600; margin-bottom: 2px; }
+    .funnel-desc .fd-detail { font-size: 12px; color: var(--gray-3); }
+    .funnel-price {
+      text-align: right;
+      white-space: nowrap;
+    }
+    .funnel-price .fp-num { font-size: 16px; font-weight: 700; color: var(--gray-5); }
+    .funnel-price .fp-unit { font-size: 11px; color: var(--gray-3); }
+    .funnel-arrow {
+      text-align: center;
+      color: var(--gray-3);
+      font-size: 18px;
+      padding: 4px 0;
+    }
+
+    /* ── Rules table ── */
+    .rules { display: flex; flex-direction: column; gap: 10px; }
+    .rule-row {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: var(--gray-1);
+    }
+    .rule-icon { flex-shrink: 0; font-size: 16px; margin-top: 1px; }
+    .rule-body .rb-title { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+    .rule-body .rb-detail { font-size: 13px; color: var(--gray-4); }
+
+    /* ── Content calendar ── */
+    .calendar { display: flex; flex-direction: column; gap: 8px; }
+    .cal-row {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 12px;
+      align-items: start;
+      font-size: 13px;
+    }
+    .cal-day {
+      font-weight: 600;
+      color: var(--red);
+      padding-top: 2px;
+    }
+    .cal-content {
+      background: var(--gray-1);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--gray-5);
+    }
+    .cal-content .cc-type {
+      font-size: 11px;
+      color: var(--gray-3);
+      margin-top: 2px;
+    }
+
+    /* ── First post ── */
+    .post-preview {
+      background: var(--gray-1);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .post-preview .pp-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--gray-5);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+    .post-preview .pp-body {
+      font-size: 14px;
+      color: var(--gray-4);
+      line-height: 1.9;
+      white-space: pre-line;
+    }
+    .post-preview .pp-tags {
+      margin-top: 12px;
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .pp-tag {
+      font-size: 12px;
+      color: var(--red);
+      background: var(--red-light);
+      padding: 2px 10px;
+      border-radius: 20px;
+    }
+
+    /* ── Outreach message ── */
+    .message-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .message-box .mb-label {
+      font-size: 11px;
+      color: var(--green);
+      font-weight: 600;
+      letter-spacing: .06em;
+      margin-bottom: 10px;
+    }
+    .message-box .mb-body {
+      font-size: 14px;
+      color: var(--gray-5);
+      line-height: 1.9;
+      white-space: pre-line;
+    }
+
+    /* ── Checklist ── */
+    .checklist { display: flex; flex-direction: column; gap: 8px; }
+    .cl-item {
+      display: flex; gap: 10px; align-items: center;
+      font-size: 14px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--gray-1);
+    }
+    .cl-check {
+      width: 18px; height: 18px;
+      border-radius: 4px;
+      border: 2px solid var(--gray-2);
+      flex-shrink: 0;
+    }
+    .cl-text { color: var(--gray-4); }
+    .cl-phase {
+      font-size: 11px; color: var(--gray-3);
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--gray-2);
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 12px;
+      color: var(--gray-3);
+    }
+
+    @media (max-width: 600px) {
+      .persona-grid { grid-template-columns: 1fr; }
+      .funnel-row { grid-template-columns: 90px 1fr; }
+      .funnel-price { display: none; }
+      header h1 { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="label">小红书内容战略文档 · v1.0</div>
+  <h1>Eric 小红书从零起号战略</h1>
+  <p>前腾讯 × 移民海外 × AI 转型实践者</p>
+  <div class="meta">
+    <span>更新于 2026-05-25</span>
+    <span>·</span>
+    <span>保密，勿外传</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- 1. 人设定位 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#fff0f2; font-size:18px;">🎯</div>
+      <div>
+        <h2>人设定位</h2>
+        <div class="sub">一句话说清楚你是谁、凭什么、为谁说话</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="persona-grid">
+        <div class="persona-item">
+          <div class="pi-label">背景标签</div>
+          <div class="pi-value">前腾讯 · 现移居海外</div>
+        </div>
+        <div class="persona-item">
+          <div class="pi-label">转型标签</div>
+          <div class="pi-value">AI + 职业发展实践者</div>
+        </div>
+        <div class="persona-item">
+          <div class="pi-label">动力背景</div>
+          <div class="pi-value">培养大女儿冲体育全奖（高尔夫）</div>
+        </div>
+        <div class="persona-item">
+          <div class="pi-label">目标受众</div>
+          <div class="pi-value">30–45 岁 · 职业卡点 · 想用 AI 破局</div>
+        </div>
+      </div>
+      <div class="persona-tagline">
+        <strong>核心人设句：</strong>前腾讯，现在移居海外，用 AI 重建自己的职业系统——顺便记录下来，给同龄人看看可不可行。
+      </div>
+      <div class="constraint">
+        <span class="ci">⚠️</span>
+        <span><strong>硬性约束：</strong>所有内容只提「移居海外」，<u>不提离婚</u>。女儿全奖是动力背景，<u>不作为独立内容方向</u>，不单独开专栏。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 内容三大支柱 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#eff6ff; font-size:18px;">🏛️</div>
+      <div>
+        <h2>内容三大支柱</h2>
+        <div class="sub">所有笔记必须归属其中一个支柱，不发散</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="pillars">
+
+        <div class="pillar pillar-1 p1">
+          <div class="pillar-head">
+            <div class="pillar-num">1</div>
+            <div class="pillar-title">AI × 职场</div>
+          </div>
+          <div class="pillar-sub">用 AI 工具解决职场真实问题，每篇必须有可操作的具体方法</div>
+          <div class="pillar-topics">
+            <span class="tag">AI 写简历</span>
+            <span class="tag">AI 做面试准备</span>
+            <span class="tag">AI 提效工作流</span>
+            <span class="tag">AI 分析薪资谈判</span>
+            <span class="tag">Prompt 实战</span>
+            <span class="tag">Claude / GPT 使用技巧</span>
+          </div>
+        </div>
+
+        <div class="pillar pillar-2 p2">
+          <div class="pillar-head">
+            <div class="pillar-num">2</div>
+            <div class="pillar-title">海外视角 × 职场</div>
+          </div>
+          <div class="pillar-sub">用亲历对比打开认知落差，国内职场惯例 vs 海外真实运作方式</div>
+          <div class="pillar-topics">
+            <span class="tag">外企面试和国内的差异</span>
+            <span class="tag">海外薪资结构拆解</span>
+            <span class="tag">移居后职业重建路径</span>
+            <span class="tag">大厂经验如何迁移</span>
+            <span class="tag">海外 HR 看中国履历的视角</span>
+          </div>
+        </div>
+
+        <div class="pillar pillar-3 p3">
+          <div class="pillar-head">
+            <div class="pillar-num">3</div>
+            <div class="pillar-title">中年转型方法论</div>
+          </div>
+          <div class="pillar-sub">35+ 的人不缺经验，缺的是重新构建自己职业叙事的框架</div>
+          <div class="pillar-topics">
+            <span class="tag">如何把大厂经验变现</span>
+            <span class="tag">职业第二曲线怎么找</span>
+            <span class="tag">35 岁后还能做什么</span>
+            <span class="tag">从打工到卖知识的跨越</span>
+            <span class="tag">人生下半场资产化</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 变现漏斗 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#f0fdf4; font-size:18px;">💰</div>
+      <div>
+        <h2>变现漏斗与定价梯度</h2>
+        <div class="sub">每层之间 10x 定价，入口免费，顶端高净值</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="funnel">
+
+        <div class="funnel-row">
+          <div class="funnel-tier t-free">免费内容</div>
+          <div class="funnel-desc">
+            <div class="fd-name">小红书 / 公众号笔记</div>
+            <div class="fd-detail">三大支柱，每周 3–5 篇，建立信任和流量</div>
+          </div>
+          <div class="funnel-price">
+            <div class="fp-num">¥0</div>
+            <div class="fp-unit">引流</div>
+          </div>
+        </div>
+
+        <div class="funnel-arrow">↓</div>
+
+        <div class="funnel-row">
+          <div class="funnel-tier t-low">付费社群</div>
+          <div class="funnel-desc">
+            <div class="fd-name">AI + 职场实战社群</div>
+            <div class="fd-detail">月更工具清单 + 每周答疑 + 成员互助，微信群运营</div>
+          </div>
+          <div class="funnel-price">
+            <div class="fp-num">¥99</div>
+            <div class="fp-unit">/ 月</div>
+          </div>
+        </div>
+
+        <div class="funnel-arrow">↓</div>
+
+        <div class="funnel-row">
+          <div class="funnel-tier t-mid">训练营</div>
+          <div class="funnel-desc">
+            <div class="fd-name">AI 职场转型 21 天训练营</div>
+            <div class="fd-detail">结构化课程 + 作业批改 + 群内答疑 + 结业认证，每期 20–30 人</div>
+          </div>
+          <div class="funnel-price">
+            <div class="fp-num">¥999</div>
+            <div class="fp-unit">/ 期</div>
+          </div>
+        </div>
+
+        <div class="funnel-arrow">↓</div>
+
+        <div class="funnel-row">
+          <div class="funnel-tier t-high">私教</div>
+          <div class="funnel-desc">
+            <div class="fd-name">1 对 1 职业重建私教</div>
+            <div class="fd-detail">3 个月陪跑，专项 AI 工具配置 + 求职策略 + 简历修改，限 5 名</div>
+          </div>
+          <div class="funnel-price">
+            <div class="fp-num">¥9,900</div>
+            <div class="fp-unit">/ 3 个月</div>
+          </div>
+        </div>
+
+        <div class="funnel-arrow">↓</div>
+
+        <div class="funnel-row">
+          <div class="funnel-tier t-vip">顶端 VIP</div>
+          <div class="funnel-desc">
+            <div class="fd-name">高端顾问（长期合作）</div>
+            <div class="fd-detail">针对高管 / 创始人，AI 战略落地 + 职业战略规划，极少名额</div>
+          </div>
+          <div class="funnel-price">
+            <div class="fp-num">¥30,000+</div>
+            <div class="fp-unit">/ 项目</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 内容创作规则 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#fdf4ff; font-size:18px;">📐</div>
+      <div>
+        <h2>内容创作规则</h2>
+        <div class="sub">每篇发出去之前对照检查，不合格的不发</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="rules">
+        <div class="rule-row">
+          <div class="rule-icon">✅</div>
+          <div class="rule-body">
+            <div class="rb-title">先有产品后有内容</div>
+            <div class="rb-detail">发第一篇笔记之前，付款链接要先能跑通。哪怕第一个产品只是 ¥99 的社群。</div>
+          </div>
+        </div>
+        <div class="rule-row">
+          <div class="rule-icon">✅</div>
+          <div class="rule-body">
+            <div class="rb-title">每篇有一个具体可操作的行动</div>
+            <div class="rb-detail">不发"思考感悟"类内容。每篇笔记结尾必须有一个读者今天就能做的事。</div>
+          </div>
+        </div>
+        <div class="rule-row">
+          <div class="rule-icon">✅</div>
+          <div class="rule-body">
+            <div class="rb-title">转型要和 AI 挂钩</div>
+            <div class="rb-detail">移居海外、大厂经验、中年转型——这些故事必须和 AI 工具使用绑定，单独发没有记忆点。</div>
+          </div>
+        </div>
+        <div class="rule-row">
+          <div class="rule-icon">✅</div>
+          <div class="rule-body">
+            <div class="rb-title">文字洁癖：不要 AI 味</div>
+            <div class="rb-detail">禁用："真相是…""请你记住…""深度解析""全方位""赋能"。口语化，第一人称，有具体细节。</div>
+          </div>
+        </div>
+        <div class="rule-row">
+          <div class="rule-icon">❌</div>
+          <div class="rule-body">
+            <div class="rb-title">不提离婚，不发情绪帖</div>
+            <div class="rb-detail">只说移居海外。女儿培养只在"关于我"里提一次，不单独发内容。</div>
+          </div>
+        </div>
+        <div class="rule-row">
+          <div class="rule-icon">❌</div>
+          <div class="rule-body">
+            <div class="rb-title">不发"我觉得 AI 很重要"这类废话</div>
+            <div class="rb-detail">AI 工具必须给出截图或具体操作步骤，不能只是概念讨论。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 起号前 30 天发布节奏 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#fff7ed; font-size:18px;">📅</div>
+      <div>
+        <h2>起号前 30 天节奏</h2>
+        <div class="sub">第 1 周打基础，第 2–4 周跑量，找到爆款类型</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="calendar">
+        <div class="cal-row">
+          <div class="cal-day">第 1 周</div>
+          <div class="cal-content">
+            名片帖（人设定位）+ 产品上线（付费社群开放报名）
+            <div class="cc-type">目标：账号基础 + 变现链路跑通</div>
+          </div>
+        </div>
+        <div class="cal-row">
+          <div class="cal-day">第 2 周</div>
+          <div class="cal-content">
+            支柱 1（AI×职场）× 2 篇 + 支柱 2（海外视角）× 1 篇
+            <div class="cc-type">目标：确认哪个方向点赞 / 收藏率最高</div>
+          </div>
+        </div>
+        <div class="cal-row">
+          <div class="cal-day">第 3 周</div>
+          <div class="cal-content">
+            集中发表现最好的支柱方向 × 3 篇，开始私信老学员
+            <div class="cc-type">目标：首批付费社群成员 10 人</div>
+          </div>
+        </div>
+        <div class="cal-row">
+          <div class="cal-day">第 4 周</div>
+          <div class="cal-content">
+            复盘数据 + 支柱 3（中年转型）× 2 篇 + 训练营预告帖
+            <div class="cc-type">目标：确认训练营是否有人感兴趣，收集需求</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. 名片帖草稿 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#fff0f2; font-size:18px;">📌</div>
+      <div>
+        <h2>名片帖草稿</h2>
+        <div class="sub">第一篇必须发，定义"你是谁"——待优化后正式发出</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="post-preview">
+        <div class="pp-title">前腾讯产品人，移居海外第一年，我是怎么用 AI 重建自己的</div>
+        <div class="pp-body">在腾讯待了好几年，今年搬到了海外。
+
+换了环境，才发现原来的职业经验没法直接用——语言、文化、HR 的评判标准全不一样。
+
+与其焦虑，不如想清楚：我真正带走了什么？
+
+花了三个月，用 AI 系统梳理了一遍自己：
+- 把过去的项目拆成可迁移的能力模块
+- 用 Claude 帮我重写了面向海外市场的简历逻辑
+- 找了 20 个类似背景的人做了信息访谈
+
+现在开始在这里记录——给同样在想「35 岁之后还能做什么」的人。
+
+不会写大道理，只写我自己试过的方法。
+
+如果你也在想「大厂经验要怎么变现」「AI 到底能帮职场做什么」——关注我，一起研究。</div>
+        <div class="pp-tags">
+          <span class="pp-tag">#AI职场</span>
+          <span class="pp-tag">#海外求职</span>
+          <span class="pp-tag">#35岁职场</span>
+          <span class="pp-tag">#中年转型</span>
+          <span class="pp-tag">#大厂出来后</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. 唤醒老学员消息 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#f0fdf4; font-size:18px;">💬</div>
+      <div>
+        <h2>唤醒老学员的第一条消息</h2>
+        <div class="sub">发给之前辅导过的学员，私信 / 微信均可用</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="message-box">
+        <div class="mb-label">发送版本 A（适合相对熟悉的学员）</div>
+        <div class="mb-body">嗨 [名字]，好久不见。
+
+最近搬到海外了，重新整理了一遍自己这几年做职业辅导的经验，发现有几个方法用 AI 工具重新跑了一遍，效果比之前好很多。
+
+现在开始在小红书上写这方面的内容，主要是「AI 怎么用在简历、面试、谈薪上」。
+
+你还在做 [上次辅导时的方向] 相关的事吗？有没有新的卡点，我可以帮你看看。</div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="message-box" style="background:#eff6ff; border-color:#bfdbfe;">
+          <div class="mb-label" style="color:#1d4ed8;">发送版本 B（适合不太熟悉的学员）</div>
+          <div class="mb-body">你好，我是之前帮你做过 [面试辅导/简历/职业规划] 的 Eric。
+
+这段时间自己做了一些转变，搬到海外，也在系统研究怎么把 AI 工具用在职业发展上——简历、面试准备、谈薪，都有一些新的方法。
+
+在小红书开始记录这些内容，如果你现在还在职业上有困惑，欢迎看看。
+
+也可以直接告诉我你现在的情况，我帮你看看能做什么。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. 90 天执行清单 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#f5f3ff; font-size:18px;">✅</div>
+      <div>
+        <h2>90 天执行清单</h2>
+        <div class="sub">按顺序执行，每完成一项打勾</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="checklist">
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-text">注册 / 整理小红书账号，填写简介（含「前腾讯」「海外」「AI 职场」关键词）</div>
+          <div class="cl-phase">第 1 天</div>
+        </div>
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-text">建好付款链接（社群 ¥99/月），哪怕是知识星球或微信收款码</div>
+          <div class="cl-phase">第 1–3 天</div>
+        </div>
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-text">发出名片帖（使用上方草稿，改成自己的语气）</div>
+          <div class="cl-phase">第 3–5 天</div>
+        </div>
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-text">发出老学员唤醒消息，至少联系 20 人</div>
+          <div class="cl-phase">第 1 周</div>
+        </div>
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-text">发出第一篇 AI 工具类笔记（含截图 / 操作步骤）</div>
+          <div class="cl-phase">第 1 周</div>
+        </div>
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-text">发出第一篇海外视角笔记（对比国内外某一职场做法）</div>
+          <div class="cl-phase">第 2 周</div>
+        </div>
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-text">收到前 3 个付费社群成员，开群</div>
+          <div class="cl-phase">第 2–3 周</div>
+        </div>
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-text">第 30 天复盘：哪个支柱数据最好，下一个月集中做这个方向</div>
+          <div class="cl-phase">第 30 天</div>
+        </div>
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-text">首期训练营招募帖（人数够了再开，不够不开）</div>
+          <div class="cl-phase">第 45–60 天</div>
+        </div>
+        <div class="cl-item">
+          <div class="cl-check"></div>
+          <div class="cl-text">第 90 天复盘：变现漏斗哪层转化最差，修一层</div>
+          <div class="cl-phase">第 90 天</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Eric 小红书内容战略 · 基于 dontbesilent 商业诊断框架 · 2026-05-25
+</footer>
+
+</body>
+</html>
