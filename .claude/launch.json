@@ -8,6 +8,14 @@
       "port": 3210,
       "autoPort": false,
       "cwd": "workflow"
+    },
+    {
+      "name": "xhs-static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8810"],
+      "port": 8810,
+      "autoPort": false,
+      "cwd": "xhs"
     }
   ]
 }
