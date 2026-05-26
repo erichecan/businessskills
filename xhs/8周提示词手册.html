@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>8周职业方向测试 — 提示词完整手册</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f8f7f4;
+    --surface: #ffffff;
+    --border: #e8e4dc;
+    --text-primary: #1a1814;
+    --text-secondary: #6b6560;
+    --text-muted: #9d9891;
+    --accent: #2d5a3d;
+    --accent-light: #edf4ef;
+    --week-w: 260px;
+    --green: #2d7a44;
+    --green-bg: #edf7f0;
+    --yellow: #b45309;
+    --yellow-bg: #fffbeb;
+    --red: #b91c1c;
+    --red-bg: #fef2f2;
+    --radius: 10px;
+    --shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+
+  body {
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.7;
+    display: flex;
+  }
+
+  /* ─── Sidebar ─── */
+  aside {
+    width: var(--week-w);
+    min-height: 100vh;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    flex-shrink: 0;
+    padding: 28px 0 40px;
+  }
+
+  .sidebar-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0 22px 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 22px;
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 13.5px;
+    border-left: 3px solid transparent;
+    transition: all .15s;
+  }
+  .nav-item:hover { background: var(--bg); color: var(--text-primary); }
+  .nav-item.active { border-left-color: var(--accent); background: var(--accent-light); color: var(--accent); font-weight: 600; }
+
+  .nav-week-num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--bg);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: all .15s;
+  }
+  .nav-item.active .nav-week-num { background: var(--accent); color: #fff; }
+
+  .sat-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  .sat-green { background: var(--green); }
+  .sat-yellow { background: var(--yellow); }
+
+  /* ─── Main ─── */
+  main {
+    flex: 1;
+    min-width: 0;
+    padding: 40px 48px 80px;
+    max-width: 900px;
+  }
+
+  /* ─── Header ─── */
+  .page-header { margin-bottom: 44px; }
+  .page-header h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 8px; }
+  .page-header p { color: var(--text-secondary); font-size: 14.5px; max-width: 560px; }
+
+  /* ─── Overview table ─── */
+  .overview { margin-bottom: 56px; }
+  .overview h2 { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 14px; }
+  .ov-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .ov-table th { text-align: left; padding: 8px 12px; background: var(--bg); color: var(--text-muted); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--border); }
+  .ov-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .ov-table tr:last-child td { border-bottom: none; }
+  .ov-table tr:hover td { background: var(--bg); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-green { background: var(--green-bg); color: var(--green); }
+  .badge-yellow { background: var(--yellow-bg); color: var(--yellow); }
+  .badge-red { background: var(--red-bg); color: var(--red); }
+
+  /* ─── Week sections ─── */
+  .week-section { margin-bottom: 64px; scroll-margin-top: 24px; }
+
+  .week-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .week-number {
+    font-size: 11px; font-weight: 800; letter-spacing: .1em;
+    color: var(--text-muted); text-transform: uppercase;
+    padding-top: 3px;
+    min-width: 52px;
+  }
+  .week-header-text { flex: 1; }
+  .week-title { font-size: 20px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; }
+  .week-subtitle { font-size: 13.5px; color: var(--text-secondary); }
+  .week-badge { margin-left: auto; flex-shrink: 0; padding-top: 3px; }
+
+  /* ─── Meta pills ─── */
+  .week-meta { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .meta-pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .meta-pill strong { color: var(--text-primary); }
+
+  /* ─── Theory box ─── */
+  .theory-box {
+    background: var(--accent-light);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    color: #2a4a35;
+  }
+  .theory-box strong { display: block; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+
+  /* ─── Prompt block ─── */
+  .prompt-block { margin-bottom: 24px; }
+  .prompt-label {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .prompt-label span { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+
+  .copy-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+  }
+  .copy-btn:hover { background: var(--bg); color: var(--text-primary); border-color: #c8c4bc; }
+  .copy-btn.copied { background: var(--green-bg); color: var(--green); border-color: var(--green); }
+
+  .prompt-pre {
+    background: #1e1e1e;
+    color: #d4d0c8;
+    padding: 22px 24px;
+    border-radius: var(--radius);
+    font-family: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, monospace;
+    font-size: 12.5px;
+    line-height: 1.75;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: var(--shadow);
+  }
+
+  /* ─── Usage notes ─── */
+  .usage-note {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    font-size: 13.5px;
+    margin-bottom: 12px;
+  }
+  .usage-note h4 { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+  .usage-note p { color: var(--text-secondary); }
+  .usage-note p + p { margin-top: 6px; }
+
+  .usage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+
+  /* ─── Divider ─── */
+  .section-divider { border: none; border-top: 1px solid var(--border); margin: 56px 0; }
+
+  /* ─── Scrollbar ─── */
+  aside::-webkit-scrollbar { width: 4px; }
+  aside::-webkit-scrollbar-track { background: transparent; }
+  aside::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  @media (max-width: 800px) {
+    aside { display: none; }
+    main { padding: 24px 20px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─────────────── SIDEBAR ─────────────── -->
+<aside>
+  <div class="sidebar-title">8 周提示词手册</div>
+  <a class="nav-item active" href="#overview">
+    <span class="nav-week-num">≡</span>
+    总览
+  </a>
+  <a class="nav-item" href="#week1">
+    <span class="nav-week-num">1</span>
+    可得性启发 × 能力盘点
+    <span class="sat-dot sat-green"></span>
+  </a>
+  <a class="nav-item" href="#week2">
+    <span class="nav-week-num">2</span>
+    禀赋效应 × 方向候选
+    <span class="sat-dot sat-green"></span>
+  </a>
+  <a class="nav-item" href="#week3">
+    <span class="nav-week-num">3</span>
+    过度自信偏差 × 方向打分
+    <span class="sat-dot sat-green"></span>
+  </a>
+  <a class="nav-item" href="#week4">
+    <span class="nav-week-num">4</span>
+    默认选项偏见 × 最小验证
+    <span class="sat-dot sat-green"></span>
+  </a>
+  <a class="nav-item" href="#week5">
+    <span class="nav-week-num">5</span>
+    认知带宽 × 做出验证物
+    <span class="sat-dot sat-yellow"></span>
+  </a>
+  <a class="nav-item" href="#week6">
+    <span class="nav-week-num">6</span>
+    现状偏见 × 发出去
+    <span class="sat-dot sat-yellow"></span>
+  </a>
+  <a class="nav-item" href="#week7">
+    <span class="nav-week-num">7</span>
+    峰终定律 × 读反馈
+    <span class="sat-dot sat-yellow"></span>
+  </a>
+  <a class="nav-item" href="#week8">
+    <span class="nav-week-num">8</span>
+    前景理论 × 复盘
+    <span class="sat-dot sat-yellow"></span>
+  </a>
+</aside>
+
+<!-- ─────────────── MAIN ─────────────── -->
+<main>
+
+  <!-- Header -->
+  <div class="page-header">
+    <h1>8周职业方向测试 — 提示词完整手册</h1>
+    <p>每周一个行为经济学理论，解释为什么这一步会卡住；配套一个 Claude 提示词，给出破解路径。面向有 10 年以上经验、在职业方向上卡住的 40 岁职场人。</p>
+  </div>
+
+  <!-- Overview -->
+  <div class="overview" id="overview">
+    <h2>8 周骨架总览</h2>
+    <table class="ov-table">
+      <thead>
+        <tr>
+          <th>周</th>
+          <th>主题</th>
+          <th>理论</th>
+          <th>饱和度</th>
+          <th>核心问题</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>第 1 周</td>
+          <td>能力盘点</td>
+          <td>可得性启发</td>
+          <td><span class="badge badge-green">小众</span></td>
+          <td>大脑只看得见职位名称，底层能力反而是盲点</td>
+        </tr>
+        <tr>
+          <td>第 2 周</td>
+          <td>方向候选</td>
+          <td>禀赋效应</td>
+          <td><span class="badge badge-green">小众</span></td>
+          <td>高估现有路径，候选方向总是现职的变体</td>
+        </tr>
+        <tr>
+          <td>第 3 周</td>
+          <td>方向打分</td>
+          <td>过度自信偏差</td>
+          <td><span class="badge badge-green">小众</span></td>
+          <td>以为凭直觉就知道哪个方向好，其实不知道</td>
+        </tr>
+        <tr>
+          <td>第 4 周</td>
+          <td>最小验证设计</td>
+          <td>默认选项偏见</td>
+          <td><span class="badge badge-green">小众</span></td>
+          <td>「再等等看」永远是最省力的默认选项</td>
+        </tr>
+        <tr>
+          <td>第 5 周</td>
+          <td>做出验证物</td>
+          <td>认知带宽</td>
+          <td><span class="badge badge-yellow">有竞争</span></td>
+          <td>有了方向，带宽释放，现在才真的能做东西</td>
+        </tr>
+        <tr>
+          <td>第 6 周</td>
+          <td>发出去</td>
+          <td>现状偏见</td>
+          <td><span class="badge badge-yellow">有竞争</span></td>
+          <td>发出去是全程阻力最强的一步</td>
+        </tr>
+        <tr>
+          <td>第 7 周</td>
+          <td>读反馈</td>
+          <td>峰终定律</td>
+          <td><span class="badge badge-yellow">有竞争</span></td>
+          <td>对反馈的判断被最强一条和最后一条绑架</td>
+        </tr>
+        <tr>
+          <td>第 8 周</td>
+          <td>复盘</td>
+          <td>前景理论</td>
+          <td><span class="badge badge-yellow">有竞争</span></td>
+          <td>把「方向没测通」误解为失败，损失感知是收益的 2 倍</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════
+       WEEK 1
+  ══════════════════════════════════════ -->
+  <div class="week-section" id="week1">
+    <div class="week-header">
+      <div class="week-number">Week 01</div>
+      <div class="week-header-text">
+        <div class="week-title">可得性启发 × 能力盘点</div>
+        <div class="week-subtitle">大脑优先提取「职位名称」，真正的可迁移能力反而看不见</div>
+      </div>
+      <div class="week-badge"><span class="badge badge-green">小众词</span></div>
+    </div>
+
+    <div class="week-meta">
+      <div class="meta-pill">输入 <strong>工作经历（口语流水账即可）</strong></div>
+      <div class="meta-pill">输出 <strong>10 条可迁移能力</strong></div>
+      <div class="meta-pill">工具 <strong>Claude</strong></div>
+      <div class="meta-pill">预计时长 <strong>30 分钟</strong></div>
+    </div>
+
+    <div class="theory-box">
+      <strong>为什么这一步会卡住</strong>
+      可得性启发（Availability Heuristic）：大脑评估事物时，优先提取「容易想到的信息」。你的职位名称、最近几年的项目，比隐性能力更容易被提取，所以你会把「我是产品经理」当成能力描述，而看不见背后「在信息不全时做出可行决策」这类真正可迁移的东西。
+    </div>
+
+    <div class="prompt-block">
+      <div class="prompt-label">
+        <span>提示词</span>
+        <button class="copy-btn" onclick="copyPrompt(this, 'prompt1')">复制</button>
+      </div>
+      <pre class="prompt-pre" id="prompt1">你是一位职业诊断顾问，专门帮助有10年以上经验的职场人发现自己"看不见"的可迁移能力。
+
+【你的任务】
+根据我提供的工作经历，提取10条可迁移能力。
+
+【重要规则——必须严格遵守】
+1. 禁止用职位名称作为能力名称（不能写"产品管理能力"、"运营能力"这类废话）
+2. 禁止只看近5年，要扫描全部经历，越早期的经历越可能藏着被遗忘的能力
+3. 重点挖掘用户自己觉得"这没什么，人人都会"的事——那往往是最值钱的能力
+4. 每条能力必须能迁移到至少2个不同行业，否则不算可迁移
+5. 找出用户反复做同一类事情的模式，那个模式背后的能力比单次经历更重要
+
+【输出格式】
+对每条能力，输出：
+
+**能力名称**（3-5个字，具体，不用行话）
+- 你做了什么：（从经历里找到的具体证据，1句话）
+- 为什么你没意识到这是能力：（你觉得理所当然的原因）
+- 可以迁移到哪里：（列2个完全不同的方向）
+
+【我的工作经历】
+（把你的经历粘贴在这里，不需要格式工整，流水账也行）</pre>
+    </div>
+
+    <div class="usage-grid">
+      <div class="usage-note">
+        <h4>用法</h4>
+        <p>把工作经历（口语流水账即可）粘贴到最后一栏，直接发给 Claude。不需要格式化简历，越口语越好。</p>
+      </div>
+      <div class="usage-note">
+        <h4>验证标准</h4>
+        <p>检查输出里有没有让你看了之后说「这个我从没想过是能力」的条目——那才是真正绕过了可得性启发。如果全是你早就知道的，规则需要调强。</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════
+       WEEK 2
+  ══════════════════════════════════════ -->
+  <div class="week-section" id="week2">
+    <div class="week-header">
+      <div class="week-number">Week 02</div>
+      <div class="week-header-text">
+        <div class="week-title">禀赋效应 × 方向候选</div>
+        <div class="week-subtitle">大脑高估现有路径的价值，候选方向总是现职的变体</div>
+      </div>
+      <div class="week-badge"><span class="badge badge-green">小众词</span></div>
+    </div>
+
+    <div class="week-meta">
+      <div class="meta-pill">输入 <strong>第 1 周的 10 条可迁移能力</strong></div>
+      <div class="meta-pill">输出 <strong>10-12 个方向候选（3 组）</strong></div>
+      <div class="meta-pill">工具 <strong>Claude</strong></div>
+      <div class="meta-pill">预计时长 <strong>20 分钟</strong></div>
+    </div>
+
+    <div class="theory-box">
+      <strong>为什么这一步会卡住</strong>
+      禀赋效应（Endowment Effect）：人会本能地高估自己已经拥有的东西的价值。你的当前职业路径、行业人脉、职位头衔，都会因为「是我的」而被高估。所以你自己想出来的备选方向，几乎必然全是现职的小变体——换行业但职能不变，或者换公司但角色相同。
+    </div>
+
+    <div class="prompt-block">
+      <div class="prompt-label">
+        <span>提示词</span>
+        <button class="copy-btn" onclick="copyPrompt(this, 'prompt2')">复制</button>
+      </div>
+      <pre class="prompt-pre" id="prompt2">你是一位职业方向顾问，专门帮助有10年以上经验的职场人发现「直觉想不到」的转型方向。
+
+【背景说明】
+人类大脑有一个叫「禀赋效应」的认知偏见：你会本能地高估自己已有的东西（包括当前职业路径）的价值，导致你生成的备选方向永远是现职的小变体。
+我的任务是帮你绕过这个偏见。
+
+【你的任务】
+根据我提供的「可迁移能力清单」，生成10-12个方向候选。
+
+【重要规则——必须严格遵守】
+1. 禁止生成现有职位名称的变体（不能写"高级XX经理"、"XX行业转型"、"XX顾问/咨询"这类换皮方向）
+2. 必须有至少3个方向完全跨行业——能力可以迁移，但目标领域要和当前行业完全不同
+3. 必须有至少2个方向是「个人品牌/内容/教学」相关——这类方向最能复用经验积累
+4. 禁止生成需要从零学习新专业技能才能进入的方向（比如「转行做程序员」）
+5. 每个方向必须说清楚：用到了清单里的哪1-2条能力，而不是泛泛说「综合能力」
+
+【输出格式】
+把10-12个方向分成3组：
+
+**A组：能力迁移型**（用现有能力，进入完全不同的行业/场景）
+**B组：内容/教学/品牌型**（把经验变成可传播的内容或课程）
+**C组：撬动型**（用1-2条核心能力做杠杆，撬动更大影响力或收入）
+
+每个方向输出：
+**方向名称**（5-10个字，说清楚「做什么」，不是职位名称）
+- 用到的能力：（引用第1周清单里的具体能力名称，1-2条）
+- 为什么禀赋效应让你想不到它：（一句话，说明这个方向和你直觉的距离）
+- 最小验证动作：（不需要辞职，你现在就能做的最小测试是什么）
+
+【我的可迁移能力清单】
+（把第1周 Claude 输出的10条能力粘贴在这里）
+
+【我当前的职业背景】（一句话即可）
+（例：在互联网公司做了8年产品经理，现在是产品总监）</pre>
+    </div>
+
+    <div class="usage-grid">
+      <div class="usage-note">
+        <h4>用法</h4>
+        <p>把第 1 周输出的 10 条能力直接粘贴进去，不需要额外整理。A/B/C 三组的方向就是第 3 周打分卡的全部原料。</p>
+      </div>
+      <div class="usage-note">
+        <h4>验证标准</h4>
+        <p>检查 A 组里有没有让你「皱眉头但仔细想觉得有道理」的方向——那才是真正绕过了禀赋效应。如果全都是「我早就想到了」，规则 2 和 3 需要调更激进。</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════
+       WEEK 3
+  ══════════════════════════════════════ -->
+  <div class="week-section" id="week3">
+    <div class="week-header">
+      <div class="week-number">Week 03</div>
+      <div class="week-header-text">
+        <div class="week-title">过度自信偏差 × 方向打分</div>
+        <div class="week-subtitle">以为凭直觉就知道哪个方向最好，其实判断完全没有数据支撑</div>
+      </div>
+      <div class="week-badge"><span class="badge badge-green">小众词</span></div>
+    </div>
+
+    <div class="week-meta">
+      <div class="meta-pill">输入 <strong>第 2 周的 10-12 个方向候选</strong></div>
+      <div class="meta-pill">输出 <strong>打分排名 + 推荐测试方向</strong></div>
+      <div class="meta-pill">工具 <strong>打分卡模板 + Claude</strong></div>
+      <div class="meta-pill">预计时长 <strong>40 分钟</strong></div>
+    </div>
+
+    <div class="theory-box">
+      <strong>为什么这一步会卡住</strong>
+      过度自信偏差（Overconfidence Bias）：研究显示，人对自己判断准确性的评估，系统性地高出真实水平约 40%。「我感觉做 X 方向更适合我」这个判断，很可能只是「X 方向让我感觉舒适」的变体——这是直觉，不是数据。打分卡强迫你把直觉转换成可比较的数字，暴露出判断里真正的盲点。
+    </div>
+
+    <div class="prompt-block">
+      <div class="prompt-label">
+        <span>提示词（含打分卡）</span>
+        <button class="copy-btn" onclick="copyPrompt(this, 'prompt3')">复制</button>
+      </div>
+      <pre class="prompt-pre" id="prompt3">你是一位职业评估顾问，专门帮助职场人用数据代替直觉做职业方向决策。
+
+【背景说明】
+人类有一种叫「过度自信偏差」的认知错误：你以为自己知道哪个方向最适合自己，但这个判断几乎全来自直觉，而不是数据。研究表明，人对自己判断的准确性系统性地高估约40%。
+我的任务是用打分卡强制你把直觉转化成可比较的数字。
+
+【你的任务】
+用6个维度，对我提供的方向候选逐一打分，最终输出排名。
+
+【6个打分维度】（每项1-5分）
+
+维度1：市场需求真实性（有人愿意付钱吗？）
+1分：我猜应该有需求，但没有任何证据
+3分：我见过有人在做，但不知道他们赚多少
+5分：我知道具体的付费场景和大概的价格区间
+
+维度2：可迁移能力覆盖度（我第1周挖出的能力，能撑起这个方向吗？）
+1分：需要从零学新技能才能入场
+3分：现有能力能覆盖50%，其余需要补
+5分：现有能力直接可用，不需要大幅补课
+
+维度3：最小测试门槛（不辞职，我能不能先试试？）
+1分：必须全职投入才能验证
+3分：兼职可以，但需要3个月以上才有信号
+5分：两周内能做出一个可发出去的东西
+
+维度4：变现路径清晰度（我大概知道怎么赚到第一笔钱）
+1分：完全不知道第一笔钱从哪里来
+3分：有想法但没验证过
+5分：知道具体的客户类型和大概的收费方式
+
+维度5：持续意愿（做这件事，我能做5年不厌倦吗？）
+1分：感觉是「应该做」，不是「想做」
+3分：感兴趣，但只要有钱就行，内容本身不重要
+5分：即使没人付钱，我也会做这件事
+
+维度6：抗风险性（如果主业受影响，这个方向能独立撑起来吗？）
+1分：强依赖现有人脉/职位，离职就归零
+3分：部分可以独立运作
+5分：完全不依赖现有职位，可以独立生存
+
+【重要规则】
+1. 必须逐一给每个方向打完所有6个维度，不允许跳过
+2. 打分必须有1句话理由，不允许只写数字
+3. 禁止在打分时把「我喜不喜欢」额外计入——喜好已经在维度5里，不要重复计入其他维度
+4. 打完后，把总分相近的方向放在一起对比，并特别标出「分数不高但直觉强烈想做」的方向——那是需要单独讨论的信号
+
+【输出格式】
+对每个方向输出评分表：
+**方向名称**
+| 维度 | 分数 | 打分理由（1句话）|
+|------|------|--------------|
+| 市场需求 | X/5 | ... |
+| 能力覆盖 | X/5 | ... |
+| 测试门槛 | X/5 | ... |
+| 变现路径 | X/5 | ... |
+| 持续意愿 | X/5 | ... |
+| 抗风险性 | X/5 | ... |
+| **总分** | **X/30** | |
+
+全部打完后输出：
+- 总分前3名
+- 「直觉强烈但分数不高」的方向（如有，单独说明）
+- 建议优先测试的1个方向，并说明理由
+
+【我的方向候选清单】
+（把第2周 Claude 输出的10-12个方向粘贴在这里）</pre>
+    </div>
+
+    <div class="usage-grid">
+      <div class="usage-note">
+        <h4>用法</h4>
+        <p>把第 2 周全部方向粘贴进去。打分过程本身就是价值——你会在填「1 分理由」时发现自己其实对某个方向完全没有证据。</p>
+      </div>
+      <div class="usage-note">
+        <h4>验证标准</h4>
+        <p>特别关注「直觉第一但总分不高」的方向——这个张力最值得讨论。不要直接放弃它，而是搞清楚是哪个维度拉低了分数，再决定要不要测。</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════
+       WEEK 4
+  ══════════════════════════════════════ -->
+  <div class="week-section" id="week4">
+    <div class="week-header">
+      <div class="week-number">Week 04</div>
+      <div class="week-header-text">
+        <div class="week-title">默认选项偏见 × 最小验证设计</div>
+        <div class="week-subtitle">「再等等看」永远是最省力的默认选项，大脑天生不会主动离开它</div>
+      </div>
+      <div class="week-badge"><span class="badge badge-green">小众词</span></div>
+    </div>
+
+    <div class="week-meta">
+      <div class="meta-pill">输入 <strong>第 3 周打分后的首选方向</strong></div>
+      <div class="meta-pill">输出 <strong>7 天验证计划 + 承诺机制</strong></div>
+      <div class="meta-pill">工具 <strong>Claude + 诊断框架</strong></div>
+      <div class="meta-pill">预计时长 <strong>30 分钟</strong></div>
+    </div>
+
+    <div class="theory-box">
+      <strong>为什么这一步会卡住</strong>
+      默认选项偏见（Default Option Bias）：研究显示，人类在面对选择时，选择「默认选项」（维持现状）的概率高达 80% 以上。器官捐献、养老金储蓄、职业转型——所有需要主动选择才能改变的事情，都受这个偏见拖累。破解方式是设计一个「离开默认选项」的最小动作，让「不做」比「做」更费劲。
+    </div>
+
+    <div class="prompt-block">
+      <div class="prompt-label">
+        <span>提示词</span>
+        <button class="copy-btn" onclick="copyPrompt(this, 'prompt4')">复制</button>
+      </div>
+      <pre class="prompt-pre" id="prompt4">你是一位行动设计顾问，专门帮助职场人把「想做」变成「现在就能做的第一步」。
+
+【背景说明】
+「默认选项偏见」是所有转型拖延的根源：当你面对选择时，大脑会自动倾向于最省力的选项——而最省力的永远是「保持现状、再等等看」。研究表明，人类选择默认选项的概率高达80%以上。
+今天的任务就是为你设计一个「强制离开默认选项」的最小动作，让「不做」比「做」更费劲。
+
+【你的任务】
+根据我选定的测试方向，设计一个7天内可以完成的最小验证计划。
+
+【重要规则——必须严格遵守】
+1. 验证动作必须在不影响主业的前提下完成（不辞职、不大额投入）
+2. 第一个动作必须能在48小时内开始，不允许「先准备一下」
+3. 成功标准必须是可以观察到的具体信号，禁止用「感觉差不多了」这类模糊标准
+4. 必须设计一个「承诺机制」——告诉某个真实的人你要做这件事，让放弃变得有成本
+5. 整个计划不允许超过7天——超过7天的计划会被大脑自动归类为「以后再说」
+
+【输出格式】
+
+**测试目标**
+- 我要验证的核心假设是：
+  用「如果我做X，那么Y类型的人会有Z反应」的格式写出来
+- 7天后，我怎么判断验证成功？
+  写出1-2个具体可观察的信号（不允许用「感觉」判断）
+
+**7天行动地图**
+| 天数 | 具体动作 | 预计耗时 | 完成标志 |
+|------|---------|---------|---------|
+| 第1天（今天就开始） | ... | ...分钟 | ... |
+| 第3天 | ... | ...分钟 | ... |
+| 第5天 | ... | ...分钟 | ... |
+| 第7天 | ... | ...分钟 | ... |
+
+**承诺机制**
+- 我打算告诉谁：（写一个真实的人名，不是「朋友」这种泛指）
+- 告诉他/她什么：（写出这句话的具体内容）
+- 如果第7天没完成，我的代价是：（一个真实的成本，比如请他们吃饭）
+
+**第5周需要做出的验证物**
+- 我需要做出什么：（一句话描述，比如「一页A4的服务介绍」「一条500字的朋友圈帖子」）
+
+【我选定的测试方向】
+（从第3周打分结果里取排名第一的方向，粘贴在这里）
+
+【我的可迁移能力清单】（供参考）
+（把第1周的10条能力粘贴在这里）</pre>
+    </div>
+
+    <div class="usage-grid">
+      <div class="usage-note">
+        <h4>用法</h4>
+        <p>把第 3 周打分第一的方向粘贴进来。重点是「承诺机制」部分——必须真的告诉一个真实的人，不能只是在脑子里想想。</p>
+      </div>
+      <div class="usage-note">
+        <h4>验证标准</h4>
+        <p>7 天计划的第一步，今天之内必须能开始。如果第一步还需要「先准备」，让 Claude 继续拆分，直到第一步可以在 48 小时内启动。</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════
+       WEEK 5
+  ══════════════════════════════════════ -->
+  <div class="week-section" id="week5">
+    <div class="week-header">
+      <div class="week-number">Week 05</div>
+      <div class="week-header-text">
+        <div class="week-title">认知带宽 × 做出验证物</div>
+        <div class="week-subtitle">困在迷茫期时大脑没有余量做东西；有方向后带宽释放，现在才能真的动</div>
+      </div>
+      <div class="week-badge"><span class="badge badge-yellow">有竞争</span></div>
+    </div>
+
+    <div class="week-meta">
+      <div class="meta-pill">输入 <strong>测试方向 + 第 4 周验证计划</strong></div>
+      <div class="meta-pill">输出 <strong>可直接发出去的验证物初稿</strong></div>
+      <div class="meta-pill">工具 <strong>Claude + PPT（可选）</strong></div>
+      <div class="meta-pill">预计时长 <strong>60-90 分钟</strong></div>
+    </div>
+
+    <div class="theory-box">
+      <strong>为什么这一步会卡住</strong>
+      认知带宽（Cognitive Bandwidth）理论：当人处于高度不确定、压力或困境中，大脑的可用「带宽」会被占满，导致决策力、创造力和执行力全面下降——不是因为不努力，而是资源真的耗尽了。好消息是：前 4 周已经消除了不确定性，带宽释放了。这一周终于可以真的做东西了。
+    </div>
+
+    <div class="prompt-block">
+      <div class="prompt-label">
+        <span>提示词</span>
+        <button class="copy-btn" onclick="copyPrompt(this, 'prompt5')">复制</button>
+      </div>
+      <pre class="prompt-pre" id="prompt5">你是一位内容创作助手，专门帮助有丰富经验的职场人快速把经验变成可以发布的内容。
+
+【背景说明】
+「认知带宽」理论发现：当一个人深陷在困境或不确定中时，大脑的可用「带宽」会被占满，没有余量去做创造性的事情。但你现在不同了——经过前4周，你已经有了明确的测试方向和具体计划。带宽释放了，现在可以真正做东西了。
+
+【你的任务】
+根据我的测试方向和可迁移能力，帮我快速生成一个可以直接发出去的验证物初稿。
+
+【重要规则——必须严格遵守】
+1. 输出必须是「可以直接发出去的」完整初稿，不是大纲或思路——我要一个能发的版本
+2. 禁止使用行业黑话和专业术语，写给「完全不了解这个领域的人」也能看懂
+3. 语气必须是「我做过，我见过」，不是「我认为，我觉得」——要用我的真实经历撑起内容
+4. 长度控制：朋友圈/小红书帖子500字以内；服务介绍1页A4以内；私信/邮件3段以内
+5. 在初稿后，单独列出「这版最脆弱的地方」——哪句话最可能让读者不信任你
+
+【输出类型】
+根据我的验证计划，生成对应类型的初稿：
+- 验证方式是「发内容看反应」→ 输出小红书/朋友圈帖子
+- 验证方式是「找潜在客户聊」→ 输出私信/邮件开场白
+- 验证方式是「展示能力样本」→ 输出一页服务介绍或案例摘要
+
+【输出格式】
+
+**验证物类型**：（说明这是哪种类型）
+
+**初稿**：
+———
+（完整的可发布内容，不是摘要，可以直接复制去发）
+———
+
+**这版最脆弱的地方**：
+- （列出2-3个最可能被质疑或不信任的点）
+
+**发出去之前，只需要改这一件事**：
+- （如果只能改一处，改哪里效果最大？）
+
+【我的测试方向和验证计划】
+（把第4周的测试目标和「需要做出的验证物」描述粘贴在这里）
+
+【我的可迁移能力清单】（作为内容原料）
+（把第1周的10条能力粘贴在这里）</pre>
+    </div>
+
+    <div class="usage-grid">
+      <div class="usage-note">
+        <h4>用法</h4>
+        <p>把第 4 周的验证计划和第 1 周的能力清单一起粘贴进来。让 Claude 生成初稿后，只改「最脆弱的地方」里提到的那一处，其他的不要动。</p>
+      </div>
+      <div class="usage-note">
+        <h4>验证标准</h4>
+        <p>初稿做出来了，不代表完成——这一步的真正交付物是「一个可以直接发出去的东西」。拿给一个不了解你工作背景的朋友看，如果他们能看懂，才算过关。</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════
+       WEEK 6
+  ══════════════════════════════════════ -->
+  <div class="week-section" id="week6">
+    <div class="week-header">
+      <div class="week-number">Week 06</div>
+      <div class="week-header-text">
+        <div class="week-title">现状偏见 × 发出去</div>
+        <div class="week-subtitle">发出去是全程阻力最强的一步——不是内容问题，是大脑把改变等同于危险</div>
+      </div>
+      <div class="week-badge"><span class="badge badge-yellow">有竞争</span></div>
+    </div>
+
+    <div class="week-meta">
+      <div class="meta-pill">输入 <strong>第 5 周做出的验证物初稿</strong></div>
+      <div class="meta-pill">输出 <strong>今天之内完成发布</strong></div>
+      <div class="meta-pill">工具 <strong>Claude + 你自己</strong></div>
+      <div class="meta-pill">预计时长 <strong>30 分钟</strong></div>
+    </div>
+
+    <div class="theory-box">
+      <strong>为什么这一步会卡住</strong>
+      现状偏见（Status Quo Bias）：维持现状永远感觉比改变更安全。「再改一下」「等状态好了再发」「这里还不够好」——这些都是现状偏见的声音，不是内容真的有问题。大脑把「发出去」等同于「让别人评判我这个人」，但实际上那只是一次数据收集。这一步的目标是强制完成「发布」这个动作本身。
+    </div>
+
+    <div class="prompt-block">
+      <div class="prompt-label">
+        <span>提示词</span>
+        <button class="copy-btn" onclick="copyPrompt(this, 'prompt6')">复制</button>
+      </div>
+      <pre class="prompt-pre" id="prompt6">你是一位行为设计顾问，专门帮助职场人突破「最后一步」的心理障碍。
+
+【背景说明】
+「现状偏见」让维持现状永远感觉比改变更安全。「发出去」是整个8周里大脑阻力最强的一步——不是因为内容不好，而是因为你的大脑把「发出去」等同于「让别人评判我这个人」。
+今天的任务不是继续完善内容，而是强制完成发布动作。
+
+【你的任务】
+帮我诊断卡点，设计发布策略，今天之内发出去。
+
+【重要规则——必须严格遵守】
+1. 你必须先诊断我的具体卡点，而不是直接给「克服恐惧」的鸡汤
+2. 发布时间必须是「今天之内」——不允许「明天状态好再发」
+3. 内容不允许再改——如果我说要再改，你必须问我「改完之后你还会有新的要改的地方吗？」
+4. 发布范围可以从最小开始（发给1个具体的人，而不是公开发布）——关键是「发出去」这个动作本身
+5. 发完之后立刻关掉界面，不要盯着看——等24小时后再看反馈
+
+【第一步：先回答这3个诊断问题】
+1. 你现在不想发的具体理由是什么？
+   （写出来，不要说「还没准备好」，要说出具体是什么不对）
+2. 你想象中最坏的情况是什么？
+   （写出来，越具体越好）
+3. 如果是你的朋友做了同样的内容，你会让他/她发出去吗？（是/否，为什么）
+
+然后把你的回答粘贴进来，我来继续帮你分析。
+
+【输出格式】（在你回答诊断问题后）
+
+**你的卡点诊断**：
+- 你的真实障碍是：（从你的回答里分析出真正的阻力来源）
+- 这是现状偏见在说话，还是内容真的有问题：（直接判断，不要模棱两可）
+
+**发布方案**（从小到大，选一个今天能做的）：
+- 最小版本：发给1个具体的人（写出是谁）
+- 中等版本：发给小圈子（朋友圈分组/特定微信群）
+- 完整版本：公开发布
+
+**今天的承诺**：
+- 我选择的发布版本是：
+- 我要在几点之前完成：
+- 发完之后截图给谁看：
+
+【我的验证物初稿】
+（把第5周做出来的初稿粘贴在这里）
+
+【我对3个诊断问题的回答】
+（先把3个问题的答案写在这里，再发给 Claude）</pre>
+    </div>
+
+    <div class="usage-grid">
+      <div class="usage-note">
+        <h4>用法</h4>
+        <p>分两轮使用：第一轮把初稿粘贴进去，回答 3 个诊断问题；第二轮把 3 个问题的答案也粘贴进来，让 Claude 做出具体的发布方案。</p>
+      </div>
+      <div class="usage-note">
+        <h4>验证标准</h4>
+        <p>今天之内，有一个真实的人看到了这个验证物。无论是私信还是公开发布，「发出去」这个动作完成了才算过关。</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════
+       WEEK 7
+  ══════════════════════════════════════ -->
+  <div class="week-section" id="week7">
+    <div class="week-header">
+      <div class="week-number">Week 07</div>
+      <div class="week-header-text">
+        <div class="week-title">峰终定律 × 读反馈</div>
+        <div class="week-subtitle">对反馈的解读被最强烈的一条和最后一条绑架，中间的大多数信号被自动忽略</div>
+      </div>
+      <div class="week-badge"><span class="badge badge-yellow">有竞争</span></div>
+    </div>
+
+    <div class="week-meta">
+      <div class="meta-pill">输入 <strong>发出去后收到的所有反馈</strong></div>
+      <div class="meta-pill">输出 <strong>客观信号报告 + 下一步方向</strong></div>
+      <div class="meta-pill">工具 <strong>Claude 帮分析</strong></div>
+      <div class="meta-pill">预计时长 <strong>30 分钟</strong></div>
+    </div>
+
+    <div class="theory-box">
+      <strong>为什么这一步会卡住</strong>
+      峰终定律（Peak-End Rule）：人对一段经历的记忆，几乎完全由「最强烈的时刻（峰值）」和「最后一刻（终值）」决定，中间的大多数反应被大脑自动压缩。收到 10 条反馈，只有 1 条非常负面，你会感觉「反馈很差」——即使其他 9 条都是正面的。这一周的任务是系统地读完所有反馈，而不是被峰值和终值绑架。
+    </div>
+
+    <div class="prompt-block">
+      <div class="prompt-label">
+        <span>提示词</span>
+        <button class="copy-btn" onclick="copyPrompt(this, 'prompt7')">复制</button>
+      </div>
+      <pre class="prompt-pre" id="prompt7">你是一位反馈分析顾问，专门帮助职场人系统性地解读测试结果，避免被单一反馈带偏判断方向。
+
+【背景说明】
+「峰终定律」描述了一个人类认知陷阱：我们对一段经历的记忆，几乎完全由最强烈的时刻（峰值）和最后一刻（终值）决定，中间的大多数反应都被大脑自动忽略。
+这意味着：10条反馈里只要有1条非常负面，你会感觉「反馈很差」——即使其他9条都是正面的。
+今天的任务是用系统方法读完所有反馈，再做判断，而不是被大脑的记忆快捷方式带跑。
+
+【你的任务】
+帮我系统性地整理和分析我发出去之后收到的所有反馈，输出一份客观的「信号报告」。
+
+【重要规则——必须严格遵守】
+1. 必须先把所有反馈逐条分类，再做整体判断——禁止「总体感觉是...」这类跳过分类的判断
+2. 必须区分「行为信号」和「语言信号」——对方做了什么比对方说了什么更真实
+3. 必须指出「峰终效应在你判断中的体现」——哪条反馈你记得最清楚？它代表整体吗？
+4. 「没有反应」也是一种信号，需要分析，而不是忽略
+5. 最终结论不允许是「测试失败」或「测试成功」——只允许是「获得了什么信息，下一步测什么」
+
+【输出格式】
+
+**反馈分类表**
+| 反馈来源 | 说了什么 / 做了什么 | 类型 | 信号强度 |
+|---------|-----------------|------|---------|
+| （逐条填入） | ... | 正面/负面/中性 | 强/中/弱 |
+
+**行为信号 vs 语言信号**
+- 说了好话但没有任何后续动作的：（列出来）
+- 没说什么但做了具体动作的：（转发/询问价格/要求深聊等）
+
+**峰终效应检查**
+- 你印象最深的一条反馈是：（让我填）
+- 它在所有反馈中占的比例：X / 总数条
+- 它是否代表多数：（是/否，一句话说明）
+
+**信号摘要**
+- 最强的正面信号（1-2条，说明为什么是强信号）：
+- 最强的负面信号（1-2条，说明为什么是强信号）：
+- 「没有反应」的比例和可能原因：
+
+**下一步建议**
+- 如果按当前信号继续，下一步验证什么：
+- 如果想微调方向，建议调整哪个维度：
+- 现在不建议做的是：
+
+【我发出去之后收到的所有反馈】
+（逐条粘贴，包括「没有回应」的情况也要说明，比如「发给了5个人，2个已读未回」）
+
+【我发的内容是什么】
+（把第5-6周做出来并发出去的验证物粘贴在这里，供参考）</pre>
+    </div>
+
+    <div class="usage-grid">
+      <div class="usage-note">
+        <h4>用法</h4>
+        <p>等第 6 周发出去 24 小时后再来读反馈。把所有反馈逐条粘贴进来，包括「没回复的」，让 Claude 做分类表，不要让自己的第一感觉先入为主。</p>
+      </div>
+      <div class="usage-note">
+        <h4>验证标准</h4>
+        <p>完成后你应该能回答：「这次验证让我知道了什么我原来不知道的事情」。如果只能说「测试通过/失败」，说明还没真正读完反馈。</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════
+       WEEK 8
+  ══════════════════════════════════════ -->
+  <div class="week-section" id="week8">
+    <div class="week-header">
+      <div class="week-number">Week 08</div>
+      <div class="week-header-text">
+        <div class="week-title">前景理论 × 复盘</div>
+        <div class="week-subtitle">大脑把「方向没测通」解读为失败，但排除一个方向本身就是最有价值的收获</div>
+      </div>
+      <div class="week-badge"><span class="badge badge-yellow">有竞争</span></div>
+    </div>
+
+    <div class="week-meta">
+      <div class="meta-pill">输入 <strong>8 周历程摘要 + 第一反应</strong></div>
+      <div class="meta-pill">输出 <strong>信息资产清单 + 90 天行动</strong></div>
+      <div class="meta-pill">工具 <strong>Claude</strong></div>
+      <div class="meta-pill">预计时长 <strong>45 分钟</strong></div>
+    </div>
+
+    <div class="theory-box">
+      <strong>为什么这一步会卡住</strong>
+      前景理论（Prospect Theory，卡尼曼与特沃斯基，1979）：人类感知损失的痛苦，是感知同等规模收益的快感的约 2 倍。这意味着：一个方向没测通，大脑会自动放大「失败感」，而忽略「排除了一个可能让你走弯路几年的方向」这个真实的收获。复盘的核心任务是用前景理论重新框架这 8 周——你不是「失败了」，你是「用 8 周换来了本来需要几年才能搞清楚的信息」。
+    </div>
+
+    <div class="prompt-block">
+      <div class="prompt-label">
+        <span>提示词</span>
+        <button class="copy-btn" onclick="copyPrompt(this, 'prompt8')">复制</button>
+      </div>
+      <pre class="prompt-pre" id="prompt8">你是一位职业复盘顾问，专门帮助职场人用「前景理论」重新框架测试结果，避免把有价值的信息误解为失败。
+
+【背景说明】
+「前景理论」是行为经济学最重要的发现之一：人类感知损失的痛苦是感知同等收益的快感的2倍。在职业测试里，这意味着：如果一个方向没有测通，大脑会自动把它解读为「失败」「我不行」「白费了时间」——但你实际上获得了真实数据，排除了一个可能让你走弯路几年的方向。这本身是极其有价值的收获。
+
+【你的任务】
+帮我做一次8周复盘，用「获得了什么信息」的视角代替「成功/失败」的视角，并决定下一步。
+
+【重要规则——必须严格遵守】
+1. 禁止使用「失败」「没成功」「白费了」这类词——如果我用了，要帮我换成准确的描述
+2. 每一条「没走通的路」，都必须说明「排除它为什么是有价值的」
+3. 「选择继续测试」和「选择换方向」都是合理结论——没有哪个更好
+4. 复盘结论必须落到一个具体的下一步行动，不允许以「需要再想想」结尾
+5. 必须帮我清点「信息资产」——我现在拥有什么是8周前没有的
+
+【输出格式】
+
+**前景理论重框架**
+- 你的大脑对这8周的本能解读是：（我来填，诚实写出第一反应）
+- 准确的描述应该是：（帮我把上面那句话重写，只改视角，不改事实）
+
+**信息资产清单**（8周前没有、现在拥有的）
+| 资产类型 | 具体内容 |
+|---------|---------|
+| 关于自己能力的新认知 | ... |
+| 关于目标方向的真实数据 | ... |
+| 已排除的「看起来好但不适合我」的方向 | ... |
+| 建立的真实连接或反馈来源 | ... |
+| 做出来的可复用的内容/材料 | ... |
+
+**排除一个方向的价值估算**
+- 如果没有这8周测试，我可能会在这个方向上迷茫多久：（让我估算）
+- 换算成时间成本：X个月 × 每月精力消耗 = 这8周帮我避免的代价
+- 这8周的真实信息回报率：（信息获取成本 vs 路径清晰度提升）
+
+**下一步决策**
+选一个并说明原因：
+□ 继续测试同一方向，调整验证假设（说明调整什么）
+□ 用同样的方法测试第2候选方向（说明是哪个）
+□ 在现有方向基础上扩大测试规模（说明怎么扩大）
+
+**90天行动计划**（基于你的选择）
+- 第1个月要完成的：
+- 第2个月要完成的：
+- 第3个月要完成的：
+
+【我的8周历程摘要】
+（把这8周里最重要的发现、做了什么、收到了什么反馈，用几句话总结在这里）
+
+【我对这8周的第一反应】
+（诚实写出你现在的感受，不用美化——这是前景理论重框架的起点）</pre>
+    </div>
+
+    <div class="usage-grid">
+      <div class="usage-note">
+        <h4>用法</h4>
+        <p>先写出你对这 8 周最诚实的第一反应（不要美化），再让 Claude 帮你重框架。「信息资产清单」是这一步最重要的输出，把它截图保存下来。</p>
+      </div>
+      <div class="usage-note">
+        <h4>验证标准</h4>
+        <p>复盘结束时，你应该能给出一个具体的下一步：是继续、调整、还是换方向。如果还是「还不确定」，说明前景理论的重框架还没完成，继续追问。</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider">
+
+  <!-- Footer -->
+  <div style="color: var(--text-muted); font-size: 12.5px; text-align: center; padding-top: 8px;">
+    AI 加速职业方向测试社群 · 内部提示词手册 · 2026-05-26
+  </div>
+
+</main>
+
+<script>
+  // ─── Copy prompt ───
+  function copyPrompt(btn, id) {
+    const text = document.getElementById(id).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '已复制';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = '复制';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  // ─── Sidebar active state ───
+  const sections = document.querySelectorAll('[id]');
+  const navItems = document.querySelectorAll('.nav-item');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navItems.forEach(item => {
+          item.classList.toggle('active', item.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+
+  // ─── Smooth scroll ───
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const target = document.querySelector(item.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+</script>
+</body>
+</html>
