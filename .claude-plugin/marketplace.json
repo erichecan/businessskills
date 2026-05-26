@@ -147,6 +147,46 @@
       "category": "utilities",
       "keywords": ["upgrade", "update", "version"],
       "skills": ["./skills/eric-upgrade"]
+    },
+    {
+      "name": "eric-xhs-deconstruct",
+      "description": "小红书爆款笔记解构。接收封面截图 + 标题 + 正文 + 互动数据，5 维解构，读取两个原子库，输出可沉淀的结构化总结。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": ["xiaohongshu", "deconstruct", "viral", "analysis", "atoms", "chinese"],
+      "skills": ["./skills/eric-xhs-deconstruct"]
+    },
+    {
+      "name": "eric-xhs-topic",
+      "description": "小红书选题评判（CP1）。4 维评判框架 + 内置 40+ 中年人品类三层规则，筛出值得做的选题。不过就给 3 个优化方向。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": ["xiaohongshu", "topic", "evaluation", "middle-aged", "chinese"],
+      "skills": ["./skills/eric-xhs-topic"]
+    },
+    {
+      "name": "eric-xhs-cover",
+      "description": "小红书封面提示词生成（CP5）。按 6 维输出 nanobanana 提示词，支持参考截图输入，给 2-3 个变体方案。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": ["xiaohongshu", "cover", "nanobanana", "prompt", "image", "chinese"],
+      "skills": ["./skills/eric-xhs-cover"]
+    },
+    {
+      "name": "eric-xhs-coach",
+      "description": "小红书内容全流程教练（主入口）。串起 CP1→CP5 完整流程，协调所有诊断/创作 skill，支持任意 CP 之间跳转。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": ["xiaohongshu", "coach", "workflow", "orchestrator", "full-pipeline", "chinese"],
+      "skills": ["./skills/eric-xhs-coach"]
     }
   ]
 }

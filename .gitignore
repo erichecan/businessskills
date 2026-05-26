@@ -30,3 +30,6 @@ build/
 .idea/
 *.swp
 Thumbs.db
+
+# 工具临时产物
+.playwright-mcp/
