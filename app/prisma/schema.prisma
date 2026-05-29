@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model HotTopic {
+  id              String   @id @default(cuid())
+  platform        String   // "xiaohongshu" | "weixin" | "youtube" | "manual"
+  title           String
+  url             String?
+  engagementScore Int?
+  rawData         String?
+  scrapedAt       DateTime @default(now())
+  status          String   @default("pending") // "pending" | "relevant" | "irrelevant"
+  topics          Topic[]
+}
+
+model Topic {
+  id          String    @id @default(cuid())
+  hotTopicId  String?
+  hotTopic    HotTopic? @relation(fields: [hotTopicId], references: [id])
+  title       String
+  angle       String?
+  format      String?   // "图文" | "短视频" | "长视频"
+  status      String    @default("draft") // "draft" | "approved" | "rejected"
+  createdAt   DateTime  @default(now())
+  contents    Content[]
+}
+
+model Content {
+  id              String   @id @default(cuid())
+  topicId         String
+  topic           Topic    @relation(fields: [topicId], references: [id])
+  diagnosisResult String?
+  draft           String?
+  aiCheckResult   String?
+  finalDraft      String?
+  titleOptions    String?
+  coverImageUrl   String?
+  status          String   @default("drafting") // "drafting" | "reviewing" | "ready"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
