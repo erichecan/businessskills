@@ -33,3 +33,17 @@ Thumbs.db
 
 # 工具临时产物
 .playwright-mcp/
+
+# 生成产出物：图片 / 音频 / 视频（只保留代码和文档）
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.avif
+*.mp4
+*.mp3
+*.wav
+*.m4a
+*.aac
+# 如需保留某张特定资源图，用 !path/to/file.png 解除忽略
