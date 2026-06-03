@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080">
+<title>XHS Slides</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #888; font-family: "PingFang SC", "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif; }
+
+  .slide {
+    width: 1080px;
+    height: 1080px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    margin: 20px auto;
+  }
+
+  /* ─── DARK THEME ─── */
+  .dark {
+    background: #11100d;
+    color: #ece6dc;
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(245,181,61,.07), transparent 45%),
+      radial-gradient(circle at 85% 100%, rgba(232,116,59,.05), transparent 45%);
+  }
+
+  /* ─── SHARED TOKENS ─── */
+  :root {
+    --gold: #f5b53d;
+    --orange: #e8743b;
+    --green: #7dd3a8;
+    --dim: #a39a8c;
+    --faint: #6f675b;
+    --card: #1f1c18;
+    --line: #332e27;
+    --ink: #ece6dc;
+  }
+
+  /* ─── SLIDE LAYOUT ─── */
+  .slide-inner {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 64px 70px 56px;
+    gap: 0;
+  }
+
+  /* ─── KICKER ─── */
+  .kicker {
+    font-size: 13px;
+    letter-spacing: .28em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 500;
+    margin-bottom: 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .kicker::before {
+    content: "";
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 10px rgba(245,181,61,.6);
+  }
+  .kicker.green::before { background: var(--green); box-shadow: 0 0 10px rgba(125,211,168,.6); }
+  .kicker.green { color: var(--green); }
+
+  /* ─── HEADING ─── */
+  .h1 {
+    font-size: 52px;
+    font-weight: 800;
+    line-height: 1.15;
+    color: var(--ink);
+    letter-spacing: -.01em;
+    margin-bottom: 10px;
+  }
+  .h1 em { color: var(--gold); font-style: normal; }
+  .h2 {
+    font-size: 38px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+
+  /* ─── SUBTITLE ─── */
+  .sub {
+    font-size: 20px;
+    color: var(--dim);
+    font-weight: 300;
+    line-height: 1.5;
+    margin-bottom: 48px;
+  }
+
+  /* ─── DIVIDER ─── */
+  .divider {
+    height: 1px;
+    background: var(--line);
+    margin: 28px 0;
+  }
+
+  /* ─── ADVANTAGE CARDS (slide 2) ─── */
+  .adv-list { display: flex; flex-direction: column; gap: 22px; flex: 1; justify-content: center; }
+  .adv-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 28px 32px;
+  }
+  .adv-num {
+    font-size: 44px;
+    font-weight: 900;
+    color: var(--gold);
+    line-height: 1;
+    flex-shrink: 0;
+    opacity: .9;
+    min-width: 40px;
+  }
+  .adv-body {}
+  .adv-title { font-size: 26px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+  .adv-desc { font-size: 18px; color: var(--dim); font-weight: 300; line-height: 1.5; }
+
+  /* ─── RESOURCE CARDS (slides 3-6) ─── */
+  .res-cards { display: flex; flex-direction: column; gap: 18px; flex: 1; justify-content: center; }
+  .res-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 26px 30px;
+    position: relative;
+  }
+  .res-card.featured { border-color: rgba(245,181,61,.35); }
+  .res-card.featured::before {
+    content: "首选";
+    position: absolute;
+    top: -1px; right: 20px;
+    background: var(--gold);
+    color: #11100d;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 12px;
+    border-radius: 0 0 8px 8px;
+  }
+  .res-name { font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+  .res-desc { font-size: 17px; color: var(--dim); font-weight: 300; line-height: 1.55; margin-bottom: 12px; }
+  .res-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag {
+    font-size: 13px;
+    padding: 3px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    color: var(--faint);
+  }
+  .tag.hot { border-color: var(--orange); color: var(--orange); }
+  .tag.cn { border-color: var(--green); color: var(--green); }
+
+  /* ─── LIST ITEMS (slides 4,6) ─── */
+  .res-list { display: flex; flex-direction: column; gap: 14px; flex: 1; justify-content: center; }
+  .res-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 20px 24px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .res-row-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--gold);
+    flex-shrink: 0;
+  }
+  .res-row-body { flex: 1; }
+  .res-row-name { font-size: 20px; font-weight: 600; color: var(--ink); margin-bottom: 3px; }
+  .res-row-note { font-size: 16px; color: var(--dim); font-weight: 300; }
+  .res-row-tag { font-size: 13px; color: var(--faint); border: 1px solid var(--line); border-radius: 20px; padding: 2px 10px; flex-shrink: 0; }
+
+  /* ─── WARNING BOX ─── */
+  .warn {
+    margin-top: 18px;
+    background: rgba(232,116,59,.08);
+    border: 1px solid rgba(232,116,59,.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    font-size: 16px;
+    color: var(--dim);
+    line-height: 1.6;
+  }
+  .warn strong { color: var(--orange); }
+
+  /* ─── TABLE SLIDE (slide 7) ─── */
+  .table-wrap { flex: 1; display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+  .table-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 4px;
+  }
+  .table-col-head {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    padding: 10px 18px;
+    border-radius: 8px;
+    text-align: center;
+  }
+  .table-col-head.gpt { background: rgba(125,211,168,.12); color: var(--green); border: 1px solid rgba(125,211,168,.3); }
+  .table-col-head.nano { background: rgba(245,181,61,.1); color: var(--gold); border: 1px solid rgba(245,181,61,.25); }
+  .table-rows { display: flex; flex-direction: column; gap: 8px; }
+  .table-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .table-cell {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 16px;
+  }
+  .cell-name { font-size: 17px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+  .cell-desc { font-size: 14px; color: var(--dim); font-weight: 300; }
+  .stamp {
+    align-self: center;
+    text-align: center;
+    margin-top: 14px;
+    font-size: 15px;
+    color: var(--faint);
+    letter-spacing: .1em;
+  }
+
+  /* ─── STEPS SLIDE (slide 8) ─── */
+  .steps { display: flex; flex-direction: column; gap: 20px; flex: 1; justify-content: center; }
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 28px;
+    padding: 26px 30px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+  .step-num {
+    font-size: 50px;
+    font-weight: 900;
+    color: var(--gold);
+    line-height: 1;
+    flex-shrink: 0;
+    opacity: .7;
+  }
+  .step-body {}
+  .step-title { font-size: 24px; font-weight: 700; color: var(--ink); margin-bottom: 5px; }
+  .step-desc { font-size: 17px; color: var(--dim); font-weight: 300; line-height: 1.55; }
+  .step-note {
+    margin-top: 20px;
+    padding: 14px 20px;
+    background: rgba(245,181,61,.07);
+    border: 1px solid rgba(245,181,61,.2);
+    border-radius: 10px;
+    font-size: 16px;
+    color: var(--dim);
+    text-align: center;
+  }
+  .step-note em { color: var(--gold); font-style: normal; font-weight: 600; }
+
+  /* ─── CLOSING SLIDE (slide 9) ─── */
+  .closing {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 0;
+  }
+  .closing-big {
+    font-size: 62px;
+    font-weight: 900;
+    line-height: 1.2;
+    color: var(--ink);
+    margin-bottom: 20px;
+  }
+  .closing-big em { color: var(--gold); font-style: normal; }
+  .closing-mid {
+    font-size: 28px;
+    color: var(--dim);
+    font-weight: 300;
+    margin-bottom: 60px;
+    line-height: 1.5;
+  }
+  .closing-line {
+    width: 60px; height: 2px;
+    background: var(--gold);
+    margin-bottom: 36px;
+    opacity: .5;
+  }
+  .closing-cta {
+    font-size: 18px;
+    color: var(--faint);
+    letter-spacing: .06em;
+    font-weight: 300;
+    border: 1px solid var(--line);
+    border-radius: 30px;
+    padding: 10px 28px;
+  }
+
+  /* ─── FOOTER ─── */
+  .slide-footer {
+    padding: 0 70px 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-label {
+    font-size: 13px;
+    color: var(--faint);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .footer-page {
+    font-size: 13px;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .footer-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    opacity: .4;
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════ SLIDE 2 ════════════════ -->
+<div class="slide dark" id="slide-02">
+  <div class="slide-inner">
+    <div class="kicker">中年人的优势</div>
+    <div class="h1">做AI出图<br><em>你反而不吃亏</em></div>
+    <div class="sub">这三件事，年轻人没有</div>
+    <div class="adv-list">
+      <div class="adv-item">
+        <div class="adv-num">①</div>
+        <div class="adv-body">
+          <div class="adv-title">审美判断力</div>
+          <div class="adv-desc">你知道"什么图能卖出去"——这个判断是10年、20年积累的，提示词写不出来</div>
+        </div>
+      </div>
+      <div class="adv-item">
+        <div class="adv-num">②</div>
+        <div class="adv-body">
+          <div class="adv-title">行业认知</div>
+          <div class="adv-desc">你了解真实的甲方需求、真实的客户痛点，AI生成的图能不能用，你一眼就看出来</div>
+        </div>
+      </div>
+      <div class="adv-item">
+        <div class="adv-num">③</div>
+        <div class="adv-body">
+          <div class="adv-title">商业嗅觉</div>
+          <div class="adv-desc">哪个场景有商业价值，往哪个方向磨提示词，你比年轻人少走很多弯路</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <div class="footer-label">AI 出图提示词宝库</div>
+    <div class="footer-dot"></div>
+    <div class="footer-page">02 / 09</div>
+  </div>
+</div>
+
+<!-- ════════════════ SLIDE 3 ════════════════ -->
+<div class="slide dark" id="slide-03">
+  <div class="slide-inner">
+    <div class="kicker">GPT Image 2 · 首选资源</div>
+    <div class="h2">商业出图就用这两个</div>
+    <div class="sub">提示词遵循度高，适合海报、电商、商用广告</div>
+    <div class="res-cards">
+      <div class="res-card featured">
+        <div class="res-name">苍何 · awesome-gpt-image-2</div>
+        <div class="res-desc">逆向470+商业案例，20+套工业级模板。配在线画廊 gpt-image2.canghe.ai，大图预览、一键复制完整提示词、按风格筛选。</div>
+        <div class="res-tags">
+          <span class="tag hot">首选</span>
+          <span class="tag cn">中文</span>
+          <span class="tag">商业海报</span>
+          <span class="tag">在线画廊</span>
+        </div>
+      </div>
+      <div class="res-card featured">
+        <div class="res-name">Anil-matcha · API提示词库</div>
+        <div class="res-desc">产品广告结构化模板，字段直接替换：产品名 / 瓶型 / 尺寸 / 比例。人像、海报、UI mockup 均有覆盖。</div>
+        <div class="res-tags">
+          <span class="tag hot">首选</span>
+          <span class="tag">产品广告</span>
+          <span class="tag">结构化模板</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <div class="footer-label">AI 出图提示词宝库</div>
+    <div class="footer-dot"></div>
+    <div class="footer-page">03 / 09</div>
+  </div>
+</div>
+
+<!-- ════════════════ SLIDE 4 ════════════════ -->
+<div class="slide dark" id="slide-04">
+  <div class="slide-inner">
+    <div class="kicker">GPT Image 2 · 进阶资源</div>
+    <div class="h2">看天花板 + 接自动化流程</div>
+    <div class="sub">量大管饱，横扫找新资源</div>
+    <div class="res-list">
+      <div class="res-row">
+        <div class="res-row-dot"></div>
+        <div class="res-row-body">
+          <div class="res-row-name">wuyoscar · gpt_image_2_skill</div>
+          <div class="res-row-note">论文配图、海报、UI mockup、地图。可接进 Claude Code / Codex 自动化流程</div>
+        </div>
+        <div class="res-row-tag">Agent Skill</div>
+      </div>
+      <div class="res-row">
+        <div class="res-row-dot"></div>
+        <div class="res-row-body">
+          <div class="res-row-name">ZeroLu · awesome-gpt-image</div>
+          <div class="res-row-note">X 平台顶级创作者提示词，照片级真实感和复杂创意实验，看"能玩到什么程度"</div>
+        </div>
+        <div class="res-row-tag">照片级</div>
+      </div>
+      <div class="res-row">
+        <div class="res-row-dot" style="background:var(--dim)"></div>
+        <div class="res-row-body">
+          <div class="res-row-name">GitHub Topic · gpt-image-2-prompts</div>
+          <div class="res-row-note">所有相关仓库聚合入口，含 Image2Studio 双语库（118 个真实图例 + API 请求）</div>
+        </div>
+        <div class="res-row-tag">总入口</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <div class="footer-label">AI 出图提示词宝库</div>
+    <div class="footer-dot"></div>
+    <div class="footer-page">04 / 09</div>
+  </div>
+</div>
+
+<!-- ════════════════ SLIDE 5 ════════════════ -->
+<div class="slide dark" id="slide-05">
+  <div class="slide-inner">
+    <div class="kicker green">Nano Banana Pro · 首选资源</div>
+    <div class="h2">参考图出图 + 保人脸一致性</div>
+    <div class="sub">底层 Gemini 3.1 Flash，贴参考图比 GPT Image 更强</div>
+    <div class="res-cards">
+      <div class="res-card featured" style="border-color: rgba(125,211,168,.3);">
+        <div class="res-name" style="color:var(--green)">aimikoda · nano-banana-pro-prompts</div>
+        <div class="res-desc">参数化3D微缩城市模板（只需换城市名即可批量出图）。产品切开"成分分层"对比、社媒视觉生成。按主题分组，附完整可用文本。</div>
+        <div class="res-tags">
+          <span class="tag" style="border-color:var(--green);color:var(--green)">首选</span>
+          <span class="tag">参考图出图</span>
+          <span class="tag">参数化模板</span>
+        </div>
+      </div>
+      <div class="res-card" style="border-color: rgba(125,211,168,.15);">
+        <div class="res-name">ZizheRuan · awesome-nanobanana2</div>
+        <div class="res-desc">社区驱动，案例来自 X、小红书，附逆向提示词笔记和技巧分析。中文为主，含产品海报、漫画式教程图。</div>
+        <div class="res-tags">
+          <span class="tag cn">中文</span>
+          <span class="tag">社区案例</span>
+          <span class="tag">逆向笔记</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <div class="footer-label">AI 出图提示词宝库</div>
+    <div class="footer-dot" style="background:var(--green)"></div>
+    <div class="footer-page">05 / 09</div>
+  </div>
+</div>
+
+<!-- ════════════════ SLIDE 6 ════════════════ -->
+<div class="slide dark" id="slide-06">
+  <div class="slide-inner">
+    <div class="kicker green">Nano Banana Pro · 更多资源</div>
+    <div class="h2">量大 + 商用注意事项</div>
+    <div class="sub">12,000+ 提示词可横扫</div>
+    <div class="res-list">
+      <div class="res-row">
+        <div class="res-row-dot" style="background:var(--green)"></div>
+        <div class="res-row-body">
+          <div class="res-row-name">GitHub Topic · nanobanana2</div>
+          <div class="res-row-note">聚合入口，含 12,000+ 提示词 awesome list 和 2,500+ 精选（配图 · 多语言 · 即时画廊）</div>
+        </div>
+        <div class="res-row-tag">12000+</div>
+      </div>
+      <div class="res-row">
+        <div class="res-row-dot" style="background:var(--green)"></div>
+        <div class="res-row-body">
+          <div class="res-row-name">amaan36 · Nano-Banana-Pro-Prompts</div>
+          <div class="res-row-note">更新勤：记忆宫殿学习图、卡通信息图、天气卡、JSON 结构化提示词（复古风等）</div>
+        </div>
+        <div class="res-row-tag">勤更新</div>
+      </div>
+      <div class="res-row">
+        <div class="res-row-dot" style="background:var(--dim)"></div>
+        <div class="res-row-body">
+          <div class="res-row-name">ZeroLu · awesome-nanobanana-pro</div>
+          <div class="res-row-note">X、微信、Replicate 头部 prompt 工程师案例，注意过滤 README 内的第三方推广</div>
+        </div>
+        <div class="res-row-tag">多来源</div>
+      </div>
+    </div>
+    <div class="warn">
+      <strong>⚠️ 商用提醒：</strong>名人同框/真人脸模板有肖像权风险，POD 商品慎用。优先选无人物或自有参考图的模板。
+    </div>
+  </div>
+  <div class="slide-footer">
+    <div class="footer-label">AI 出图提示词宝库</div>
+    <div class="footer-dot" style="background:var(--green)"></div>
+    <div class="footer-page">06 / 09</div>
+  </div>
+</div>
+
+<!-- ════════════════ SLIDE 7 ════════════════ -->
+<div class="slide dark" id="slide-07">
+  <div class="slide-inner">
+    <div class="kicker">全局速查</div>
+    <div class="h2"><em style="color:var(--gold)">13</em> 个资源 · 一张图收藏</div>
+    <div class="divider"></div>
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="table-col-head gpt">GPT Image 2</div>
+        <div class="table-col-head nano">Nano Banana Pro</div>
+      </div>
+      <div class="table-rows">
+        <div class="table-row">
+          <div class="table-cell">
+            <div class="cell-name">苍何 awesome-gpt-image-2</div>
+            <div class="cell-desc">470+案例 · 在线画廊 · 首选</div>
+          </div>
+          <div class="table-cell">
+            <div class="cell-name">aimikoda nano-banana-pro</div>
+            <div class="cell-desc">参数化模板 · 参考图出图 · 首选</div>
+          </div>
+        </div>
+        <div class="table-row">
+          <div class="table-cell">
+            <div class="cell-name">Anil-matcha API提示词库</div>
+            <div class="cell-desc">产品广告 · 结构化字段</div>
+          </div>
+          <div class="table-cell">
+            <div class="cell-name">ZizheRuan awesome-nanobanana2</div>
+            <div class="cell-desc">中文社区 · 逆向笔记</div>
+          </div>
+        </div>
+        <div class="table-row">
+          <div class="table-cell">
+            <div class="cell-name">wuyoscar gpt_image_2_skill</div>
+            <div class="cell-desc">自动化流程 · Agent接入</div>
+          </div>
+          <div class="table-cell">
+            <div class="cell-name">GitHub Topic nanobanana2</div>
+            <div class="cell-desc">12,000+提示词 · 聚合入口</div>
+          </div>
+        </div>
+        <div class="table-row">
+          <div class="table-cell">
+            <div class="cell-name">ZeroLu awesome-gpt-image</div>
+            <div class="cell-desc">X顶级创作者 · 照片级</div>
+          </div>
+          <div class="table-cell">
+            <div class="cell-name">amaan36 Nano-Banana-Pro</div>
+            <div class="cell-desc">勤更新 · JSON提示词</div>
+          </div>
+        </div>
+        <div class="table-row">
+          <div class="table-cell">
+            <div class="cell-name">GitHub Topic gpt-image-2</div>
+            <div class="cell-desc">总入口 · 双语库118图例</div>
+          </div>
+          <div class="table-cell">
+            <div class="cell-name">ZeroLu awesome-nanobanana-pro</div>
+            <div class="cell-desc">照片级人像 · 多来源</div>
+          </div>
+        </div>
+      </div>
+      <div class="stamp">↑ 截图收藏备用</div>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <div class="footer-label">AI 出图提示词宝库</div>
+    <div class="footer-dot"></div>
+    <div class="footer-page">07 / 09</div>
+  </div>
+</div>
+
+<!-- ════════════════ SLIDE 8 ════════════════ -->
+<div class="slide dark" id="slide-08">
+  <div class="slide-inner">
+    <div class="kicker">实操路径</div>
+    <div class="h2">中年人AI出图<em style="color:var(--gold)">三步开始</em></div>
+    <div class="sub">不需要会编程，不需要有作品集</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <div class="step-body">
+          <div class="step-title">选一个具体场景</div>
+          <div class="step-desc">商业海报 / 电商详情图 / 社媒封面，三选一，不要同时做三个</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <div class="step-body">
+          <div class="step-title">进首选仓库找 5 个提示词</div>
+          <div class="step-desc">把产品名、尺寸、风格换成自己的，先跑通，再优化</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <div class="step-body">
+          <div class="step-title">每天出 3 张，持续 10 天</div>
+          <div class="step-desc">第 10 天你对"哪张能商用"的判断会发生质变，这才是真正的起点</div>
+        </div>
+      </div>
+      <div class="step-note"><em>慢一点没关系。</em> 你的判断力是别人的护城河。</div>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <div class="footer-label">AI 出图提示词宝库</div>
+    <div class="footer-dot"></div>
+    <div class="footer-page">08 / 09</div>
+  </div>
+</div>
+
+<!-- ════════════════ SLIDE 9 ════════════════ -->
+<div class="slide dark" id="slide-09">
+  <div class="slide-inner" style="justify-content:center">
+    <div class="closing">
+      <div class="closing-big">你不需要<br>比年轻人<em>快</em></div>
+      <div class="closing-mid">但你懂客户，懂生意<br>这件事，AI给不了年轻人</div>
+      <div class="closing-line"></div>
+      <div class="closing-cta">收藏此笔记 · 今晚进一个仓库</div>
+    </div>
+  </div>
+  <div class="slide-footer">
+    <div class="footer-label">AI 出图提示词宝库</div>
+    <div class="footer-dot"></div>
+    <div class="footer-page">09 / 09</div>
+  </div>
+</div>
+
+</body>
+</html>

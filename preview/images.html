@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>图片预览 — 视频号情感视频</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #111;
+      color: #eee;
+      font-family: -apple-system, "PingFang SC", sans-serif;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 18px;
+      font-weight: 500;
+      color: #aaa;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #333;
+      padding-bottom: 12px;
+    }
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .card {
+      background: #1a1a1a;
+      border-radius: 10px;
+      overflow: hidden;
+      width: 200px;
+    }
+    .card img {
+      width: 200px;
+      height: 355px; /* 9:16 */
+      object-fit: cover;
+      display: block;
+    }
+    .card .label {
+      padding: 8px 10px;
+      font-size: 12px;
+      color: #888;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+  <h1>图片预览 — 视频号场景图</h1>
+  <div class="grid">
+    <div class="card">
+      <img src="../test_images/test_chibi_01.png" alt="test_chibi_01">
+      <div class="label">test_chibi_01.png</div>
+    </div>
+    <div class="card">
+      <img src="../test_images/test_chibi_02.png" alt="test_chibi_02">
+      <div class="label">test_chibi_02.png（脸瘦/中年）</div>
+    </div>
+    <div class="card">
+      <img src="../test_images/test_chibi_03.png" alt="test_chibi_03">
+      <div class="label">test_chibi_03.png（沧桑感）</div>
+    </div>
+    <div class="card">
+      <img src="../test_images/test_chibi_04.png" alt="test_chibi_04">
+      <div class="label">test_chibi_04.png（比例修正）</div>
+    </div>
+    <div class="card">
+      <img src="../test_images/test_chibi_05.png" alt="test_chibi_05">
+      <div class="label">test_chibi_05.png（03脸+04比例）</div>
+    </div>
+  </div>
+</body>
+</html>

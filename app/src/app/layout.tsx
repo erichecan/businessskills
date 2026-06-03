@@ -35,6 +35,7 @@ export default function RootLayout({
           <Link href="/trends" className="text-zinc-400 hover:text-white transition-colors">热点</Link>
           <Link href="/topics" className="text-zinc-400 hover:text-white transition-colors">选题</Link>
           <Link href="/publish" className="text-zinc-400 hover:text-white transition-colors">发布</Link>
+          <Link href="/video" className="text-zinc-400 hover:text-white transition-colors">视频号</Link>
         </nav>
         <main className="flex-1 p-6">{children}</main>
       </body>

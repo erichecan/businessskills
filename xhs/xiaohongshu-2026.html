@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>小红书 2026 · 内容流量全攻略</title>
+  <style>
+    :root {
+      --red: #ff2442;
+      --red-light: #fff0f2;
+      --red-mid: #ffccd4;
+      --gray-0: #fafafa;
+      --gray-1: #f4f4f5;
+      --gray-2: #e4e4e7;
+      --gray-3: #a1a1aa;
+      --gray-4: #52525b;
+      --gray-5: #18181b;
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+      --green: #16a34a;
+      --green-light: #f0fdf4;
+      --amber: #d97706;
+      --amber-light: #fffbeb;
+      --purple: #7c3aed;
+      --purple-light: #f5f3ff;
+      --radius: 12px;
+      --shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.05);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+      background: var(--gray-0);
+      color: var(--gray-5);
+      line-height: 1.75;
+      font-size: 15px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #ff2442 0%, #ff6b6b 100%);
+      color: #fff;
+      padding: 48px 32px 40px;
+      text-align: center;
+    }
+    header .label {
+      display: inline-block;
+      background: rgba(255,255,255,.2);
+      border: 1px solid rgba(255,255,255,.4);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 12px;
+      letter-spacing: .08em;
+      margin-bottom: 16px;
+    }
+    header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    header p { opacity: .85; font-size: 14px; }
+    header .meta {
+      margin-top: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      font-size: 13px;
+      opacity: .8;
+    }
+
+    /* ── Layout ── */
+    main {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 32px 16px 64px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--gray-2);
+    }
+    .card-header .icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .card-header h2 { font-size: 16px; font-weight: 600; }
+    .card-header .sub { font-size: 12px; color: var(--gray-3); margin-top: 2px; }
+    .card-body { padding: 20px 24px; }
+
+    /* ── Stat grid ── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .stat-item {
+      background: var(--gray-1);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+    }
+    .stat-num {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--red);
+      line-height: 1.2;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--gray-3);
+      margin-top: 4px;
+    }
+
+    /* ── Policy table ── */
+    .policy-list { display: flex; flex-direction: column; gap: 10px; }
+    .policy-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 14px 16px;
+      background: var(--gray-1);
+      border-radius: 10px;
+    }
+    .policy-badge {
+      flex-shrink: 0;
+      background: var(--red);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 20px;
+      margin-top: 2px;
+    }
+    .policy-text { font-size: 14px; line-height: 1.6; }
+    .policy-text strong { color: var(--red); }
+
+    /* ── Compare table ── */
+    .compare-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .compare-table th {
+      background: var(--red-light);
+      color: var(--red);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .compare-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--gray-2);
+      vertical-align: top;
+    }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table tr:nth-child(even) td { background: var(--gray-0); }
+    .tag-video {
+      display: inline-block;
+      background: #dcfce7;
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .tag-img {
+      display: inline-block;
+      background: #fef3c7;
+      color: var(--amber);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    /* ── Format cards ── */
+    .format-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .format-card {
+      border-radius: 10px;
+      padding: 16px 18px;
+      border: 1px solid transparent;
+    }
+    .format-card.best {
+      background: var(--green-light);
+      border-color: #bbf7d0;
+    }
+    .format-card.good {
+      background: var(--accent-light);
+      border-color: #bfdbfe;
+    }
+    .format-card.mid {
+      background: var(--amber-light);
+      border-color: #fde68a;
+    }
+    .format-card.low {
+      background: var(--gray-1);
+      border-color: var(--gray-2);
+    }
+    .format-title {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .format-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+    .badge-best { background: var(--green); color: #fff; }
+    .badge-good { background: var(--accent); color: #fff; }
+    .badge-mid  { background: var(--amber); color: #fff; }
+    .badge-low  { background: var(--gray-3); color: #fff; }
+    .format-desc { font-size: 13px; color: var(--gray-4); line-height: 1.6; }
+    .format-data {
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-5);
+    }
+
+    /* ── Tool chain ── */
+    .toolchain {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .tool-step {
+      background: var(--red-light);
+      border: 1px solid var(--red-mid);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--red);
+    }
+    .tool-arrow { color: var(--gray-3); font-size: 14px; }
+
+    /* ── Audience section ── */
+    .audience-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .platform-box {
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .platform-box.xhs {
+      background: var(--red-light);
+      border: 1px solid var(--red-mid);
+    }
+    .platform-box.vnum {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+    }
+    .platform-name {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .platform-name.xhs-name { color: var(--red); }
+    .platform-name.vnum-name { color: var(--green); }
+    .platform-stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(0,0,0,.06);
+      font-size: 13px;
+    }
+    .platform-stat-row:last-child { border-bottom: none; }
+    .psr-label { color: var(--gray-4); }
+    .psr-val { font-weight: 700; color: var(--gray-5); }
+    .psr-val.highlight-red { color: var(--red); }
+    .psr-val.highlight-green { color: var(--green); }
+
+    /* ── Strategy pills ── */
+    .strategy-row {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .strategy-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .step-circle {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--red);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .strategy-content {}
+    .strategy-title { font-weight: 600; font-size: 14px; margin-bottom: 3px; }
+    .strategy-desc { font-size: 13px; color: var(--gray-4); line-height: 1.6; }
+
+    /* ── Notice box ── */
+    .notice {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-top: 14px;
+      font-size: 13px;
+    }
+    .notice-green {
+      background: var(--green-light);
+      border: 1px solid #bbf7d0;
+      color: var(--green);
+    }
+    .notice-amber {
+      background: var(--amber-light);
+      border: 1px solid #fde68a;
+      color: var(--amber);
+    }
+    .notice-red {
+      background: var(--red-light);
+      border: 1px solid var(--red-mid);
+      color: var(--red);
+    }
+
+    /* ── Data reference ── */
+    .data-ref {
+      font-size: 12px;
+      color: var(--gray-3);
+      padding-top: 14px;
+      border-top: 1px solid var(--gray-2);
+      margin-top: 14px;
+    }
+    .data-ref a { color: var(--gray-3); }
+
+    /* ── Section divider ── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--gray-3);
+      padding: 0 4px;
+      margin-bottom: -8px;
+    }
+
+    /* ── Highlight bar ── */
+    .highlight-bar {
+      background: linear-gradient(135deg, #ff2442 0%, #ff6b6b 100%);
+      border-radius: 10px;
+      padding: 18px 22px;
+      color: #fff;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+    .highlight-bar .hb-icon { font-size: 24px; flex-shrink: 0; }
+    .highlight-bar .hb-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .highlight-bar .hb-desc { font-size: 13px; opacity: .88; line-height: 1.6; }
+
+    /* responsive */
+    @media (max-width: 600px) {
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .format-grid { grid-template-columns: 1fr; }
+      .audience-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="label">2026 平台调研报告</div>
+  <h1>小红书流量全攻略</h1>
+  <p>AI 视频 · 平台战略 · 中年男性受众分析</p>
+  <div class="meta">
+    <span>📅 2026年6月更新</span>
+    <span>🔍 基于多份行业报告</span>
+    <span>🎯 面向训练营创作者</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- 平台现状 -->
+  <div class="section-label">平台基本面</div>
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#fff0f2;">📊</div>
+      <div>
+        <h2>小红书 2026 平台现状</h2>
+        <div class="sub">月活、搜索、内容生态关键数据</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="stat-grid">
+        <div class="stat-item">
+          <div class="stat-num">4亿</div>
+          <div class="stat-label">月活用户（2026 Q1）</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">8亿次</div>
+          <div class="stat-label">日均搜索量</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">700万篇</div>
+          <div class="stat-label">日均新增笔记</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">1.4亿次</div>
+          <div class="stat-label">日均求购需求</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">&gt;50%</div>
+          <div class="stat-label">视频内容消费占比</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-num">2700万次</div>
+          <div class="stat-label">品牌邀约（2025年，+34%）</div>
+        </div>
+      </div>
+      <div class="notice notice-red" style="margin-top:16px;">
+        <span>🏆</span>
+        <div>2026年最大动作：拿下美加墨世界杯转播权，从 UGC 社区向<strong>综合内容平台</strong>战略迈步，slogan 从「生活指南」改为「生活兴趣社区」</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 视频扶持政策 -->
+  <div class="section-label">官方政策</div>
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#f0fdf4;">🚀</div>
+      <div>
+        <h2>2026 视频扶持政策</h2>
+        <div class="sub">官方明确重点扶持，力度历史最大</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="policy-list">
+        <div class="policy-item">
+          <div class="policy-badge">流量</div>
+          <div class="policy-text"><strong>500亿流量激励计划</strong>——扶持 15 个内容赛道，每位创作者每月最高获 <strong>8万流量券</strong></div>
+        </div>
+        <div class="policy-item">
+          <div class="policy-badge">基金</div>
+          <div class="policy-text"><strong>数千万创作基金</strong>——单期最高支持 <strong>100万元</strong></div>
+        </div>
+        <div class="policy-item">
+          <div class="policy-badge">曝光</div>
+          <div class="policy-text"><strong>RED精选曝光倍增</strong>——入选作品平均曝光从 50万 → <strong>270万</strong>（提升 440%）</div>
+        </div>
+        <div class="policy-item">
+          <div class="policy-badge">分成</div>
+          <div class="policy-text"><strong>视频分成计划</strong>——2026 年下半年上线，借鉴 YouTube 广告插入模式（内测中）</div>
+        </div>
+        <div class="policy-item">
+          <div class="policy-badge">算法</div>
+          <div class="policy-text"><strong>推荐周期延长至 90 天</strong>——优质视频长尾传播；<strong>大幅降低完播率权重</strong>，转向收藏、真实互动和观看时长</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 视频 vs 图文 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#eff6ff;">⚡</div>
+      <div>
+        <h2>视频 vs 图文：流量效率对比</h2>
+        <div class="sub">基于 854 万篇笔记分析（36氪数据）</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th><span class="tag-video">视频笔记</span></th>
+            <th><span class="tag-img">图文笔记</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>初始曝光量</td>
+            <td>比图文高 <strong>30%</strong></td>
+            <td>基准值</td>
+          </tr>
+          <tr>
+            <td>爆款 TOP50 占比</td>
+            <td><strong>48篇（96%）</strong></td>
+            <td>2篇（4%）</td>
+          </tr>
+          <tr>
+            <td>平均互动量（TOP10）</td>
+            <td><strong>点赞 66.5万</strong></td>
+            <td>点赞 22.5万</td>
+          </tr>
+          <tr>
+            <td>推荐周期</td>
+            <td><strong>优质视频延长至 90天</strong></td>
+            <td>标准周期</td>
+          </tr>
+          <tr>
+            <td>搜索结果占比</td>
+            <td><strong>60%</strong></td>
+            <td>40%</td>
+          </tr>
+          <tr>
+            <td>最优时长</td>
+            <td><strong>60–90秒</strong>（完播率 +27%）</td>
+            <td>信息密度高的长图文</td>
+          </tr>
+          <tr>
+            <td>优势赛道</td>
+            <td>生活/运动/科普/资讯/测评</td>
+            <td>美妆/穿搭/母婴（习惯已固化）</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="notice notice-amber" style="margin-top: 14px;">
+        <span>⚠️</span>
+        <div>图文<strong>没有被放弃</strong>——平台是「两条腿走路」，长图文、播客同步推进。图文在美妆、穿搭等传统赛道仍是更高效的发布选择。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI 视频形式 -->
+  <div class="section-label">AI 视频形式推荐</div>
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#f5f3ff;">🤖</div>
+      <div>
+        <h2>AI 最低成本视频形式对比</h2>
+        <div class="sub">按成本/流量综合性价比排序</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="format-grid">
+        <div class="format-card best">
+          <div class="format-title">
+            AI 情感配音视频
+            <span class="format-badge badge-best">最推荐</span>
+          </div>
+          <div class="format-desc">图片 + 背景音乐 + AI旁白读情感文案。父亲/家庭/人生感悟题材，完播率高、转发率是同类 3 倍。</div>
+          <div class="format-data">📈 25条视频 → 涨粉 4.2万 · 完播率 40%+ · 零成本</div>
+        </div>
+        <div class="format-card good">
+          <div class="format-title">
+            AI 儿童故事/绘本视频
+            <span class="format-badge badge-good">强推</span>
+          </div>
+          <div class="format-desc">AI 生图 + AI配音，家长群体粘性高，带货绘本/教育课程转化好。</div>
+          <div class="format-data">📈 2个月涨粉 11.7万 · 40条作品带货 2000单</div>
+        </div>
+        <div class="format-card mid">
+          <div class="format-title">
+            AI 数字人口播
+            <span class="format-badge badge-mid">次推</span>
+          </div>
+          <div class="format-desc">克隆真人形象，成本极低可复用，知识科普类效果好，数字人感太强时用户感知下降。</div>
+          <div class="format-data">📈 15天涨粉 1.6万 · 完播率比真人高 23%</div>
+        </div>
+        <div class="format-card low">
+          <div class="format-title">
+            AI 图文（静态）
+            <span class="format-badge badge-low">流量低</span>
+          </div>
+          <div class="format-desc">操作最简单，但流量远不如视频。80篇涨粉 9000+，知识付费变现 32单。适合测试文案方向。</div>
+          <div class="format-data">⚡ 操作最简单，但流量效率最低</div>
+        </div>
+      </div>
+
+      <!-- 工具链 -->
+      <div style="margin-top: 20px; padding: 16px 18px; background: var(--gray-1); border-radius: 10px;">
+        <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--gray-5);">🛠 AI情感配音视频工具链（全程零成本）</div>
+        <div class="toolchain">
+          <div class="tool-step">DeepSeek<br><span style="font-size:11px;font-weight:400;opacity:.7;">写情感文案</span></div>
+          <div class="tool-arrow">→</div>
+          <div class="tool-step">即梦AI<br><span style="font-size:11px;font-weight:400;opacity:.7;">生成图片</span></div>
+          <div class="tool-arrow">→</div>
+          <div class="tool-step">剪映图文成片<br><span style="font-size:11px;font-weight:400;opacity:.7;">视频合成</span></div>
+          <div class="tool-arrow">→</div>
+          <div class="tool-step">豆包/魔音工坊<br><span style="font-size:11px;font-weight:400;opacity:.7;">AI配音</span></div>
+        </div>
+        <div style="margin-top: 10px; font-size: 12px; color: var(--gray-3);">每条视频制作时间约 3 分钟，建议日更，不追单条爆款靠量积累</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 受众分析 -->
+  <div class="section-label">受众与平台选择</div>
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#f5f3ff;">👥</div>
+      <div>
+        <h2>中年男性受众：小红书 vs 视频号</h2>
+        <div class="sub">面向 35–50 岁男性训练营，哪个平台更适合？</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="audience-grid">
+        <div class="platform-box xhs">
+          <div class="platform-name xhs-name">📕 小红书</div>
+          <div class="platform-stat-row">
+            <span class="psr-label">月活用户</span>
+            <span class="psr-val">4亿</span>
+          </div>
+          <div class="platform-stat-row">
+            <span class="psr-label">男性占比</span>
+            <span class="psr-val highlight-red">28%</span>
+          </div>
+          <div class="platform-stat-row">
+            <span class="psr-label">35岁以上用户</span>
+            <span class="psr-val highlight-red">约21%（偏少）</span>
+          </div>
+          <div class="platform-stat-row">
+            <span class="psr-label">核心流量来源</span>
+            <span class="psr-val">搜索（占50–65%）</span>
+          </div>
+          <div class="platform-stat-row">
+            <span class="psr-label">搜索转化率</span>
+            <span class="psr-val">是推荐流量的 4.1倍</span>
+          </div>
+        </div>
+        <div class="platform-box vnum">
+          <div class="platform-name vnum-name">💚 微信视频号</div>
+          <div class="platform-stat-row">
+            <span class="psr-label">日活用户（DAU）</span>
+            <span class="psr-val">6.2亿</span>
+          </div>
+          <div class="platform-stat-row">
+            <span class="psr-label">男性占比</span>
+            <span class="psr-val highlight-green">39%（高11个百分点）</span>
+          </div>
+          <div class="platform-stat-row">
+            <span class="psr-label">40–55岁用户</span>
+            <span class="psr-val highlight-green">核心活跃用户群</span>
+          </div>
+          <div class="platform-stat-row">
+            <span class="psr-label">核心流量来源</span>
+            <span class="psr-val">熟人社交关系链</span>
+          </div>
+          <div class="platform-stat-row">
+            <span class="psr-label">内容偏好</span>
+            <span class="psr-val">资讯 &gt; 教育 &gt; 娱乐</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 10px;">
+        <div class="highlight-bar">
+          <div class="hb-icon">🎯</div>
+          <div>
+            <div class="hb-title">建议：两个平台都做，分工不同</div>
+            <div class="hb-desc">小红书做<strong>搜索 SEO 入口</strong>——高意向用户主动搜"35岁职场危机"时找到你；视频号做<strong>社交裂变主阵地</strong>——35–50岁男性直接在里面，社群/直播成交。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 平台战略定性 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon" style="background:#fffbeb;">🔭</div>
+      <div>
+        <h2>小红书 ≠ 第二个抖音</h2>
+        <div class="sub">战略上视频化，但刻意保持差异化定位</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="strategy-row">
+        <div class="strategy-item">
+          <div class="step-circle" style="background:#16a34a;">✓</div>
+          <div class="strategy-content">
+            <div class="strategy-title">主推中长视频（2分钟以上），不做短视频平台</div>
+            <div class="strategy-desc">与抖音 15秒–1分钟的强爽感短视频有意区分，主打深度内容和中长视频。</div>
+          </div>
+        </div>
+        <div class="strategy-item">
+          <div class="step-circle" style="background:#16a34a;">✓</div>
+          <div class="strategy-content">
+            <div class="strategy-title">算法价值观不同：降低完播率权重，强调收藏和真实互动</div>
+            <div class="strategy-desc">抖音以完播率、点击率为主；小红书转向"沉淀价值"而非"刺激消费"。</div>
+          </div>
+        </div>
+        <div class="strategy-item">
+          <div class="step-circle" style="background:#16a34a;">✓</div>
+          <div class="strategy-content">
+            <div class="strategy-title">去中心化分发：50% 流量给普通用户，非头部集中</div>
+            <div class="strategy-desc">抖音头部集中化；小红书千粉博主也被纳入商单体系，长尾创作者有流量。</div>
+          </div>
+        </div>
+        <div class="strategy-item">
+          <div class="step-circle" style="background:#16a34a;">✓</div>
+          <div class="strategy-content">
+            <div class="strategy-title">图文 + 视频 + 播客 + 直播全形态，不单押视频</div>
+            <div class="strategy-desc">2026年同步上线长图文、播客，做全形态而非转型纯视频平台。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 数据来源 -->
+  <div class="card">
+    <div class="card-body">
+      <div class="data-ref">
+        📚 数据来源：虎嗅（小红书月活破4亿报道）· 36氪（854万篇笔记分析）· 千瓜数据《2025视频笔记种草洞察报告》· 青瓜传媒《2026最新小红书流量机制》· 玑智《2026小红书流量逻辑》· 人人都是产品经理《2026小红书经营趋势》· 艾媒咨询《2024微信视频号用户画像报告》· 友望数据《视频号中老年用户消费洞察》（2025年1月）
+      </div>
+    </div>
+  </div>
+
+</main>
+</body>
+</html>
