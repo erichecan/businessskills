@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>面试咨询 IP 战略手册</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+      background: #f5f4f0;
+      color: #1a1a1a;
+      line-height: 1.7;
+    }
+
+    .hero {
+      background: #1a1a1a;
+      color: #fff;
+      padding: 64px 40px 48px;
+      text-align: center;
+    }
+    .hero .tag {
+      display: inline-block;
+      background: #e8d5a3;
+      color: #1a1a1a;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 2px;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 12px;
+    }
+    .hero p {
+      color: #999;
+      font-size: 15px;
+    }
+
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    /* ── Section Header ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin: 56px 0 28px;
+    }
+    .section-num {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #1a1a1a;
+      color: #e8d5a3;
+      font-size: 16px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 22px;
+      font-weight: 800;
+    }
+    .section-sub {
+      font-size: 13px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    /* ── Role Cards ── */
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 600px) { .role-grid { grid-template-columns: 1fr; } }
+
+    .role-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      border-top: 4px solid #1a1a1a;
+    }
+    .role-card.highlight { border-top-color: #e8d5a3; background: #1a1a1a; color: #fff; }
+    .role-card.highlight .role-label { color: #e8d5a3; }
+    .role-card.highlight .role-desc { color: #aaa; }
+    .role-card.highlight .do-not { color: #ff6b6b; }
+
+    .role-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    .role-name {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+    .role-desc {
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 14px;
+    }
+    .role-list {
+      list-style: none;
+      font-size: 13px;
+    }
+    .role-list li {
+      padding: 5px 0;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      gap: 8px;
+    }
+    .role-card.highlight .role-list li { border-bottom-color: #333; }
+    .role-list li:last-child { border-bottom: none; }
+    .role-list li::before { content: "→"; opacity: 0.4; flex-shrink: 0; }
+    .do-not {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #e05555;
+      padding: 8px 12px;
+      background: #fff5f5;
+      border-radius: 6px;
+    }
+    .role-card.highlight .do-not { background: #2a1a1a; }
+
+    /* ── Phase Table ── */
+    .phase-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      font-size: 14px;
+    }
+    .phase-table th {
+      background: #1a1a1a;
+      color: #e8d5a3;
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 1px;
+    }
+    .phase-table td {
+      padding: 13px 16px;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: top;
+    }
+    .phase-table tr:last-child td { border-bottom: none; }
+    .phase-table tr:hover td { background: #fafaf8; }
+    .week-badge {
+      display: inline-block;
+      background: #1a1a1a;
+      color: #e8d5a3;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: linear-gradient(to right, transparent, #ddd, transparent);
+      margin: 60px 0 0;
+    }
+
+    /* ── 博商模块 ── */
+    .boshan-intro {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 24px;
+      border-left: 4px solid #e8d5a3;
+    }
+    .boshan-intro .quote {
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+    .boshan-intro .quote-sub {
+      font-size: 13px;
+      color: #888;
+    }
+
+    .step-list { display: flex; flex-direction: column; gap: 16px; }
+    .step-item {
+      background: #fff;
+      border-radius: 12px;
+      padding: 22px 24px;
+      display: flex;
+      gap: 18px;
+    }
+    .step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #f5f4f0;
+      font-size: 14px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: #1a1a1a;
+    }
+    .step-body h4 {
+      font-size: 15px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .step-body p {
+      font-size: 13px;
+      color: #555;
+      line-height: 1.6;
+    }
+    .step-body .highlight-text {
+      display: inline-block;
+      background: #e8d5a3;
+      color: #1a1a1a;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-top: 8px;
+    }
+
+    /* ── Funnel ── */
+    .funnel { display: flex; flex-direction: column; gap: 4px; margin: 20px 0; }
+    .funnel-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: #fff;
+      border-radius: 8px;
+      padding: 14px 20px;
+    }
+    .funnel-row.top { border-left: 4px solid #ddd; }
+    .funnel-row.mid { border-left: 4px solid #aaa; }
+    .funnel-row.high { border-left: 4px solid #555; }
+    .funnel-row.top-tier { border-left: 4px solid #e8d5a3; }
+    .funnel-price {
+      font-size: 18px;
+      font-weight: 800;
+      min-width: 90px;
+    }
+    .funnel-desc { font-size: 13px; color: #555; flex: 1; }
+    .funnel-purpose {
+      font-size: 11px;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* ── Apply Box ── */
+    .apply-box {
+      background: #1a1a1a;
+      color: #fff;
+      border-radius: 12px;
+      padding: 28px;
+      margin-top: 24px;
+    }
+    .apply-box h4 {
+      font-size: 16px;
+      font-weight: 800;
+      color: #e8d5a3;
+      margin-bottom: 16px;
+    }
+    .apply-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 600px) { .apply-grid { grid-template-columns: 1fr; } }
+    .apply-item {
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 13px;
+    }
+    .apply-item .label {
+      color: #e8d5a3;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .apply-item .val { color: #ccc; line-height: 1.6; }
+    .apply-item.skip { opacity: 0.5; }
+    .apply-item.skip .label { color: #ff6b6b; }
+
+    footer {
+      text-align: center;
+      padding: 32px 0 48px;
+      font-size: 12px;
+      color: #bbb;
+    }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="tag">面试咨询 · 战略手册</div>
+  <h1>IP 团队角色 × 博商打法拆解</h1>
+  <p>2026-06-05 &nbsp;·&nbsp; 接下来 3 个月 All In 的起点</p>
+</div>
+
+<div class="container">
+
+  <!-- ══════════════════════════════════
+       PART 1：IP 团队角色
+  ══════════════════════════════════ -->
+  <div class="section-header">
+    <div class="section-num">1</div>
+    <div>
+      <div class="section-title">博商式 IP 团队角色设计</div>
+      <div class="section-sub">IP 主理人只做两件事：输出内容、交付服务。其余全部交出去。</div>
+    </div>
+  </div>
+
+  <div class="role-grid">
+
+    <div class="role-card highlight">
+      <div class="role-label">角色一 · 核心</div>
+      <div class="role-name">IP 主理人（你）</div>
+      <div class="role-desc">只做不可替代的事</div>
+      <ul class="role-list">
+        <li>出镜：短视频、直播、播客</li>
+        <li>观点输出（口述或语音，不写稿）</li>
+        <li>高价值 1v1 咨询交付</li>
+        <li>对外人设维护：评论区互动</li>
+      </ul>
+      <div class="do-not">❌ 不做：剪辑、排版、发帖、回私信、排期、收款</div>
+    </div>
+
+    <div class="role-card">
+      <div class="role-label">角色二</div>
+      <div class="role-name">内容策划</div>
+      <div class="role-desc">让你的观点变成流量</div>
+      <ul class="role-list">
+        <li>爆款选题挖掘（竞品拆解、评论区挖需求）</li>
+        <li>脚本撰写（口述整理成结构化脚本）</li>
+        <li>内容日历维护</li>
+        <li>数据复盘（什么选题带咨询询盘）</li>
+      </ul>
+    </div>
+
+    <div class="role-card">
+      <div class="role-label">角色三</div>
+      <div class="role-name">视觉 / 剪辑</div>
+      <div class="role-desc">让内容好看、能传播</div>
+      <ul class="role-list">
+        <li>短视频剪辑（字幕、封面、节奏）</li>
+        <li>小红书图文制作</li>
+        <li>封面图模板维护（形成 IP 识别度）</li>
+      </ul>
+    </div>
+
+    <div class="role-card">
+      <div class="role-label">角色四</div>
+      <div class="role-name">私域运营</div>
+      <div class="role-desc">把公域流量接住、养熟、不流失</div>
+      <ul class="role-list">
+        <li>微信 / 小红书私信第一条回复</li>
+        <li>社群日常维护</li>
+        <li>用户分层标记（准付费 vs 观望）</li>
+        <li>活动策划（限时名额、打折节点）</li>
+      </ul>
+    </div>
+
+    <div class="role-card">
+      <div class="role-label">角色五</div>
+      <div class="role-name">销售成交</div>
+      <div class="role-desc">把意向转成付款</div>
+      <ul class="role-list">
+        <li>咨询前问卷收集（筛选匹配度）</li>
+        <li>首次沟通承接（报价、答疑）</li>
+        <li>跟进未付款的潜在客户</li>
+        <li>转介绍激励机制管理</li>
+      </ul>
+    </div>
+
+    <div class="role-card">
+      <div class="role-label">角色六</div>
+      <div class="role-name">交付 / 客户成功</div>
+      <div class="role-desc">让付了钱的人真正拿到结果</div>
+      <ul class="role-list">
+        <li>服务排期与提醒</li>
+        <li>会话前资料整理（简历、JD、背景）</li>
+        <li>会话后跟进（复盘、追加问题）</li>
+        <li>收集案例故事（反哺内容策划）</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- 启动版时间表 -->
+  <div class="section-header" style="margin-top: 36px;">
+    <div class="section-num" style="background:#e8d5a3; color:#1a1a1a;">▶</div>
+    <div>
+      <div class="section-title">三个月 Solo 启动版</div>
+      <div class="section-sub">一个人跑不了六个角色，按优先级外包</div>
+    </div>
+  </div>
+
+  <table class="phase-table">
+    <thead>
+      <tr>
+        <th>阶段</th>
+        <th>你自己做</th>
+        <th>第一个外包</th>
+        <th>第二个外包</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="week-badge">第 1-4 周</span></td>
+        <td>全部角色</td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><span class="week-badge">第 5-8 周</span></td>
+        <td>IP 主理人 + 销售成交</td>
+        <td>视觉 / 剪辑</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td><span class="week-badge">第 9-12 周</span></td>
+        <td>IP 主理人</td>
+        <td>视觉 / 剪辑 + 内容策划</td>
+        <td>私域运营</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size:13px; color:#888; margin-top:12px; padding: 0 4px;">
+    外包顺序逻辑：先外包剪辑（最耗时、最好找人、不需要懂你），再外包策划（需磨合但能放大产出），最后才是私域（涉及信任，要先建立 SOP 再交出去）。
+  </p>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════
+       PART 2：博商打法拆解
+  ══════════════════════════════════ -->
+  <div class="section-header">
+    <div class="section-num">2</div>
+    <div>
+      <div class="section-title">博商 IP 打造核心玩法拆解</div>
+      <div class="section-sub">基于真实案例研究 · 工业化 IP 流水线模型</div>
+    </div>
+  </div>
+
+  <div class="boshan-intro">
+    <div class="quote">博商不是在"培养一个人"，是在工业化生产 IP。</div>
+    <div class="quote-sub">选题是市场调研出来的，讲师是赛马淘汰出来的，内容是流水线拍出来的，投流是数据驱动的。</div>
+  </div>
+
+  <div class="step-list">
+
+    <div class="step-item">
+      <div class="step-num">01</div>
+      <div class="step-body">
+        <h4>选题先行：需求倒推内容</h4>
+        <p>不是先有讲师再有内容，而是先调研中小企业主最关心什么（股权、销售管理、人力资源、商业模式），再去找能讲这个的人。选题 = 痛点 × 搜索量 × 购买意愿，三者交叉才立项。每条内容出发点都是"有人会为这个掏钱"，而不是"我有话想说"。</p>
+        <span class="highlight-text">→ 你的版本：先找面试者最怕的 5 个问题</span>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-num">02</div>
+      <div class="step-body">
+        <h4>讲师赛马：数据说话，末位淘汰</h4>
+        <p>同一选题邀请多个讲师试拍，同时投流跑数据。核心筛选标准：能把专业内容讲成大白话 + 网感好 + 案例多。投流一个月，数据好的加码，末位的直接淘汰。每个讲师账号配 10 个操盘手，日更 10 条内容。</p>
+        <span class="highlight-text">→ 你的版本：现阶段不需要，先把一个方向跑通</span>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <h4>内容结构：知识切片 + 高密度分发</h4>
+        <p>把一个完整课程拆成几百条短视频。两天一夜内完成 300 条素材的 KPI。内容公式：痛点场景开头 → 专业观点 → 案例佐证 → 行动指令。多平台矩阵分发（抖音主战场 + 视频号 + 小红书）。</p>
+        <span class="highlight-text">→ 你的版本：一次咨询的洞察拆成 10 条小红书笔记</span>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-num">04</div>
+      <div class="step-body">
+        <h4>爆款核心逻辑：量 + 赛马，不是创意</h4>
+        <p>同时跑多个讲师、多条内容 → 数据自动筛出爆款 → 对爆款加投流 → 爆款带来更多素材。单个视频爆不爆不重要，矩阵里总有一个会爆。这是"撒网捕鱼"而非"精准钓鱼"。</p>
+        <span class="highlight-text">→ 你的版本：小红书每周 5 条，看哪条数据好，复制那个结构</span>
+      </div>
+    </div>
+
+    <div class="step-item">
+      <div class="step-num">05</div>
+      <div class="step-body">
+        <h4>私域承接：从公域到成交的完整路径</h4>
+        <p>低价课买完 → 进私域社群 → 持续输出价值 → 销售跟进 → 转化高客单。内部用阿米巴模式：获客收益分配给前端团队，后端交付独立核算。销售话术标准化，专门的成交团队承接私信和电话。</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 获客漏斗 -->
+  <div class="section-header" style="margin-top: 36px;">
+    <div class="section-num" style="background:#e8d5a3; color:#1a1a1a;">$</div>
+    <div>
+      <div class="section-title">三级产品漏斗</div>
+      <div class="section-sub">199 元课程一年卖三四千万——但这只是入口，利润全在高客单</div>
+    </div>
+  </div>
+
+  <div class="funnel">
+    <div class="funnel-row top">
+      <div class="funnel-price">¥199</div>
+      <div class="funnel-desc">低价引流短课 — 海量获客，筛选意向买家</div>
+      <div class="funnel-purpose">引流钩子</div>
+    </div>
+    <div class="funnel-row mid">
+      <div class="funnel-price">¥19,800</div>
+      <div class="funnel-desc">线下课 / 训练营 — 建立信任，承接转化</div>
+      <div class="funnel-purpose">中间层</div>
+    </div>
+    <div class="funnel-row high">
+      <div class="funnel-price">¥29,800</div>
+      <div class="funnel-desc">总裁班 — 主要利润来源</div>
+      <div class="funnel-purpose">利润层</div>
+    </div>
+    <div class="funnel-row top-tier">
+      <div class="funnel-price">¥10万+</div>
+      <div class="funnel-desc">私董会 / 专属咨询 — 高净值客户，百万级天花板</div>
+      <div class="funnel-purpose">顶层</div>
+    </div>
+  </div>
+
+  <!-- 对你的启示 -->
+  <div class="apply-box">
+    <h4>套用到面试咨询的版本</h4>
+    <div class="apply-grid">
+      <div class="apply-item">
+        <div class="label">✅ 选题倒推</div>
+        <div class="val">先找面试者最怕的 5 个问题（"被问到薪资怎么办"、"空窗期如何解释"），内容从那里出发</div>
+      </div>
+      <div class="apply-item">
+        <div class="label">✅ 三级产品</div>
+        <div class="val">99 元简历诊断 → 999 元模拟面试训练营 → 3,000+ 元全程 1v1 陪跑</div>
+      </div>
+      <div class="apply-item">
+        <div class="label">✅ 内容切片</div>
+        <div class="val">一次咨询的洞察 → 拆成 10 条小红书笔记，持续喂算法</div>
+      </div>
+      <div class="apply-item skip">
+        <div class="label">❌ 赛马机制</div>
+        <div class="val">现在不需要，先把一个方向跑通，有稳定现金流再谈规模化</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  面试咨询 · 2026-06-05 &nbsp;·&nbsp; All In 第 1 天
+</footer>
+
+</body>
+</html>
