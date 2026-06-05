@@ -12,8 +12,7 @@ make_script.py — 根据话题自动生成口播稿 + 分镜描述
 """
 
 import argparse
-import json
-import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -50,43 +49,14 @@ PROMPT_TEMPLATE = """你是一位专注于中年男性情感共鸣的视频号�
 """
 
 
-def get_openai_client():
-    """优先用环境变量 OPENAI_API_KEY，其次读 codex auth.json 的 access_token"""
-    try:
-        from openai import OpenAI
-    except ImportError:
-        print("❌ 请安装 openai: pip install openai")
-        sys.exit(1)
-
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if api_key:
-        return OpenAI(api_key=api_key)
-
-    auth_path = Path.home() / ".codex" / "auth.json"
-    if auth_path.exists():
-        try:
-            auth = json.loads(auth_path.read_text())
-            token = auth.get("tokens", {}).get("access_token")
-            if token:
-                return OpenAI(api_key=token)
-        except Exception:
-            pass
-
-    print("❌ 未找到 OpenAI API Key，请设置环境变量 OPENAI_API_KEY 或通过 codex 登录")
-    sys.exit(1)
-
-
-def generate_script(topic: str) -> str:
-    client = get_openai_client()
-    prompt = PROMPT_TEMPLATE.format(topic=topic)
-
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.85,
-        max_tokens=1200,
+def generate_with_claude(prompt: str) -> str:
+    result = subprocess.run(
+        ["claude", "-p", "--dangerously-skip-permissions", prompt],
+        capture_output=True, text=True, timeout=180,
     )
-    return response.choices[0].message.content.strip()
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr[:300] if result.stderr else "(无错误输出)")
+    return result.stdout.strip()
 
 
 def parse_output(raw: str) -> tuple[str, str]:
@@ -109,7 +79,7 @@ def main():
     parser = argparse.ArgumentParser(description="根据话题生成口播稿和分镜")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--topic", help="直接输入话题描述")
-    group.add_argument("--topic-file", help="从文件读取话题")
+    group.add_argument("--topic-file", help="从文件读取话题（默认读 topic.txt）")
     parser.add_argument("--output-dir", required=True, help="输出目录")
     args = parser.parse_args()
 
@@ -130,16 +100,21 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"📝 话题：{topic}")
-    print(f"🤖 调用 OpenAI API 生成口播稿 + 分镜...")
+    print(f"🤖 调用 Claude 生成口播稿 + 分镜...")
+
+    prompt = PROMPT_TEMPLATE.format(topic=topic)
 
     try:
-        raw = generate_script(topic)
-    except Exception as e:
-        print(f"❌ API 调用失败：{e}")
+        raw = generate_with_claude(prompt)
+    except subprocess.TimeoutExpired:
+        print("❌ 超时（180s），请检查网络或 Claude 登录状态")
+        sys.exit(1)
+    except RuntimeError as e:
+        print(f"❌ Claude 调用失败：{e}")
         sys.exit(1)
 
     if not raw:
-        print("❌ API 返回内容为空")
+        print("❌ Claude 返回内容为空")
         sys.exit(1)
 
     try:
