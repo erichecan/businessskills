@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>L1 全流程跑通 · 案例「讲项目被追问卡壳」</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --ink:#1a1a1a; --gold:#e8d5a3; --paper:#f5f4f0; --line:#e8e6df; --green:#2e9e6b; --green-bg:#eef9f2; --red:#e05555; --red-bg:#fdf2f2; --muted:#888; }
+    body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; background:var(--paper); color:var(--ink); line-height:1.7; }
+    .hero { background:var(--ink); color:#fff; padding:60px 40px 48px; text-align:center; position:relative; overflow:hidden; }
+    .hero::before { content:""; position:absolute; inset:0; background-image:linear-gradient(rgba(232,213,163,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(232,213,163,.06) 1px,transparent 1px); background-size:28px 28px; }
+    .hero>*{position:relative;z-index:1;}
+    .hero .tag{display:inline-block;background:var(--gold);color:var(--ink);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:4px 14px;border-radius:2px;margin-bottom:18px;}
+    .hero h1{font-size:32px;font-weight:800;margin-bottom:12px;}
+    .hero .sub{color:var(--gold);font-size:15px;font-weight:600;}
+    .hero .meta{color:#888;font-size:13px;margin-top:14px;}
+    .container{max-width:880px;margin:0 auto;padding:0 24px 80px;}
+
+    .diff{background:var(--ink);color:#fff;border-radius:12px;padding:22px;margin:28px 0;}
+    .diff .l{color:var(--gold);font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
+    .diff p{font-size:14px;color:#ddd;margin-top:8px;line-height:1.7;}
+    .diff p b{color:#fff;}
+
+    .station{background:#fff;border-radius:14px;border:1px solid var(--line);margin-bottom:16px;overflow:hidden;}
+    .st-head{display:flex;align-items:center;gap:12px;padding:14px 22px;background:var(--ink);color:#fff;}
+    .st-code{background:var(--gold);color:var(--ink);font-weight:800;font-size:13px;padding:3px 10px;border-radius:5px;}
+    .st-name{font-size:16px;font-weight:800;flex:1;}
+    .st-tag{font-size:11px;color:#ccc;}
+    .st-body{padding:20px 22px;}
+    .lbl{font-size:11px;font-weight:800;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin:14px 0 7px;}
+    .lbl:first-child{margin-top:0;}
+    .box{background:var(--paper);border-radius:8px;padding:12px 16px;font-size:14px;line-height:1.7;}
+    .pill{display:inline-block;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:2px 9px;margin:2px 4px 2px 0;font-size:13px;}
+    .pill.on{background:var(--gold);border-color:var(--gold);}
+    ul.clean{list-style:none;font-size:14px;}
+    ul.clean li{padding:5px 0 5px 20px;position:relative;}
+    ul.clean li::before{content:"›";position:absolute;left:4px;color:var(--gold);font-weight:800;}
+    .score{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+    .sc{background:var(--green-bg);color:var(--green);font-weight:700;font-size:13px;padding:4px 10px;border-radius:6px;}
+
+    /* 成品笔记仿真 */
+    .note{border:2px solid var(--gold);border-radius:14px;overflow:hidden;max-width:420px;margin:6px auto;background:#fff;}
+    .note-cover{background:linear-gradient(135deg,#1a1a1a,#3a3320);color:#fff;padding:28px 22px;text-align:center;}
+    .note-cover .big{font-size:26px;font-weight:900;line-height:1.3;}
+    .note-cover .big em{color:var(--gold);font-style:normal;}
+    .note-cover .small{margin-top:10px;font-size:13px;color:#bbb;}
+    .note-body{padding:18px 20px;font-size:14px;line-height:1.8;}
+    .note-body h4{font-size:15px;font-weight:800;margin:12px 0 4px;}
+    .note-body .tags{margin-top:12px;color:#3a6ea5;font-size:13px;}
+
+    .verdict{background:var(--green-bg);border-left:4px solid var(--green);border-radius:8px;padding:16px 20px;margin-top:24px;font-size:14px;}
+    .verdict b{color:var(--green);}
+    .hook-list .hk{background:var(--red-bg);border-left:3px solid var(--red);border-radius:6px;padding:10px 14px;font-size:13.5px;margin-bottom:8px;line-height:1.5;}
+    footer{text-align:center;padding:32px 0 48px;font-size:12px;color:#bbb;}
+  </style>
+</head>
+<body>
+<div class="hero">
+  <div class="tag">L1 全流程跑通 · 验证</div>
+  <h1>案例:讲项目被追问卡壳</h1>
+  <div class="sub">用一个真实场景,从选题到成品走完内容生产线 7 道工序</div>
+  <div class="meta">2026-06-06 · 同时验证「现场表达」差异化</div>
+</div>
+
+<div class="container">
+
+  <div class="diff">
+    <div class="l">本案例要证明的差异化</div>
+    <p>别人教「面试必问 20 题答案」(通用)、「STAR 简历模板」(只解决写);<b>这个案例针对的是——你自己做过的项目,面试官让你"具体讲讲"时讲不出、被追问就卡壳。</b>这是谁都遇到、却几乎没人系统讲的痛点。这就是「现场表达」。</p>
+  </div>
+
+  <!-- P-C1 -->
+  <div class="station">
+    <div class="st-head"><span class="st-code">P-C1</span><span class="st-name">选题立项 · 选题六步</span><span class="st-tag">🤖→👤</span></div>
+    <div class="st-body">
+      <div class="lbl">① 锁定母题</div>
+      <div class="box">三主轴选 <span class="pill on">解码器</span>(本周)· 目标人群:有 1-3 年经验、简历不错但面试讲不好的社招 PM/研发</div>
+      <div class="lbl">② 采集素材 · 三来源</div>
+      <ul class="clean">
+        <li>你的案例库:那个"DAU 涨 30% 讲不清贡献"的学员(独家)</li>
+        <li>评论区真实提问:"被问具体怎么做的就懵了""说几句就卡壳"</li>
+        <li>竞品爆款:满屏"面试必问题",几乎没人讲"讲不出自己做的事"</li>
+      </ul>
+      <div class="lbl">③ 拆场景(母题 → 具体选题)</div>
+      <div class="box">锁定一个场景一个痛点:<b>面试官说"具体讲讲这个项目",你只会重复简历 → 被判定执行工具人</b></div>
+      <div class="lbl">④ 提语言钉(标题钩子)</div>
+      <ul class="clean">
+        <li>简历写"DAU 涨 30%",面试官说"具体讲讲",90% 的人当场露馅</li>
+        <li>面试讲项目卡壳,不是你不会做,是你不会"说"</li>
+      </ul>
+      <div class="lbl">⑤ 三维打分</div>
+      <div class="score"><span class="sc">痛点 5</span><span class="sc">搜索量 4</span><span class="sc">购买意愿 5</span><span class="sc">综合 100 ✓ 过</span></div>
+      <div class="lbl">⑥ 选题卡 + 赛马预备</div>
+      <div class="box">母题:解码器/现场表达 · 场景:讲项目被追问 · 痛点:只会复述简历 · 语言钉:"具体讲讲"露馅 · 形式:图文 · <b>预留 4 个角度版本(见 P-C4)</b></div>
+    </div>
+  </div>
+
+  <!-- P-C2 -->
+  <div class="station">
+    <div class="st-head"><span class="st-code">P-C2</span><span class="st-name">母体生产 · 母体三步</span><span class="st-tag">🔒 👤 不可替代</span></div>
+    <div class="st-body">
+      <div class="lbl">① 选案例(你的案例库)</div>
+      <div class="box">3 年经验 PM,简历写"负责会员功能,DAU 提升 30%"。模面时面试官追问"这 30% 里<b>你的</b>贡献是什么?怎么归因的?"——他卡壳了,只会重复"这是我负责的"。</div>
+      <div class="lbl">② 口述核心观点(面试官视角)</div>
+      <div class="box">面试官追问"具体讲讲",<b>不是考你做没做,是验证"这到底是不是你做的、你有没有想清楚"</b>。只会复述简历的人,等于自己承认"我只是执行,没动脑"。面试官想听的不是结果数字,是<b>你的判断和取舍</b>。</div>
+      <div class="lbl">③ 转写留存</div>
+      <div class="box">→ 存入母体库,打标:母题=解码器 / 场景=讲项目 / 关联案例=会员功能 PM</div>
+    </div>
+  </div>
+
+  <!-- P-C3 -->
+  <div class="station">
+    <div class="st-head"><span class="st-code">P-C3</span><span class="st-name">脚本结构化 · 脚本四步</span><span class="st-tag">🤖→👤</span></div>
+    <div class="st-body">
+      <div class="lbl">四段式结构化脚本(成稿)</div>
+      <div class="box">
+        <b>【痛点开头·语言钉】</b>面试官一句"具体讲讲这个项目",直接把人问懵——简历上金光闪闪,一开口就露馅。<br><br>
+        <b>【专业观点】</b>你以为他在考你做没做。错。他在验证两件事:这到底<b>是不是你做的</b>、你<b>有没有想清楚</b>。只会复述简历"我负责 XX、涨了 30%",等于自己盖章:我是执行工具人。<br><br>
+        <b>【真实案例】</b>带过一个 3 年 PM,简历漂亮。模面问"这 30% 你的贡献是什么",他卡住,翻来覆去"这是我负责的"。问题不是他没做,是他只记得结果,说不出<b>自己的判断</b>。<br><br>
+        <b>【行动指令·留钩子】</b>讲项目别用"我负责",用"我判断 + 我取舍":当时面临什么选择、你为什么这么定、舍了什么。<span style="color:var(--red)">完整的"讲述结构"模板,我整理在置顶,私信「项目」领。</span>
+      </div>
+      <div class="lbl">检验</div>
+      <div class="score"><span class="sc">四段齐全 ✓</span><span class="sc">3 秒钩子 ✓</span><span class="sc">留钩子导流 ✓</span><span class="sc">面试官口吻 ✓</span></div>
+    </div>
+  </div>
+
+  <!-- P-C4 -->
+  <div class="station">
+    <div class="st-head"><span class="st-code">P-C4</span><span class="st-name">切片放大 · 4 角度赛马</span><span class="st-tag">🤖</span></div>
+    <div class="st-body">
+      <div class="lbl">一个母体 → 4 个独立角度(供数据赛马)</div>
+      <ul class="clean">
+        <li><b>角度 A(人群·应届)</b>:没大项目?课程作业/实习这样讲,面试官也眼前一亮</li>
+        <li><b>角度 B(痛点·归因)</b>:被追问"你的贡献占多少",这样答既诚实又加分</li>
+        <li><b>角度 C(场景·卡壳)</b>:说几句就卡壳,不是紧张,是你没有"讲述结构"</li>
+        <li><b>角度 D(反差·工具人)</b>:同样的项目,有人讲成"我打杂",有人讲成"我主导"——差的是怎么说</li>
+      </ul>
+      <div class="box" style="margin-top:10px;">→ 发出去看哪条数据好,复制爆款结构(P-C7 闭环)</div>
+    </div>
+  </div>
+
+  <!-- P-C5 -->
+  <div class="station">
+    <div class="st-head"><span class="st-code">P-C5</span><span class="st-name">成品制作 · 成品四步</span><span class="st-tag">🤖→👤</span></div>
+    <div class="st-body">
+      <div class="lbl">成品笔记(可直接发布样例)</div>
+      <div class="note">
+        <div class="note-cover">
+          <div class="big">面试官说<br><em>"具体讲讲"</em><br>这样答他才信是你做的</div>
+          <div class="small">前腾讯面试官 · 90% 的人在这露馅</div>
+        </div>
+        <div class="note-body">
+          面试官一句"这个项目具体讲讲",多少人当场卡壳——简历金光闪闪,一开口就露馅。<br>
+          <h4>他到底在考什么?</h4>
+          不是考你做没做。是验证:① 这<b>是不是你做的</b> ② 你<b>有没有想清楚</b>。<br>
+          只会说"我负责 XX、DAU 涨 30%"=自己承认"我是执行工具人"。<br>
+          <h4>面试官想听的不是结果,是你的判断</h4>
+          带过一个 3 年 PM,被追问"这 30% 你的贡献是什么",翻来覆去"这是我负责的"。他不是没做,是说不出<b>自己的取舍</b>。<br>
+          <h4>3 步把项目讲成"你的"</h4>
+          ① 背景冲突:当时面临什么选择<br>② 我的判断:为什么这么定、舍了什么<br>③ 结果反思:拿到什么、下次怎么改<br>
+          <div class="tags">#面试 #求职 #产品经理 #面试技巧 #职场表达</div>
+        </div>
+      </div>
+      <div class="lbl">检验</div>
+      <div class="score"><span class="sc">语言钉标题 ✓</span><span class="sc">视觉锤(墨金封面) ✓</span><span class="sc">AI 味检测 待跑</span></div>
+    </div>
+  </div>
+
+  <!-- P-C6 -->
+  <div class="station">
+    <div class="st-head"><span class="st-code">P-C6</span><span class="st-name">多平台分发 · 分发三步</span><span class="st-tag">🤖</span></div>
+    <div class="st-body">
+      <div class="box">主战场 <span class="pill on">小红书图文</span> + <span class="pill">视频号口播</span>(你出镜讲更有"面试官"信任感)· 个人版 3 个号,不堆量 · 排期:本周这条算"引流"内容</div>
+    </div>
+  </div>
+
+  <!-- P-C7 -->
+  <div class="station">
+    <div class="st-head"><span class="st-code">P-C7</span><span class="st-name">数据回收 · 反哺</span><span class="st-tag">🤖→👤</span></div>
+    <div class="st-body">
+      <div class="box" style="color:var(--muted)">待发布后回填:回收 4 个角度的赞藏/私信数 → 赛马筛爆款(24h 赞藏≥200)→ 爆款结构沉淀模板 → 反哺 P-C1 下一批选题。<br><b>关键看:哪条带来的"私信领模板"最多</b>(私信=变现入口,比点赞更重要)。</div>
+    </div>
+  </div>
+
+  <div class="verdict">
+    <b>跑通结论:</b>L1 七道工序端到端可走通,产出了可直接发布的成品笔记。<br>
+    <b>差异化验证:</b>整条内容没有一句"通用面试技巧"或"简历模板",全程围绕"<b>你自己做的事现场怎么说</b>"——和满屏的"必问20题""STAR模板"明显不是一回事。痛点("讲不出、卡壳、怕追问")是真实的、个性化的、没人系统讲的。
+  </div>
+</div>
+
+<footer>L1 全流程跑通示范 · 2026-06-06 · 案例「讲项目被追问卡壳」· 差异化:现场表达</footer>
+</body>
+</html>
