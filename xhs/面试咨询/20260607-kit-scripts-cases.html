@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>开干物料包 · 私信话术 + 案例库模板</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    :root { --ink:#1a1a1a; --gold:#e8d5a3; --paper:#f5f4f0; --line:#e8e6df; --green:#2e9e6b; --green-bg:#eef9f2; --red:#e05555; --red-bg:#fdf2f2; --muted:#888; --blue:#3a6ea5; }
+    body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; background:var(--paper); color:var(--ink); line-height:1.7; }
+    .hero { background:var(--ink); color:#fff; padding:54px 40px 40px; text-align:center; position:relative; overflow:hidden; }
+    .hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(232,213,163,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(232,213,163,.06) 1px,transparent 1px);background-size:28px 28px;}
+    .hero>*{position:relative;z-index:1;}
+    .hero .tag{display:inline-block;background:var(--gold);color:var(--ink);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:4px 14px;border-radius:2px;margin-bottom:16px;}
+    .hero h1{font-size:30px;font-weight:800;margin-bottom:10px;}
+    .hero .sub{color:var(--gold);font-size:15px;font-weight:600;}
+    .container{max-width:860px;margin:0 auto;padding:0 24px 80px;}
+    .section-header{display:flex;align-items:center;gap:14px;margin:48px 0 16px;}
+    .section-num{width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--gold);font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .section-title{font-size:21px;font-weight:800;}
+    .section-sub{font-size:13px;color:var(--muted);}
+
+    .principle{background:var(--ink);color:#fff;border-radius:12px;padding:18px 22px;margin-top:24px;font-size:13.5px;line-height:1.7;}
+    .principle b{color:var(--gold);}
+
+    .scene{background:#fff;border-radius:12px;border:1px solid var(--line);margin-bottom:14px;overflow:hidden;}
+    .scene-head{display:flex;align-items:center;gap:10px;padding:11px 18px;background:#242424;color:#fff;}
+    .scene-tag{background:var(--gold);color:var(--ink);font-weight:800;font-size:12px;padding:3px 10px;border-radius:5px;}
+    .scene-when{font-size:12px;color:#bbb;}
+    .scene-body{padding:16px 18px;}
+    .script{background:var(--green-bg);border-left:3px solid var(--green);border-radius:8px;padding:14px 16px;font-size:14px;line-height:1.75;white-space:pre-line;}
+    .note{font-size:12.5px;color:var(--muted);margin-top:10px;}
+    .note b{color:var(--ink);}
+
+    .tagbox{background:#fff;border-radius:10px;padding:16px 18px;border-left:4px solid var(--blue);font-size:13.5px;}
+    .tagbox h4{font-size:14px;font-weight:800;margin-bottom:6px;color:var(--blue);}
+    .chips span{display:inline-block;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:2px 9px;margin:3px 4px 0 0;font-size:12.5px;}
+
+    /* 案例卡 */
+    .casecard{background:#fff;border-radius:12px;border:1px solid var(--line);margin-bottom:14px;overflow:hidden;}
+    .case-head{display:flex;align-items:center;gap:10px;padding:11px 18px;background:var(--ink);color:#fff;}
+    .case-no{background:var(--gold);color:var(--ink);font-weight:800;font-size:12px;padding:3px 10px;border-radius:5px;}
+    .case-name{font-size:14px;font-weight:700;flex:1;}
+    .case-body{padding:6px 18px 16px;}
+    .field{display:grid;grid-template-columns:130px 1fr;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13.5px;}
+    @media(max-width:560px){.field{grid-template-columns:1fr;gap:2px;}}
+    .field:last-child{border-bottom:none;}
+    .field .fk{font-weight:800;color:var(--muted);font-size:12px;}
+    .field .fv{color:#333;}
+    .field .blank{color:var(--muted);font-style:italic;}
+    .demo .field .fv{color:#1a1a1a;}
+    .demo{border-color:var(--gold);}
+    .demo .case-head{background:linear-gradient(135deg,#1a1a1a,#3a3320);}
+    .tip{background:var(--red-bg);border-left:4px solid var(--red);border-radius:8px;padding:14px 18px;font-size:13.5px;margin-top:10px;}
+    .tip b{color:var(--red);}
+    footer{text-align:center;padding:32px 0 48px;font-size:12px;color:#bbb;}
+  </style>
+</head>
+<body>
+<div class="hero">
+  <div class="tag">开干物料包</div>
+  <h1>私信话术 + 案例库模板</h1>
+  <div class="sub">明天就能用 · 接住私信 + 攒下内容原料</div>
+</div>
+
+<div class="container">
+
+  <!-- 一、私信话术 -->
+  <div class="section-header"><div class="section-num">1</div><div><div class="section-title">私信首响话术</div><div class="section-sub">对应 P-M1 承接 · Day 6-7 接私信用</div></div></div>
+
+  <div class="principle">
+    <b>4 条原则:</b>① 24h 内首响 ② 先给价值(发模板/答一句),再了解情况 ③ 顺手收集打标(岗位/经验/目标公司/卡点)④ <b>不一上来推销</b>——求职用户理性,油腻会跑。
+  </div>
+
+  <div class="scene">
+    <div class="scene-head"><span class="scene-tag">场景 A</span><span class="scene-when">来「领模板」的(最高频)</span></div>
+    <div class="scene-body">
+      <div class="script">你好呀~模板发你 👉【链接/文件】，按里面的结构改,简历会清爽很多。
+
+我之前在腾讯做产品 + 当面试官,面过几百号候选人。
+方便的话告诉我两句,我能给你更对路的建议:
+① 你现在是应届还是社招?② 目标什么岗位 / 公司?③ 现在最卡在简历、笔试还是面试哪一步?</div>
+      <div class="note"><b>要点:</b>先发模板(兑现钩子)→ 亮身份(信任)→ 3 个问题自然打标,不索取过度。</div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-head"><span class="scene-tag">场景 B</span><span class="scene-when">直接问具体问题(如"空窗一年怎么解释")</span></div>
+    <div class="scene-body">
+      <div class="script">这个问题挺典型的,很多人就栽在这。
+先给你一个方向:别解释"为什么空窗",要讲"这段时间你为目标做了什么"——面试官怕的是你停摆,不是你休息。
+
+不过具体怎么说得看你情况:你空窗这一年大概在忙什么?目标是回原来的岗位还是转方向?说说,我帮你想怎么讲最稳。</div>
+      <div class="note"><b>要点:</b>先给一句真干货(证明你专业)→ 再问情况(顺势打标)→ 给"我帮你想"的承接钩子。</div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-head"><span class="scene-tag">场景 C</span><span class="scene-when">问"有没有辅导 / 怎么收费"(高意向)</span></div>
+    <div class="scene-body">
+      <div class="script">有的~我这边主要是 1v1 帮你把简历和面试现场表达打磨到能拿 offer。
+
+不过为了不浪费你钱,我一般先看看匹不匹配:你目标岗位 / 经验几年 / 最近面试卡在哪?
+你发我一下,我先免费帮你诊断一个最大的问题。你觉得有用,我们再聊要不要深入 🙂</div>
+      <div class="note"><b>要点:</b>不报价硬卖 → 先「免费诊断一个问题」筛匹配 + 给价值(博商:用低门槛钩子筛意向)→ 把决定权交回对方。</div>
+    </div>
+  </div>
+
+  <div class="tagbox">
+    <h4>每次聊完,顺手打标(存进表格 / 备注)</h4>
+    <div class="chips">
+      <span>身份:应届 / 社招 / 转行</span><span>目标岗位</span><span>经验年限</span><span>目标公司</span><span>卡点:简历 / 笔试 / 面试 / 谈薪</span><span>意向:观望 / 准付费</span>
+    </div>
+  </div>
+
+  <!-- 二、案例库模板 -->
+  <div class="section-header"><div class="section-num">2</div><div><div class="section-title">案例库填空模板</div><div class="section-sub">内容母体的原料(P-C2)+ 信任锤(P-M4)· 往里填就成案例库</div></div></div>
+
+  <div class="tip">
+    <b>为什么先攒案例:</b>它是你整条产线的原料——每个真实案例能拆出好几条选题,offer 截图/改前改后是求职赛道最强信任锤。<b>没案例,内容就只能讲通用道理,跟红海没区别。</b>先填 3-5 个,够第一个月用。
+  </div>
+
+  <!-- 示范 -->
+  <div class="casecard demo">
+    <div class="case-head"><span class="case-no">示范</span><span class="case-name">3 年经验 PM · 讲项目讲不清贡献</span></div>
+    <div class="case-body">
+      <div class="field"><div class="fk">学员标签(脱敏)</div><div class="fv">3 年经验产品经理 / 二本 / 想跳大厂</div></div>
+      <div class="field"><div class="fk">初始问题</div><div class="fv">简历漂亮("负责会员功能,DAU 提升 30%"),但一到面试讲项目就垮</div></div>
+      <div class="field"><div class="fk">关键场景(选题来源)</div><div class="fv">面试官追问"这 30% 里你的贡献是什么、怎么归因",当场卡壳</div></div>
+      <div class="field"><div class="fk">他原来怎么做(错误示范=送命话素材)</div><div class="fv">翻来覆去"这是我负责的",只会复述简历数字</div></div>
+      <div class="field"><div class="fk">你怎么改的(方法=解码器素材)</div><div class="fv">教他用"背景冲突→我的判断→取舍→结果反思"讲,重点讲"为什么这么定、舍了什么"</div></div>
+      <div class="field"><div class="fk">结果(信任锤)</div><div class="fv">2 周后拿到 2 个中厂 offer,薪资涨 25%(offer 截图已存)</div></div>
+      <div class="field"><div class="fk">能拆出的内容</div><div class="fv">① "具体讲讲"怎么答 ② 被追问贡献怎么答 ③ 工具人 vs 主导者讲法 ④ 讲述结构 3 步法</div></div>
+    </div>
+  </div>
+
+  <!-- 空卡 ×3 -->
+  <div class="casecard">
+    <div class="case-head"><span class="case-no">案例 1</span><span class="case-name">_______(一句话标签)</span></div>
+    <div class="case-body">
+      <div class="field"><div class="fk">学员标签(脱敏)</div><div class="fv blank">经验 / 学历 / 目标(隐去真名公司)</div></div>
+      <div class="field"><div class="fk">初始问题</div><div class="fv blank">他来时最大的卡点是什么</div></div>
+      <div class="field"><div class="fk">关键场景(选题来源)</div><div class="fv blank">哪道题 / 哪个环节出问题</div></div>
+      <div class="field"><div class="fk">他原来怎么做(错误示范)</div><div class="fv blank">错误说法 → 可做"送命话"素材</div></div>
+      <div class="field"><div class="fk">你怎么改的(方法)</div><div class="fv blank">你的方法 → 可做"解码器/现场表达"素材</div></div>
+      <div class="field"><div class="fk">结果(信任锤)</div><div class="fv blank">拿到什么 offer / 数据对比 / 有无截图</div></div>
+      <div class="field"><div class="fk">能拆出的内容</div><div class="fv blank">这个案例能变成哪几条选题</div></div>
+    </div>
+  </div>
+
+  <div class="casecard">
+    <div class="case-head"><span class="case-no">案例 2</span><span class="case-name">_______</span></div>
+    <div class="case-body">
+      <div class="field"><div class="fk">学员标签(脱敏)</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">初始问题</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">关键场景(选题来源)</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">他原来怎么做(错误示范)</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">你怎么改的(方法)</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">结果(信任锤)</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">能拆出的内容</div><div class="fv blank">　</div></div>
+    </div>
+  </div>
+
+  <div class="casecard">
+    <div class="case-head"><span class="case-no">案例 3</span><span class="case-name">_______</span></div>
+    <div class="case-body">
+      <div class="field"><div class="fk">学员标签(脱敏)</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">初始问题</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">关键场景(选题来源)</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">他原来怎么做(错误示范)</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">你怎么改的(方法)</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">结果(信任锤)</div><div class="fv blank">　</div></div>
+      <div class="field"><div class="fk">能拆出的内容</div><div class="fv blank">　</div></div>
+    </div>
+  </div>
+
+  <div class="tip" style="background:var(--green-bg);border-color:var(--green);">
+    <b style="color:var(--green)">用法:</b>先填 3-5 个你印象最深的真实学员。填完你会发现——<b>每个案例至少能拆出 3-4 条选题</b>,第一个月的内容原料就齐了。脱敏务必做到位(隐去真名、公司、可识别细节)。
+  </div>
+
+</div>
+<footer>开干物料包 · 2026-06-07 · 私信话术(P-M1)+ 案例库(P-C2/P-M4 原料)</footer>
+</body>
+</html>
