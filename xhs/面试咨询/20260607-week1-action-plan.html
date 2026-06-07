@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>第一周作战计划 · 走通内容生产流程</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    :root { --ink:#1a1a1a; --gold:#e8d5a3; --paper:#f5f4f0; --line:#e8e6df; --green:#2e9e6b; --green-bg:#eef9f2; --red:#e05555; --red-bg:#fdf2f2; --muted:#888; }
+    body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; background:var(--paper); color:var(--ink); line-height:1.7; }
+    .hero { background:var(--ink); color:#fff; padding:56px 40px 44px; text-align:center; position:relative; overflow:hidden; }
+    .hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(232,213,163,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(232,213,163,.06) 1px,transparent 1px);background-size:28px 28px;}
+    .hero>*{position:relative;z-index:1;}
+    .hero .tag{display:inline-block;background:var(--gold);color:var(--ink);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:4px 14px;border-radius:2px;margin-bottom:16px;}
+    .hero h1{font-size:32px;font-weight:800;margin-bottom:10px;}
+    .hero .sub{color:var(--gold);font-size:15px;font-weight:600;}
+    .container{max-width:880px;margin:0 auto;padding:0 24px 80px;}
+    .section-header{display:flex;align-items:center;gap:14px;margin:48px 0 18px;}
+    .section-num{width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--gold);font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .section-title{font-size:21px;font-weight:800;}
+    .section-sub{font-size:13px;color:var(--muted);}
+
+    .mind{background:var(--ink);color:#fff;border-radius:12px;padding:22px;}
+    .mind .big{font-size:18px;font-weight:800;color:var(--gold);line-height:1.5;}
+    .mind p{font-size:13.5px;color:#ddd;margin-top:8px;line-height:1.7;}
+
+    .prep{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    @media(max-width:600px){.prep{grid-template-columns:1fr;}}
+    .pcard{background:#fff;border-radius:10px;padding:16px 18px;border-left:4px solid var(--gold);}
+    .pcard h4{font-size:14px;font-weight:800;margin-bottom:5px;}
+    .pcard p{font-size:13px;color:#555;}
+
+    .day{background:#fff;border-radius:12px;border:1px solid var(--line);margin-bottom:12px;overflow:hidden;}
+    .day-head{display:flex;align-items:center;gap:12px;padding:12px 20px;background:#242424;color:#fff;}
+    .day-tag{background:var(--gold);color:var(--ink);font-weight:800;font-size:12px;padding:3px 10px;border-radius:5px;white-space:nowrap;}
+    .day-title{font-size:15px;font-weight:800;flex:1;}
+    .day-step{font-size:11px;color:#bbb;}
+    .day-body{padding:14px 20px;}
+    ul.todo{list-style:none;font-size:14px;}
+    ul.todo li{padding:6px 0 6px 26px;position:relative;line-height:1.5;}
+    ul.todo li::before{content:"☐";position:absolute;left:2px;color:var(--gold);font-weight:800;}
+    .tool{display:inline-block;background:var(--ink);color:var(--gold);font-size:11px;padding:1px 7px;border-radius:4px;margin-left:4px;}
+
+    .base{background:var(--green-bg);border-left:4px solid var(--green);border-radius:8px;padding:16px 20px;font-size:14px;}
+    .base h4{color:var(--green);font-size:14px;margin-bottom:8px;}
+    .base ul{list-style:none;}
+    .base li{padding:4px 0 4px 22px;position:relative;}
+    .base li::before{content:"✓";position:absolute;left:2px;color:var(--green);font-weight:800;}
+
+    .dont{background:var(--red-bg);border-left:4px solid var(--red);border-radius:8px;padding:16px 20px;font-size:14px;}
+    .dont h4{color:var(--red);font-size:14px;margin-bottom:8px;}
+    .dont ul{list-style:none;}
+    .dont li{padding:4px 0 4px 22px;position:relative;}
+    .dont li::before{content:"✗";position:absolute;left:2px;color:var(--red);font-weight:800;}
+    footer{text-align:center;padding:32px 0 48px;font-size:12px;color:#bbb;}
+  </style>
+</head>
+<body>
+<div class="hero">
+  <div class="tag">第一周作战计划</div>
+  <h1>走通内容生产流程</h1>
+  <div class="sub">目标不是出爆款，是跑通流程 + 验证方向</div>
+</div>
+
+<div class="container">
+
+  <div class="mind" style="margin-top:28px;">
+    <div class="big">第一周只赌一件事:把 1 个母体 → 5 条内容 → 发出去 → 看数据。</div>
+    <p>博商逻辑:爆款是从一批里<b style="color:#fff">筛</b>出来的,不是第一条憋出来的。第一周让四齿轮用最小版本转起来——产能(切 5 条)、内容公式(套上)、赛马(多角度看数据)、漏斗(留私信钩子)。<b style="color:#fff">不追求完美,追求"跑完一圈、拿到第一波真实反馈"。</b></p>
+  </div>
+
+  <!-- 0 开跑前装备 -->
+  <div class="section-header"><div class="section-num">0</div><div><div class="section-title">开跑前 · 轻装备(半天搞定)</div><div class="section-sub">别搭全套,够第一周用就行</div></div></div>
+  <div class="prep">
+    <div class="pcard"><h4>📱 账号</h4><p>小红书(主)+ 视频号。简介:「前腾讯 PM/面试官 · 教你面试现场怎么说」</p></div>
+    <div class="pcard"><h4>🔨 视觉锤(封面模板)</h4><p>1 个固定模板,直接用跑通示范那个墨金风(大字钉 + "前腾讯面试官")</p></div>
+    <div class="pcard"><h4>📚 案例库</h4><p>整理 <b>3-5 个真实学员案例</b>(脱敏)——这是你内容的独家原料,别人抄不走</p></div>
+    <div class="pcard"><h4>💬 私信话术</h4><p>1 条标准首响,接住来「领模板」的人(顺手打标:岗位/经验/目标公司)</p></div>
+  </div>
+
+  <!-- Day by day -->
+  <div class="section-header"><div class="section-num">1</div><div><div class="section-title">7 天 · 按天作战</div><div class="section-sub">对应图纸 L1 工序,每条发布前过 eric-boshang 质检</div></div></div>
+
+  <div class="day">
+    <div class="day-head"><span class="day-tag">Day 1</span><span class="day-title">选题</span><span class="day-step">P-C1 选题六步</span></div>
+    <div class="day-body"><ul class="todo">
+      <li>锁定本周母题:<b>现场表达</b>(讲出自己的亮点 + 扛追问)<span class="tool">eric-xhs-topic</span></li>
+      <li>拆 5 个具体场景选题:讲项目卡壳 / 被追问"你的贡献" / 自我介绍讲不出亮点 / 谈薪不会说 / 离职原因</li>
+      <li>每个选题配 1 个你的真实学员案例</li>
+      <li>各起 1 个语言钉标题(面试官视角)<span class="tool">eric-xhs-title</span></li>
+    </ul></div>
+  </div>
+
+  <div class="day">
+    <div class="day-head"><span class="day-tag">Day 2</span><span class="day-title">母体生产</span><span class="day-step">P-C2 母体三步 🔒你</span></div>
+    <div class="day-body"><ul class="todo">
+      <li>对着 5 个选题,<b>一次性口述录制</b>(不写稿,手机录音/录像即可)</li>
+      <li>每条讲清:面试官在评估什么 + 那个真实案例 + 该怎么说</li>
+      <li>AI 转写成文字,存母体库</li>
+    </ul></div>
+  </div>
+
+  <div class="day">
+    <div class="day-head"><span class="day-tag">Day 3</span><span class="day-title">脚本 + 切片</span><span class="day-step">P-C3 + P-C4</span></div>
+    <div class="day-body"><ul class="todo">
+      <li>AI 把口述转四段式脚本(痛点→观点→案例→行动)<span class="tool">eric-content</span><span class="tool">eric-hook</span></li>
+      <li>每条留"私信领模板"钩子(模糊结论,导流)</li>
+      <li>切成第一批 <b>5 条</b>成品稿(不同角度)</li>
+    </ul></div>
+  </div>
+
+  <div class="day">
+    <div class="day-head"><span class="day-tag">Day 4</span><span class="day-title">成品制作</span><span class="day-step">P-C5 成品四步</span></div>
+    <div class="day-body"><ul class="todo">
+      <li>套封面模板出 5 张封面(统一视觉锤)<span class="tool">eric-xhs-cover</span></li>
+      <li>排版 + 过 AI 味检测,超标重写<span class="tool">eric-ai-check</span></li>
+      <li><b>发布前每条过 eric-boshang 四齿轮质检</b>,不达标打回</li>
+    </ul></div>
+  </div>
+
+  <div class="day">
+    <div class="day-head"><span class="day-tag">Day 5</span><span class="day-title">发布</span><span class="day-step">P-C6 分发三步</span></div>
+    <div class="day-body"><ul class="todo">
+      <li>5 条发小红书(主)+ 视频号,错峰发(别一次全发)</li>
+      <li>每条评论区/简介挂私信钩子</li>
+      <li>本周内容定位为"引流",先不卖任何东西</li>
+    </ul></div>
+  </div>
+
+  <div class="day">
+    <div class="day-head"><span class="day-tag">Day 6-7</span><span class="day-title">观察 + 承接 + 复盘</span><span class="day-step">P-C7 + P-M1</span></div>
+    <div class="day-body"><ul class="todo">
+      <li>回收 5 条数据:赞藏 / 完播 / <b>私信数</b>(私信最重要)<span class="tool">app:stats</span></li>
+      <li>来私信的:用话术接住 + 打标(P-M1 承接)</li>
+      <li>复盘:哪个角度/钩子数据最好 → 下周复制它的结构<span class="tool">eric-benchmark</span></li>
+    </ul></div>
+  </div>
+
+  <!-- 成功标准 -->
+  <div class="section-header"><div class="section-num">2</div><div><div class="section-title">第一周成功标准</div><div class="section-sub">来自三阶段路线的 MVP 基准线</div></div></div>
+  <div class="base">
+    <h4>达到任一即算"方向跑通",可以加大产能</h4>
+    <ul>
+      <li><b>流程跑通</b>:5 条全部产出并发布(这是底线,必须做到)</li>
+      <li><b>数据信号</b>:有 1 条 24h 赞藏破 100-200,<b>或</b> 单条带来 5-10 个私信/加微</li>
+      <li><b>方向信号</b>:评论区出现"求模板/怎么找你/说到我了"</li>
+    </ul>
+  </div>
+
+  <!-- 别做 -->
+  <div class="section-header"><div class="section-num">3</div><div><div class="section-title">第一周别做(博商红线)</div><div class="section-sub">这些是后面的事,第一周做=分散精力/烧钱</div></div></div>
+  <div class="dont">
+    <h4>克制住,别碰</h4>
+    <ul>
+      <li>别堆账号矩阵——个人学不了博商上百号,<b>3 个号够</b></li>
+      <li>别上付费投流——先纯自然流验证内容戳不戳人(求职内容自然流质量高)</li>
+      <li>别急着做低价课/卖货——先验证内容,有稳定私信再谈变现</li>
+      <li>别为单条憋到完美——量 + 数据 &gt; 单条惊艳,发出去才有反馈</li>
+      <li>别数涨了多少粉——第一周看的是"有没有人被戳到",不是粉丝数</li>
+    </ul>
+  </div>
+
+</div>
+<footer>第一周作战计划 · 2026-06-07 起 · 跑通流程 + 验证方向 · 配合 IP 工厂图纸 L1</footer>
+</body>
+</html>
