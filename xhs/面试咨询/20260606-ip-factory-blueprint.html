@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>面试咨询 IP 工厂图纸 v2 · Production Blueprint</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink: #1a1a1a;
+      --gold: #e8d5a3;
+      --paper: #f5f4f0;
+      --line: #e8e6df;
+      --green: #2e9e6b;
+      --green-bg: #eef9f2;
+      --red: #e05555;
+      --red-bg: #fdf2f2;
+      --muted: #888;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.7;
+    }
+    code, .mono {
+      font-family: "SF Mono", "JetBrains Mono", "Menlo", monospace;
+      font-size: 0.86em;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      background: var(--ink);
+      color: #fff;
+      padding: 64px 40px 52px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: "";
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(232,213,163,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(232,213,163,0.06) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+    }
+    .hero > * { position: relative; z-index: 1; }
+    .hero .tag {
+      display: inline-block;
+      background: var(--gold);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 2px;
+      margin-bottom: 20px;
+    }
+    .hero h1 { font-size: 38px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 14px; }
+    .hero .strategy {
+      max-width: 620px; margin: 0 auto 16px;
+      font-size: 16px; color: var(--gold); font-weight: 600; line-height: 1.6;
+    }
+    .hero .meta { color: #888; font-size: 13px; }
+
+    .container { max-width: 920px; margin: 0 auto; padding: 0 24px 90px; }
+
+    /* ── Section Header ── */
+    .section-header { display: flex; align-items: center; gap: 16px; margin: 64px 0 24px; }
+    .section-num {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: var(--ink); color: var(--gold);
+      font-size: 16px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .section-title { font-size: 23px; font-weight: 800; }
+    .section-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    /* ── L0 总装图 ── */
+    .factory-flow {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch;
+      background: var(--ink); border-radius: 14px; padding: 22px; margin-bottom: 14px;
+    }
+    .fcell {
+      flex: 1; min-width: 120px;
+      background: #242424; border-radius: 10px; padding: 14px 12px; text-align: center;
+      border-top: 3px solid var(--gold); position: relative;
+    }
+    .fcell .fname { color: #fff; font-weight: 800; font-size: 15px; margin-bottom: 6px; }
+    .fcell .fio { color: #999; font-size: 11px; line-height: 1.5; }
+    .fcell .fmetric { color: var(--gold); font-size: 11px; font-weight: 700; margin-top: 8px; }
+    .farrow { color: var(--gold); align-self: center; font-size: 18px; flex: 0 0 auto; }
+    .feedback-note {
+      text-align: center; font-size: 12px; color: var(--gold);
+      background: #242424; border-radius: 8px; padding: 10px; margin-bottom: 22px;
+    }
+
+    .l0-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; font-size: 13px; }
+    .l0-table th { background: var(--ink); color: var(--gold); padding: 11px 14px; text-align: left; font-size: 12px; letter-spacing: 1px; }
+    .l0-table td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .l0-table tr:last-child td { border-bottom: none; }
+    .l0-table tr:hover td { background: #fafaf8; }
+
+    /* ── 图例 / 模板 ── */
+    .legend-box { background: #fff; border-radius: 12px; padding: 24px; border-left: 4px solid var(--gold); }
+    .legend-box h4 { font-size: 15px; font-weight: 800; margin-bottom: 14px; }
+    .field-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 24px; font-size: 13px; }
+    @media (max-width: 600px) { .field-grid { grid-template-columns: 1fr; } }
+    .field-grid .f { display: flex; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+    .field-grid .fn { font-weight: 800; color: var(--ink); flex-shrink: 0; }
+    .field-grid .fd { color: #555; }
+
+    .lvl-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    .lvl-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #555; background: var(--paper); border-radius: 6px; padding: 6px 10px; }
+
+    /* ── 自动化等级徽章 ── */
+    .lvl { display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px; }
+    .lvl.l0 { background: #eceae3; color: #777; }
+    .lvl.l1 { background: #f3e8c8; color: #8a6d2f; }
+    .lvl.l2 { background: var(--gold); color: var(--ink); }
+    .lvl.l3 { background: #2a7d52; color: #fff; }
+
+    /* ── 工序卡 ── */
+    .station-band { display: flex; align-items: center; gap: 12px; margin: 30px 0 16px; }
+    .station-band .bar { height: 1px; flex: 1; background: var(--line); }
+    .station-band .label { font-size: 12px; font-weight: 800; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+
+    .pcard { background: #fff; border-radius: 14px; padding: 0; margin-bottom: 16px; overflow: hidden; border: 1px solid var(--line); }
+    .pcard-head {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 22px; background: var(--ink); color: #fff;
+    }
+    .pcode { background: var(--gold); color: var(--ink); font-weight: 800; font-size: 13px; padding: 3px 10px; border-radius: 5px; flex-shrink: 0; }
+    .pname { font-size: 17px; font-weight: 800; flex: 1; }
+    .powner { font-size: 12px; color: #ccc; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .powner .lock { color: var(--gold); }
+
+    .pcard-body { padding: 20px 22px; }
+    .io-row {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      background: var(--paper); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px;
+    }
+    .io-row .io-item { flex: 1; min-width: 140px; }
+    .io-row .io-label { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
+    .io-row .io-val { font-weight: 600; }
+    .io-row .io-arrow { color: var(--gold); font-size: 20px; font-weight: 800; flex: 0 0 auto; }
+
+    .blk { margin-bottom: 16px; }
+    .blk:last-child { margin-bottom: 0; }
+    .blk-label { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; margin-bottom: 7px; display: flex; align-items: center; gap: 6px; }
+    .sop-list { list-style: none; font-size: 13.5px; color: #333; }
+    .sop-list li { padding: 3px 0 3px 26px; position: relative; }
+    .sop-list li .n { position: absolute; left: 0; top: 3px; width: 18px; height: 18px; background: var(--paper); border-radius: 5px; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; color: var(--ink); }
+
+    .qc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 600px) { .qc-grid { grid-template-columns: 1fr; } }
+    .qc { border-radius: 8px; padding: 11px 14px; font-size: 13px; line-height: 1.55; }
+    .qc.pass { background: var(--green-bg); border-left: 3px solid var(--green); }
+    .qc.fail { background: var(--red-bg); border-left: 3px solid var(--red); }
+    .qc .qc-h { font-size: 11px; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .qc.pass .qc-h { color: var(--green); }
+    .qc.fail .qc-h { color: var(--red); }
+
+    .calib { background: var(--paper); border-radius: 8px; padding: 12px 14px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+    .calib .ci { display: flex; flex-direction: column; }
+    .calib .ci-l { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
+    .calib .ci-v { font-weight: 700; }
+    .badge-tbc { display: inline-block; background: #fff4d6; color: #997000; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 3px; vertical-align: middle; }
+
+    .auto-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+    .auto-path { display: inline-flex; align-items: center; gap: 6px; }
+    .auto-path .arrow { color: var(--muted); }
+    .mod-tag { display: inline-block; background: var(--ink); color: var(--gold); font-size: 11px; padding: 2px 8px; border-radius: 4px; margin: 2px 2px 0 0; }
+    .mod-tag.todo { background: #fff; color: var(--red); border: 1px dashed var(--red); }
+
+    /* ── 附录表 ── */
+    .appx-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; font-size: 13px; }
+    .appx-table th { background: var(--ink); color: var(--gold); padding: 11px 14px; text-align: left; font-size: 12px; letter-spacing: 0.5px; }
+    .appx-table td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .appx-table tr:last-child td { border-bottom: none; }
+    .appx-table tr:hover td { background: #fafaf8; }
+    .appx-table code { background: var(--paper); padding: 1px 6px; border-radius: 4px; }
+    .st-have { color: var(--green); font-weight: 700; }
+    .st-todo { color: var(--red); font-weight: 700; }
+
+    /* ── 自动化演进三栏 ── */
+    .evo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    @media (max-width: 720px) { .evo-grid { grid-template-columns: 1fr; } }
+    .evo-col { background: #fff; border-radius: 12px; padding: 18px; border-top: 4px solid var(--line); }
+    .evo-col.now { border-top-color: #ccc; }
+    .evo-col.next { border-top-color: var(--gold); }
+    .evo-col.lock { border-top-color: var(--ink); }
+    .evo-col h5 { font-size: 14px; font-weight: 800; margin-bottom: 10px; }
+    .evo-col ul { list-style: none; font-size: 13px; color: #444; }
+    .evo-col li { padding: 5px 0; border-bottom: 1px solid var(--paper); }
+    .evo-col li:last-child { border-bottom: none; }
+
+    /* ── 工业级 SOP · 标准作业书 ── */
+    .sop-step { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+    .sop-step:last-child { margin-bottom: 0; }
+    .sop-step-head { display: flex; align-items: center; gap: 10px; background: var(--paper); padding: 10px 14px; }
+    .sop-step-head .sn { width: 22px; height: 22px; border-radius: 6px; background: var(--ink); color: var(--gold); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .sop-step-head .stitle { font-weight: 800; font-size: 14px; }
+    .sop-step-head .sowner { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .sop-spec { padding: 12px 14px; display: grid; grid-template-columns: max-content 1fr; gap: 7px 14px; font-size: 13px; }
+    @media (max-width: 600px) { .sop-spec { grid-template-columns: 1fr; gap: 2px 0; } .sop-spec dt { padding-top: 9px; } }
+    .sop-spec dt { font-weight: 800; color: var(--muted); font-size: 10.5px; letter-spacing: 0.5px; text-transform: uppercase; padding-top: 2px; white-space: nowrap; }
+    .sop-spec dd { color: #333; line-height: 1.55; }
+    .pill { display: inline-block; background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 1px 7px; margin: 1px 3px 1px 0; font-size: 12px; }
+    .pill.tool { background: var(--ink); color: var(--gold); border-color: var(--ink); }
+    .pill.todo { background: #fff; color: var(--red); border: 1px dashed var(--red); }
+    .code-block { background: #14171c; color: #d6dbe2; border-radius: 8px; padding: 12px 14px; margin-top: 4px; font-family: "SF Mono", "Menlo", monospace; font-size: 11.5px; line-height: 1.6; overflow-x: auto; white-space: pre; }
+    .code-block .ck { color: #9ecbff; }
+    .code-block .cs { color: #e8d5a3; }
+    .code-block .cc { color: #6b7280; }
+    .code-block .cn { color: #c3e88d; }
+
+    /* ── 数据源可行性表 ── */
+    .src-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 2px; background: #fff; }
+    .src-table th { background: #242424; color: var(--gold); padding: 6px 9px; text-align: left; font-size: 10.5px; letter-spacing: 0.3px; }
+    .src-table td { padding: 6px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .src-table tr:last-child td { border-bottom: none; }
+    .fea { font-weight: 700; font-size: 10.5px; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
+    .fea.ok { background: var(--green-bg); color: var(--green); }
+    .fea.dev { background: #f3e8c8; color: #8a6d2f; }
+    .fea.hard { background: var(--red-bg); color: var(--red); }
+    .fea.man { background: #eceae3; color: #555; }
+
+    .divider { height: 1px; background: linear-gradient(to right, transparent, #ccc, transparent); margin: 64px 0 0; }
+
+    footer { text-align: center; padding: 36px 0 48px; font-size: 12px; color: #bbb; }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="tag">面试咨询 · 生产图纸 Production Blueprint</div>
+  <h1>IP 工厂图纸 v2</h1>
+  <div class="strategy">不培养一个人，而是工业化生产 IP。<br>选题是调研出来的，内容是流水线产出的，爆款是数据筛出来的，规模是 AI 放大的。</div>
+  <div class="meta">2026-06-06 &nbsp;·&nbsp; 升级自 v1 战略手册 &nbsp;·&nbsp; 第一阶段：图纸 → 第二阶段：施工系统</div>
+</div>
+
+<div class="container">
+
+  <!-- ════════ L0 全厂总装图 ════════ -->
+  <div class="section-header">
+    <div class="section-num">L0</div>
+    <div>
+      <div class="section-title">全厂总装图</div>
+      <div class="section-sub">一页鸟瞰整条产线 · 六车间闭环 · 数据与案例反哺回选题</div>
+    </div>
+  </div>
+
+  <div class="factory-flow">
+    <div class="fcell"><div class="fname">选题</div><div class="fio">需求 → 选题清单</div><div class="fmetric">命中率 ≥ 30%</div></div>
+    <div class="farrow">→</div>
+    <div class="fcell"><div class="fname">生产</div><div class="fio">选题+母体 → 成品</div><div class="fmetric">单母体 ≥ 10 条</div></div>
+    <div class="farrow">→</div>
+    <div class="fcell"><div class="fname">分发</div><div class="fio">成品 → 多平台</div><div class="fmetric">覆盖 ≥ 3 平台</div></div>
+    <div class="farrow">→</div>
+    <div class="fcell"><div class="fname">数据</div><div class="fio">数据 → 爆款判定</div><div class="fmetric">爆款率 ≥ 5%</div></div>
+    <div class="farrow">→</div>
+    <div class="fcell"><div class="fname">私域</div><div class="fio">流量 → 意向</div><div class="fmetric">承接率 ≥ 80%</div></div>
+    <div class="farrow">→</div>
+    <div class="fcell"><div class="fname">成交</div><div class="fio">意向 → 客户</div><div class="fmetric">付费 ≥ 5%</div></div>
+  </div>
+  <div class="feedback-note">↻ 闭环反哺：成交客户的案例 + 各平台数据 → 回灌「选题」车间，工厂自我迭代</div>
+
+  <table class="l0-table">
+    <thead><tr><th>车间</th><th>输入 → 输出</th><th>关键标定值 <span class="badge-tbc">待校准</span></th><th>当前自动化</th></tr></thead>
+    <tbody>
+      <tr><td><b>选题</b></td><td>市场需求 → 选题清单</td><td>选题命中率 ≥ 30%</td><td><span class="lvl l1">L1</span></td></tr>
+      <tr><td><b>生产</b></td><td>选题+母体 → 成品内容</td><td>单母体产出 ≥ 10 条</td><td><span class="lvl l1">L1</span> → <span class="lvl l2">L2</span></td></tr>
+      <tr><td><b>分发</b></td><td>成品 → 多平台发布</td><td>覆盖 ≥ 3 平台</td><td><span class="lvl l1">L1</span> → <span class="lvl l2">L2</span></td></tr>
+      <tr><td><b>数据</b></td><td>发布数据 → 爆款判定</td><td>爆款率 ≥ 5%</td><td><span class="lvl l2">L2</span></td></tr>
+      <tr><td><b>私域</b></td><td>公域流量 → 意向用户</td><td>私信承接率 ≥ 80%</td><td><span class="lvl l0">L0</span> → <span class="lvl l1">L1</span></td></tr>
+      <tr><td><b>成交</b></td><td>意向 → 付费客户</td><td>付费转化 ≥ 5%</td><td><span class="lvl l0">L0</span> 🔒</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ════════ 工序卡模板 / 图例 ════════ -->
+  <div class="section-header">
+    <div class="section-num" style="background:var(--gold); color:var(--ink);">★</div>
+    <div>
+      <div class="section-title">工序卡 · 标准件</div>
+      <div class="section-sub">全图纸的原子单元，也是第二阶段的系统模块说明书 · 每张卡固定 8 字段</div>
+    </div>
+  </div>
+
+  <div class="legend-box">
+    <h4>每张工序卡固定 8 个字段</h4>
+    <div class="field-grid">
+      <div class="f"><span class="fn">①工序号·名</span><span class="fd">P-C/P-M 编号 + 名称</span></div>
+      <div class="f"><span class="fn">②输入物料</span><span class="fd">上一道工序的产出</span></div>
+      <div class="f"><span class="fn">③输出成品</span><span class="fd">交给下一道的东西</span></div>
+      <div class="f"><span class="fn">④负责人</span><span class="fd">👤人 / 🤖AI / 协作</span></div>
+      <div class="f"><span class="fn">⑤作业标准</span><span class="fd">SOP，3-5 步可执行</span></div>
+      <div class="f"><span class="fn">⑥检验标准</span><span class="fd">质量闸门：合格 vs 废品</span></div>
+      <div class="f"><span class="fn">⑦数据标定</span><span class="fd">基准值+公式+校准方式</span></div>
+      <div class="f"><span class="fn">⑧自动化路线</span><span class="fd">L0→L3 当前位+升级模块</span></div>
+    </div>
+    <div class="lvl-legend">
+      <span class="lvl-chip"><span class="lvl l0">L0</span> 纯人工</span>
+      <span class="lvl-chip"><span class="lvl l1">L1</span> AI 辅助·人改定</span>
+      <span class="lvl-chip"><span class="lvl l2">L2</span> AI 主导·人审</span>
+      <span class="lvl-chip"><span class="lvl l3">L3</span> 全自动</span>
+      <span class="lvl-chip">🔒 永久人工锁定</span>
+    </div>
+  </div>
+
+  <!-- ════════ L1 内容生产车间 ════════ -->
+  <div class="section-header">
+    <div class="section-num">L1</div>
+    <div>
+      <div class="section-title">内容生产车间</div>
+      <div class="section-sub">画到最深 · 7 道工序闭环 · 放大走「单 IP 多产能 + 多平台分发」</div>
+    </div>
+  </div>
+
+  <!-- P-C1 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-C1</span><span class="pname">选题立项</span><span class="powner">🤖→👤 审</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">市场需求信号（评论提问 / 竞品爆款 / 搜索词 / 高频咨询问题）</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">立项选题卡（目标人群 + 痛点 + 预期钩子）</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 选题六步</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">锁定母题</span><span class="sowner">👤 定 + 🤖 辅助</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd>你定方向 + <span class="pill tool">eric-xhs-topic</span> 辅助</dd>
+            <dt>触发时机</dt><dd>每周一次，定本周主攻方向</dd>
+            <dt>动作</dt><dd>从「面试表达」三主轴里选 1 个本周母题：<span class="pill">送命话</span><span class="pill">解码器</span><span class="pill">谈薪·应对追问</span></dd>
+            <dt>输出</dt><dd>本周母题方向（如「送命话」）+ 目标人群（应届 / 社招 / 转行）</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">采集素材 · 三来源</span><span class="sowner">🤖 抓取 + 👤 案例库</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd>分平台双轨：公众号走脚本自动 <span class="pill tool">app:scrape</span>；反爬平台人工 / 半自动 <span class="pill tool">web-access</span><span class="pill">你 + 助理</span></dd>
+            <dt>触发时机</dt><dd>自动源 每日 <b>09:00</b> 定时；人工源 <b>每周一</b>批量录入；统一回看 <b>近 7 天</b></dd>
+            <dt>检索词</dt><dd><span class="pill">面试</span><span class="pill">求职</span><span class="pill">offer</span><span class="pill">薪资谈判</span><span class="pill">空窗期</span><span class="pill">背调</span><span class="pill">转行</span><span class="pill">简历</span></dd>
+            <dt>数据源·可行性</dt><dd>
+              <table class="src-table">
+                <thead><tr><th>数据源</th><th>获取方式</th><th>状态</th></tr></thead>
+                <tbody>
+                  <tr><td>微信公众号</td><td>RSSHub feed</td><td><span class="fea ok">✅ 已实现</span> 仅标题/链接/时间</td></tr>
+                  <tr><td>知乎 · 微博</td><td>RSSHub 路由</td><td><span class="fea dev">🔧 需开发</span> 路由会失效，要维护</td></tr>
+                  <tr><td>小红书 · 抖音</td><td>登录态 + 无头浏览器</td><td><span class="fea hard">⚠️ 高难·需 PoC</span> 强反爬，未必稳定</td></tr>
+                  <tr><td>脉脉 · BOSS · 看准</td><td>人工收集</td><td><span class="fea man">👤 人工兜底</span> 强反爬 + 合规风险</td></tr>
+                </tbody>
+              </table>
+            </dd>
+            <dt>抓取维度</dt><dd><b>自动可得</b>（公众号）：标题 · 链接 · 发布时间。<br><b>需人工/半自动补录</b>：互动数(赞藏评转) · 评论区提问 · 搜索热度 · 作者粉丝量 —— 多数平台无开放接口，前端可见时手动记，否则不采集。</dd>
+            <dt>人工兜底</dt><dd>抓不动的平台 → 每周固定时段挑当周高互动内容，按统一 JSON 模板手动录入（可用 <span class="pill tool">web-access</span> 半自动提取）。<b>关键：人工与自动写入同一 schema，下游工序无差别对待。</b></dd>
+            <dt>输出格式</dt><dd>统一 JSON（schema ↓）→ 写入 <span class="pill tool">app:hot-topics</span> 表 + 归档至 <span class="pill">知识库/原始数据池</span></dd>
+          </dl>
+          <div class="code-block"><span class="cc">// 统一输出 schema · 每平台每日一个文件，逐条写入 hot-topics 表</span>
+{
+  <span class="ck">"platform"</span>: <span class="cs">"xiaohongshu"</span>,
+  <span class="ck">"crawled_at"</span>: <span class="cs">"2026-06-06T09:00:00+08:00"</span>,
+  <span class="ck">"keyword"</span>: <span class="cs">"面试 薪资谈判"</span>,
+  <span class="ck">"items"</span>: [
+    {
+      <span class="ck">"id"</span>: <span class="cs">"65f3a..."</span>,
+      <span class="ck">"title"</span>: <span class="cs">"面试被问期望薪资，这样答多拿 30%"</span>,
+      <span class="ck">"summary"</span>: <span class="cs">"..."</span>,
+      <span class="ck">"published_at"</span>: <span class="cs">"2026-06-03"</span>,
+      <span class="ck">"metrics"</span>: { <span class="ck">"likes"</span>: <span class="cn">1203</span>, <span class="ck">"collects"</span>: <span class="cn">890</span>, <span class="ck">"comments"</span>: <span class="cn">156</span>, <span class="ck">"shares"</span>: <span class="cn">44</span> },
+      <span class="ck">"top_comments"</span>: [<span class="cs">"被问期望薪资怎么答"</span>, <span class="cs">"空窗期一年怎么解释"</span>],
+      <span class="ck">"search_heat"</span>: <span class="cn">87</span>,
+      <span class="ck">"author"</span>: { <span class="ck">"name"</span>: <span class="cs">"职场..."</span>, <span class="ck">"followers"</span>: <span class="cn">12000</span> }
+    }
+  ]
+}</div>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">拆场景（母题 → 具体选题）</span><span class="sowner">🤖→👤</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd>AI 拆 + 你用案例库校</dd>
+            <dt>动作</dt><dd>把母题拆成<b>单一具体场景</b>，一个场景 = 一个选题。例「送命话」→ 离职原因 / 缺点题 / 空窗期 / 期望薪资 / 反问环节</dd>
+            <dt>素材依据</dt><dd>① <b>你的辅导案例库</b>（独家，真实学员踩过的坑）② 评论区/私信真实提问 ③ 竞品爆款角度 <span class="pill tool">eric-xhs-deconstruct</span></dd>
+            <dt>检验</dt><dd>一个选题只锁<b>一个场景 + 一个痛点</b>，不贪大（「面试技巧大全」=废）</dd>
+            <dt>输出</dt><dd>候选选题清单（每条：场景 + 痛点）</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">4</span><span class="stitle">提语言钉（标题钩子）</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd><span class="pill tool">eric-xhs-title</span></dd>
+            <dt>动作</dt><dd>每个候选选题套标题公式，提炼「语言钉」——一句戳痛、记得住，用<b>面试官视角</b></dd>
+            <dt>范例</dt><dd>「我在腾讯面了 300 个 PM，挂在这句话上的最多」/「离职原因说这 3 句，面试官当场把你划掉」</dd>
+            <dt>输出</dt><dd>带钩子标题的候选选题</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">5</span><span class="stitle">三维打分</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd><span class="pill tool">eric-xhs-topic</span></dd>
+            <dt>触发时机</dt><dd>步骤 1 抓取任务完成后<b>自动触发</b></dd>
+            <dt>打分方法</dt><dd>痛点 × 搜索量 × 购买意愿，各维 <b>1-5 分</b>，乘积模型（非加权）</dd>
+            <dt>维度·公式</dt><dd>痛点强度 = 评论区情绪强度 + 提问频次<br>搜索量 = 平台搜索热度分位<br>购买意愿 = 是否「花钱可解决」（简历/模拟面试/offer 谈判 = 高分）<br><b>综合分 = 痛点 × 搜索量 × 购买意愿</b>（任一维 &lt; 3 一票否决）</dd>
+            <dt>合格阈值</dt><dd>三维各 <b>≥ 3</b> 且 综合 <b>≥ 27</b>（满分 125）才进入立项候选</dd>
+            <dt>输出格式</dt><dd>打分表 JSON：<span class="pill">topic_id</span><span class="pill">pain</span><span class="pill">search</span><span class="pill">intent</span><span class="pill">score</span><span class="pill">verdict</span></dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">6</span><span class="stitle">产出选题卡 + 赛马预备</span><span class="sowner">👤 你</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd>你本人终审 · 每日约 <b>10 分钟</b></dd>
+            <dt>触发时机</dt><dd>步骤 5 打分完成后当日</dd>
+            <dt>判断清单</dt><dd>① 符合人设吗（前腾讯面试官）　② 你有真实案例/独到观点吗　③ 能导向变现吗<br><b>三问全 Yes 才放行</b></dd>
+            <dt>输出格式</dt><dd>立项选题卡（母题 + 场景 + 痛点 + 语言钉标题 + 角度 + 预期形式）→ 流入 P-C2</dd>
+            <dt>赛马预备</dt><dd>每个选题预留 <b>3-5 个角度版本</b>（人群切片/痛点切片），供 P-C5 切片 + 数据赛马用</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>三维度均过阈值，且落在「面试表达」三主轴(送命话 / 解码器 / 谈薪·应对追问)</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>纯蹭热点 / 与变现无关 / 自嗨选题</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">命中率 ≥ 30%</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">带来询盘的选题数 ÷ 立项选题数</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">跑满 30 个选题后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path">抓取 <span class="lvl l0">L0</span>/<span class="lvl l1">L1</span> 混合 <span class="arrow">→</span> <span class="lvl l2">L2</span></span>
+          <span><span class="mod-tag">app:scrape·仅公众号</span><span class="mod-tag todo">多平台抓取·需开发</span><span class="mod-tag">eric-xhs-topic</span><span class="mod-tag">app:hot-topics</span></span>
+        </div>
+        <div style="font-size:12px; color:var(--muted); margin-top:6px;">现状：公众号自动(L1)、其余人工/半自动(L0)；打分与终审已可用。升 L2 的前提＝多平台抓取打通。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-C2 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-C2</span><span class="pname">母体生产</span><span class="powner"><span class="lock">🔒</span> 👤 不可替代</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">立项选题卡</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">原始母体素材（出镜口播 / 一次真实咨询的洞察）</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 母体三步</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">选案例</span><span class="sowner">👤 你 + 🤖 检索</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>从你的<b>辅导案例库</b>挑 1 个最匹配本周选题场景的真实学员案例(脱敏)</dd>
+            <dt>没有案例时</dt><dd>用你亲历的面试官见闻替代——绝不编</dd>
+            <dt>输出</dt><dd>选定案例 + 它要佐证的核心观点</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">口述录制</span><span class="sowner"><span class="lock">🔒</span> 👤 不可替代</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>围绕选题口述核心观点 + 这个真实案例，<b>不写稿</b>；录音或出镜录像</dd>
+            <dt>视角要求</dt><dd>用<b>面试官视角</b>讲"为什么"——他在评估什么、这句为什么会死</dd>
+            <dt>输出</dt><dd>原始录音 / 录像</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">转写留存</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>语音转文字，存入<b>母体库</b>并打标(母题 / 场景 / 关联案例)</dd>
+            <dt>输出</dt><dd>母体素材(文字 + 音视频)→ 流入 P-C3</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>观点清晰 + 有真实案例 + 有「只有你能讲」的独特性</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>正确的废话 / 无案例 / 可被任何人替代</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">复用率 ≥ 8 条/母体</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">一个母体切出的成品数</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">跑满 10 个母体后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l0">L0</span> 🔒 永久人工</span><span style="color:var(--muted); font-size:12px;">— 这是你不可替代的价值源，不交给 AI</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-C3 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-C3</span><span class="pname">脚本结构化</span><span class="powner">🤖→👤 审</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">原始母体素材</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">结构化脚本（痛点开头→观点→案例→行动指令）</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 脚本四步</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">转四段式结构</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd><span class="pill tool">eric-content</span></dd>
+            <dt>动作</dt><dd>把口述整理成博商四段式：<b>痛点场景开头 → 专业观点 → 真实案例 → 行动指令</b></dd>
+            <dt>输出</dt><dd>结构化初稿</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">套钩子(语言钉开头)</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd><span class="pill tool">eric-hook</span></dd>
+            <dt>动作</dt><dd>开头 3 秒钩子，10-15 方案选最佳；面试官视角("我面了 300 个 PM…")</dd>
+            <dt>输出</dt><dd>强开头脚本</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">留模糊结论(留钩子)</span><span class="sowner">🤖→👤</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>博商内容公式关键项：<b>不把话说死</b>，完整答法留钩子导向私信 / ¥99 诊断</dd>
+            <dt>检验</dt><dd>有没有给"私信/低价课"留下一步钩子？说死了就无法导流变现</dd>
+            <dt>输出</dt><dd>带钩子脚本</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">4</span><span class="stitle">校人设 + 去 AI 腔</span><span class="sowner">👤 你</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>人工校正语气 = <b>前腾讯面试官</b>口吻；过 <span class="pill tool">eric-ai-check</span> 去 AI 腔</dd>
+            <dt>输出</dt><dd>终稿 → 流入 P-C4</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>四段齐全 + 开头 3 秒有钩子 + 行动指令明确</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>结构散 / 无钩子 / AI 腔</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">一次过审率 ≥ 70%</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">无需返工的脚本数 ÷ 总数</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">跑满 30 条后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l1">L1</span><span class="arrow">→</span><span class="lvl l2">L2</span></span>
+          <span><span class="mod-tag">eric-content</span><span class="mod-tag">eric-hook</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-C4 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-C4</span><span class="pname">切片放大 · 单 IP 多产能</span><span class="powner">🤖 AI</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">结构化脚本 / 母体素材</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">N 条平台化笔记/视频脚本（放大核心工序）</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 切片三步</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">定角度</span><span class="sowner">🤖→👤</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>一个母体拆成多角度：<span class="pill">人群切片(应届/社招/转行)</span><span class="pill">场景切片</span><span class="pill">痛点切片</span></dd>
+            <dt>输出</dt><dd>角度清单(≥ 10 个)</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">AI 批量生成 · 赛马预备</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd><span class="pill tool">eric-xhs-deconstruct</span><span class="pill tool">app:content</span></dd>
+            <dt>动作</dt><dd>每个角度生成一条独立笔记；<b>关键选题出 3-5 个版本</b>(不同钩子/结构)供数据赛马</dd>
+            <dt>输出</dt><dd>N 条笔记 + 多版本</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">去重控质</span><span class="sowner">🤖→👤 抽检</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>控重复度，每条要有独立钩子、单条可独立成立</dd>
+            <dt>检验</dt><dd>换汤不换药 / 明显灌水的 → 砍掉</dd>
+            <dt>输出</dt><dd>合格切片稿 → 流入 P-C5</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>每条有独立钩子、互不重复、单条可独立成立</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>换汤不换药 / 明显灌水</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">单母体产出 ≥ 10 条</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">成品数 ÷ 母体数</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">跑满 10 母体后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l2">L2</span></span>
+          <span><span class="mod-tag">eric-xhs-deconstruct</span><span class="mod-tag">app:content</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-C5 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-C5</span><span class="pname">成品制作</span><span class="powner">🤖→👤 审</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">平台化笔记脚本</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">可发布成品（正文+标题+封面+排版，过 AI 味检测）</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 成品四步</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">起标题(语言钉)</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd><span class="pill tool">eric-xhs-title</span></dd>
+            <dt>动作</dt><dd>套公式起钩子标题,≤ 20 字,面试官视角</dd>
+            <dt>输出</dt><dd>标题候选(选 1 主推 + 备选供赛马)</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">做封面(视觉锤)</span><span class="sowner">🤖 出词 + 👤 生图</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd><span class="pill tool">eric-xhs-cover</span> 出 nanobanana 提示词</dd>
+            <dt>动作</dt><dd>保持<b>统一视觉锤</b>(固定模板 + 腾讯背景视觉),一眼认出是你</dd>
+            <dt>输出</dt><dd>封面图</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">排版</span><span class="sowner">🤖→👤</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>按小红书图文规范排版(分点 / 留白 / 重点标黄)</dd>
+            <dt>输出</dt><dd>排版稿</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">4</span><span class="stitle">AI 味检测</span><span class="sowner">🤖→👤</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd><span class="pill tool">eric-ai-check</span></dd>
+            <dt>动作</dt><dd>22 特征扫描,超标重写</dd>
+            <dt>检验</dt><dd>AI 味通过率 ≥ 90%【待校准】</dd>
+            <dt>输出</dt><dd>可发布成品 → 流入 P-C6</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>标题有钩子 + 封面有识别度 + AI 味检测通过</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>标题平淡 / 封面无辨识 / AI 味超标</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">AI 味通过率 ≥ 90%</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">通过条数 ÷ 总条数</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">跑满 50 条后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l1">L1</span><span class="arrow">→</span><span class="lvl l2">L2</span></span>
+          <span><span class="mod-tag">eric-xhs-title</span><span class="mod-tag">eric-xhs-cover</span><span class="mod-tag">eric-ai-check</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-C6 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-C6</span><span class="pname">多平台分发</span><span class="powner">🤖 AI</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">可发布成品</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">已发布内容（小红书 / 抖音 / 视频号 / 公众号）</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 分发三步</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">平台适配</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>按各平台调性适配:标题长度、话题标签、封面比例(小红书 3:4 / 视频号横竖)</dd>
+            <dt>输出</dt><dd>各平台版本</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">排期</span><span class="sowner">🤖→👤</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>按内容日历排期;博商节奏 <b>每约 9 条引流插 1 条变现</b></dd>
+            <dt>输出</dt><dd>发布排期表</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">发布</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>多平台同步 / 错峰发布(小红书 + 抖音 + 视频号)</dd>
+            <dt>合规红线</dt><dd>个人版 <b>3-5 个号</b>即可,<b>不堆上百号</b>(博商矩阵个人学不了 + 平台限流风险)</dd>
+            <dt>输出</dt><dd>已发布内容 → 流入 P-C7</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>覆盖 ≥ 3 平台 + 每平台格式正确</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>一稿原样多投 / 格式错乱</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">覆盖 ≥ 3 · 及时率 ≥ 95%</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">按时发布数 ÷ 计划发布数</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">跑满 1 个日历周期后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l1">L1</span><span class="arrow">→</span><span class="lvl l2">L2</span></span>
+          <span><span class="mod-tag">app:video</span><span class="mod-tag todo">多平台适配器·需开发</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-C7 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-C7</span><span class="pname">数据回收 · 反哺</span><span class="powner">🤖→👤 审</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">各平台发布数据</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">爆款判定 + 复制指令 + 反哺选题清单</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 数据回收四步</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">回收数据</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd><span class="pill tool">app:stats</span></dd>
+            <dt>动作</dt><dd>回收各平台数据:赞藏评转 / 完播 / <b>私信询盘数</b>(最重要)</dd>
+            <dt>输出</dt><dd>数据表</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">赛马筛爆款</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>按阈值筛:小爆 = 24h 赞藏 ≥ 200,大爆 ≥ 1000【待校准】</dd>
+            <dt>输出</dt><dd>爆款 / 平款 / 废款分级</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">复制爆款结构 + 砍差的</span><span class="sowner">🤖→👤</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd><span class="pill tool">eric-benchmark</span></dd>
+            <dt>动作</dt><dd>爆款结构<b>沉淀成模板</b>、加投/复制;数据差的角度<b>停掉</b>(不恋战)</dd>
+            <dt>输出</dt><dd>可复用爆款模板</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">4</span><span class="stitle">反哺选题</span><span class="sowner">🤖→👤</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>爆款主题 + 模板回灌 P-C1 选题库,下一轮母题优先用</dd>
+            <dt>输出</dt><dd>反哺选题清单 → 回 P-C1(闭环)</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>每周产出爆款判定 + 至少 1 条可复制结论</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>只收数据不产结论</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">爆款率 ≥ 5%</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">爆款数 ÷ 发布数（小爆=24h赞藏≥200，大爆≥1000）</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">跑满 50 条后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l2">L2</span></span>
+          <span><span class="mod-tag">app:stats</span><span class="mod-tag">eric-benchmark</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ L2 变现车间 ════════ -->
+  <div class="section-header">
+    <div class="section-num">L2</div>
+    <div>
+      <div class="section-title">增长转化车间 · 博商增长端</div>
+      <div class="section-sub">投流 → 直播逼单 → 私域承接 → 成交 · 把流量变成确定的转化 · 三级 ¥99→¥999→¥3000+</div>
+    </div>
+  </div>
+
+  <!-- P-G1 投流 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-G1</span><span class="pname">投流（千川）</span><span class="powner">👤→AI 辅助</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">已验证爆款素材 + 引流课/直播间</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">直播间/私域精准流量</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 投流三步(博商控成本)</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">小预算试跑</span><span class="sowner">👤→AI</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>小预算 <b>300-500</b>,多定向赛马(不同人群/素材跑数据)</dd>
+            <dt>输出</dt><dd>各定向的初步数据</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">跑出人群模型</span><span class="sowner">🤖→👤</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd><b>先模型后规模</b>——跑出稳定的正 ROI 人群模型,才进入放量</dd>
+            <dt>输出</dt><dd>稳定人群模型</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">放量</span><span class="sowner">👤→AI</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>投「成交」目标 ROI 最高;付费流量撬动自然流</dd>
+            <dt>个人版</dt><dd>前期<b>可纯自然流起号</b>(求职内容垂直、痛点强,自然流质量高)</dd>
+            <dt>输出</dt><dd>直播间/私域精准流量</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>先跑出正 ROI 的人群模型再放量</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>没模型就盲目放量烧钱 / 直播间接不住流量</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">ROI / GPM / 转化成本</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">成交额 ÷ 消耗 = ROI</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">小预算跑稳定后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l0">L0</span><span class="arrow">→</span><span class="lvl l1">L1</span></span>
+          <span><span class="mod-tag todo">千川投放·外部平台</span></span>
+        </div>
+        <div style="font-size:12px; color:var(--red); margin-top:6px;">⚠️ 合规：2026.1 抖音教培转定向邀约 + 注册资本 100 万门槛，投放前先确认资质。前期建议自然流。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-G2 直播转化 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-G2</span><span class="pname">直播转化（四段式逼单）</span><span class="powner"><span class="lock">🔒</span> 👤 主播=你</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">进入直播间的流量</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">低价课成交 + 私域意向用户</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 直播四段式(博商)</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">建认知(黄金 3 秒)</span><span class="sowner">👤 主播</span></div>
+          <dl class="sop-spec">
+            <dt>话术</dt><dd>贴片:「这里是帮你拿大厂 offer 的直播间,简历/面试/谈薪都能问」</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">戳痛点</span><span class="sowner">👤 主播</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>讲真实案例(「3 年 PM 改完简历一周约了 5 家」),<b>不堆干货</b></dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">建信任</span><span class="sowner">👤 主播</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>展示学员 <b>offer 截图 + 改简历前后对比</b>(求职赛道最强信任锤)</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">4</span><span class="stitle">限量逼单(克制)</span><span class="sowner">👤 主播</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>1v1 名额「本周只放 10 个」,321 上链接、报名额</dd>
+            <dt>红线</dt><dd>求职用户理性,<b>克制套路</b>,过度逼单反噬专业人设</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>四段齐全 + 用真实案例/offer 截图建信任</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>过度套路逼单（求职用户理性，反噬专业人设）</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">停留时长 / 转化率 / UV 价值</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">成交数 ÷ 进入直播间人数</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">跑满 3 场直播后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l0">L0</span> 🔒 永久人工</span><span style="color:var(--muted); font-size:12px;">— 主播是你，信任不可替代；AI 可辅助写脚本/话术</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-M1 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-M1</span><span class="pname">私域承接</span><span class="powner">👤→AI 辅助</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">公域来的私信 / 评论意向</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">已承接 + 已分层标记的用户</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 承接三步(博商企微打标)</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">首条响应</span><span class="sowner">👤→AI 辅助</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>标准话术首条回复,<b>24h 内首响</b>(可用话术库半自动)</dd>
+            <dt>输出</dt><dd>已响应用户</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">问卷打标</span><span class="sowner">🤖→👤</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>博商打标:收集<b>目标岗位 / 经验年限 / 目标公司</b></dd>
+            <dt>输出</dt><dd>用户画像标签</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">分层入群</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>按标签分层入群:<span class="pill">校招群</span><span class="pill">社招群</span><span class="pill">转行群</span></dd>
+            <dt>检验</dt><dd>合格 = 24h 内首响 + 已打标 + 已入对应群;废品 = 漏回 / 未分层</dd>
+            <dt>输出</dt><dd>分层用户池 → 流入 P-M2</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>24h 内首响 + 已打标</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>漏回 / 未分层</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">承接率 ≥ 80% · 首响 < 24h</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">已回复数 ÷ 总私信数</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">积累 100 条私信后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l0">L0</span><span class="arrow">→</span><span class="lvl l1">L1</span></span>
+          <span><span class="mod-tag">话术库</span><span class="mod-tag todo">私信助手·需开发</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-M2 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-M2</span><span class="pname">养熟转化</span><span class="powner">👤 人</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">已分层意向用户</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">高意向待成交用户</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 养熟三步(博商社群全周期)</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">社群价值输出</span><span class="sowner">👤→AI 辅助</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>社群 / 朋友圈持续输出价值</dd>
+            <dt>博商社群全周期</dt><dd>引流群 → 新用户群 → 转化群 → <b>交付群(重)</b> → 铁粉群;个人版精简为 <b>3 群</b>(新用户/转化/交付)</dd>
+            <dt>输出</dt><dd>活跃社群</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">预告矩阵触达</span><span class="sowner">👤 + AI</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>博商督学公式:<b>直播预告 + 群分享 + 1v1 私聊 + 朋友圈</b>,多触点</dd>
+            <dt>输出</dt><dd>触达记录</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">定向跟进准付费</span><span class="sowner">👤 你</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>针对准付费用户定向跟,用案例 / 限时名额制造转化节点</dd>
+            <dt>检验</dt><dd>合格 = 准付费用户有持续触达记录;废品 = 养在池子里不动</dd>
+            <dt>输出</dt><dd>高意向用户 → 流入 P-M3</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>准付费用户有持续触达记录</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>养在池子里不动</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">意向→高意向 ≥ 20%</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">高意向数 ÷ 意向数</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">跑满 1 个转化周期后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l0">L0</span><span class="arrow">→</span><span class="lvl l1">L1</span></span><span style="color:var(--muted); font-size:12px;">— 话术/SOP 可部分 AI 化，信任仍靠人</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-M3 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-M3</span><span class="pname">成交</span><span class="powner"><span class="lock">🔒</span> 👤 不可替代</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">高意向用户</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">付费客户</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 成交四步</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">问卷筛匹配</span><span class="sowner">👤 + AI</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>咨询前问卷筛匹配度(求职阶段 / 目标岗位 / 预算)</dd>
+            <dt>输出</dt><dd>匹配度分级</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">报价答疑</span><span class="sowner"><span class="lock">🔒</span> 👤 不可替代</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>首次沟通报价答疑,三级产品引导:<b>¥99 简历诊断 → ¥999 模面训练营 → ¥3000+ 全程陪跑</b></dd>
+            <dt>输出</dt><dd>报价 + 意向判断</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">限量逼单(克制)</span><span class="sowner">👤 你</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>「本周只放 X 个 1v1 名额」造稀缺</dd>
+            <dt>红线</dt><dd><b>克制</b>——求职用户理性,过度套路逼单反噬专业人设</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">4</span><span class="stitle">跟进未付款</span><span class="sowner">👤 + AI 提醒</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>跟进未付款,丢单复盘</dd>
+            <dt>检验</dt><dd>合格 = 完成报价 + 明确成交/未成交结论;废品 = 答疑后无跟进 / 丢单不复盘</dd>
+            <dt>输出</dt><dd>付费客户 → 流入交付</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>完成报价 + 明确成交/未成交结论</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>答疑后无跟进 / 丢单不复盘</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">付费 ≥ 5%（高客单）/ ≥ 15%（低价）</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">付费数 ÷ 深度沟通数</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">积累 50 次深度沟通后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l0">L0</span> 🔒 永久人工</span><span style="color:var(--muted); font-size:12px;">— 信任与成交不可替代</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P-M4 -->
+  <div class="pcard">
+    <div class="pcard-head"><span class="pcode">P-M4</span><span class="pname">案例沉淀 · 闭环反哺</span><span class="powner">🤖→👤 审</span></div>
+    <div class="pcard-body">
+      <div class="io-row">
+        <div class="io-item"><div class="io-label">输入物料</div><div class="io-val">已交付客户的过程与结果</div></div>
+        <span class="io-arrow">→</span>
+        <div class="io-item"><div class="io-label">输出成品</div><div class="io-val">案例故事 → 反哺 P-C1 选题</div></div>
+      </div>
+      <div class="blk"><div class="blk-label">⑤ 标准作业书 SOP · 案例三步</div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">1</span><span class="stitle">收集学员故事</span><span class="sowner">🤖→👤</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>交付后收集故事(脱敏):<b>offer 截图 / 改简历前后对比</b>(求职赛道最强信任锤)</dd>
+            <dt>输出</dt><dd>原始案例素材</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">2</span><span class="stitle">提炼可传播案例</span><span class="sowner">🤖 AI</span></div>
+          <dl class="sop-spec">
+            <dt>执行主体</dt><dd><span class="pill tool">eric-report</span></dd>
+            <dt>动作</dt><dd>提炼成可传播案例(冲突 + 转折 + 结果)</dd>
+            <dt>输出</dt><dd>案例卡</dd>
+          </dl>
+        </div>
+
+        <div class="sop-step">
+          <div class="sop-step-head"><span class="sn">3</span><span class="stitle">回灌 + 发展导师</span><span class="sowner">👤 你</span></div>
+          <dl class="sop-spec">
+            <dt>动作</dt><dd>① 案例回灌选题库作新母体(反哺 P-C1)② <b>优秀学员发展成在岗导师</b>(扩产能 + 护城河)</dd>
+            <dt>检验</dt><dd>合格 = 每个成交客户至少沉淀 1 个案例;废品 = 交付完即结束、不留素材</dd>
+            <dt>输出</dt><dd>案例 → 反哺 P-C1 + 在岗导师网络</dd>
+          </dl>
+        </div>
+
+      </div>
+      <div class="blk"><div class="blk-label">⑥ 检验标准（质量闸门）</div>
+        <div class="qc-grid">
+          <div class="qc pass"><div class="qc-h">✓ 合格</div>每个成交客户至少沉淀 1 个案例</div>
+          <div class="qc fail"><div class="qc-h">✗ 废品</div>交付完即结束 / 不留素材</div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑦ 数据标定</div>
+        <div class="calib">
+          <div class="ci"><span class="ci-l">基准值 <span class="badge-tbc">待校准</span></span><span class="ci-v">≥ 1 个案例/成交客户</span></div>
+          <div class="ci"><span class="ci-l">公式</span><span class="ci-v">案例数 ÷ 成交客户数</span></div>
+          <div class="ci"><span class="ci-l">校准方式</span><span class="ci-v">积累 10 个成交客户后回填</span></div>
+        </div>
+      </div>
+      <div class="blk"><div class="blk-label">⑧ 自动化路线</div>
+        <div class="auto-row"><span class="auto-path"><span class="lvl l1">L1</span><span class="arrow">→</span><span class="lvl l2">L2</span></span>
+          <span><span class="mod-tag">eric-report</span><span class="mod-tag">知识库归档</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ════════ 附录 A ════════ -->
+  <div class="section-header">
+    <div class="section-num" style="background:var(--gold); color:var(--ink);">A</div>
+    <div>
+      <div class="section-title">附录 A · 指标仪表盘总表</div>
+      <div class="section-sub">所有标定值的单一真相源 · 跑出真数据后在此统一回填</div>
+    </div>
+  </div>
+
+  <table class="appx-table">
+    <thead><tr><th>工序</th><th>指标</th><th>基准值 <span class="badge-tbc">待校准</span></th><th>公式</th><th>校准方式</th></tr></thead>
+    <tbody>
+      <tr><td>P-C1</td><td>选题命中率</td><td>≥ 30%</td><td>询盘选题数 ÷ 立项数</td><td>满 30 选题</td></tr>
+      <tr><td>P-C2</td><td>母体复用率</td><td>≥ 8 条/母体</td><td>成品数 ÷ 母体数</td><td>满 10 母体</td></tr>
+      <tr><td>P-C3</td><td>脚本过审率</td><td>≥ 70%</td><td>免返工数 ÷ 总数</td><td>满 30 条</td></tr>
+      <tr><td>P-C4</td><td>单母体产出</td><td>≥ 10 条</td><td>成品数 ÷ 母体数</td><td>满 10 母体</td></tr>
+      <tr><td>P-C5</td><td>AI 味通过率</td><td>≥ 90%</td><td>通过数 ÷ 总数</td><td>满 50 条</td></tr>
+      <tr><td>P-C6</td><td>平台覆盖 · 及时率</td><td>≥ 3 · ≥ 95%</td><td>按时发布 ÷ 计划</td><td>满 1 周期</td></tr>
+      <tr><td>P-C7</td><td>爆款率</td><td>≥ 5%</td><td>爆款 ÷ 发布（24h赞藏≥200）</td><td>满 50 条</td></tr>
+      <tr><td>P-M1</td><td>私信承接率</td><td>≥ 80% · 首响&lt;24h</td><td>已回复 ÷ 总私信</td><td>满 100 私信</td></tr>
+      <tr><td>P-M2</td><td>意向→高意向</td><td>≥ 20%</td><td>高意向 ÷ 意向</td><td>满 1 周期</td></tr>
+      <tr><td>P-M3</td><td>付费转化</td><td>≥ 5% / ≥ 15%</td><td>付费 ÷ 深度沟通</td><td>满 50 沟通</td></tr>
+      <tr><td>P-M4</td><td>案例转化</td><td>≥ 1 个/客户</td><td>案例 ÷ 成交客户</td><td>满 10 客户</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ════════ 附录 B ════════ -->
+  <div class="section-header">
+    <div class="section-num" style="background:var(--gold); color:var(--ink);">B</div>
+    <div>
+      <div class="section-title">附录 B · 自动化演进路线图</div>
+      <div class="section-sub">人主导 → AI 渐进接管 · 哪些升级、哪些永远人工</div>
+    </div>
+  </div>
+
+  <div class="evo-grid">
+    <div class="evo-col now">
+      <h5>🟢 现在（人主导 L0-L1）</h5>
+      <ul>
+        <li>P-C1 选题 · 人审</li>
+        <li>P-C3 脚本 · 人改定</li>
+        <li>P-C5 成品 · 人审</li>
+        <li>P-M1 私域 · 人为主</li>
+        <li>P-M2 养熟 · 人为主</li>
+      </ul>
+    </div>
+    <div class="evo-col next">
+      <h5>🟡 下一步（AI 接管 → L2）</h5>
+      <ul>
+        <li>P-C1 → 自动选题打分</li>
+        <li>P-C3 → 自动结构化</li>
+        <li>P-C5 → 自动成品+检测</li>
+        <li>P-C6 → 多平台适配器<span class="st-todo">（需开发）</span></li>
+        <li>P-M1 → 私信助手<span class="st-todo">（需开发）</span></li>
+      </ul>
+    </div>
+    <div class="evo-col lock">
+      <h5>🔒 永远人工（L0 锁定）</h5>
+      <ul>
+        <li>P-C2 母体生产 — 你的观点</li>
+        <li>P-M3 成交 — 信任与转化</li>
+        <li style="color:var(--muted); border:none; padding-top:10px;">这两道是 IP 的护城河，不交给 AI</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ════════ 附录 C ════════ -->
+  <div class="section-header">
+    <div class="section-num" style="background:var(--gold); color:var(--ink);">C</div>
+    <div>
+      <div class="section-title">附录 C · AI 弹药库映射表</div>
+      <div class="section-sub">每道工序 ↔ 现有 skill / app 模块 · 明确现成可用 vs 第二阶段缺口</div>
+    </div>
+  </div>
+
+  <table class="appx-table">
+    <thead><tr><th>工序</th><th>对接模块</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>P-C1 选题立项</td><td><code>app:scrape</code> <code>app:hot-topics</code> <code>eric-xhs-topic</code></td><td class="st-have">已有</td></tr>
+      <tr><td>P-C2 母体生产</td><td>—（永久人工）</td><td>—</td></tr>
+      <tr><td>P-C3 脚本结构化</td><td><code>eric-content</code> <code>eric-hook</code></td><td class="st-have">已有</td></tr>
+      <tr><td>P-C4 切片放大</td><td><code>eric-xhs-deconstruct</code> <code>app:content</code></td><td class="st-have">已有</td></tr>
+      <tr><td>P-C5 成品制作</td><td><code>eric-xhs-title</code> <code>eric-xhs-cover</code> <code>eric-ai-check</code></td><td class="st-have">已有</td></tr>
+      <tr><td>P-C6 多平台分发</td><td><code>app:video</code> + 多平台适配器</td><td class="st-todo">部分需开发</td></tr>
+      <tr><td>P-C7 数据回收</td><td><code>app:stats</code> <code>eric-benchmark</code></td><td class="st-have">已有</td></tr>
+      <tr><td>P-M1 私域承接</td><td>话术库 + 私信助手</td><td class="st-todo">需开发</td></tr>
+      <tr><td>P-M2 养熟转化</td><td>话术库 / SOP</td><td class="st-todo">需开发</td></tr>
+      <tr><td>P-M3 成交</td><td>—（永久人工）</td><td>—</td></tr>
+      <tr><td>P-M4 案例沉淀</td><td><code>eric-report</code> + 知识库归档</td><td class="st-have">已有</td></tr>
+    </tbody>
+  </table>
+
+  <div style="background:var(--ink); color:#fff; border-radius:12px; padding:24px; margin-top:24px;">
+    <div style="color:var(--gold); font-weight:800; font-size:15px; margin-bottom:10px;">第二阶段施工入口</div>
+    <div style="font-size:13.5px; color:#ccc; line-height:1.7;">
+      本图纸即施工蓝图。每张工序卡的字段直接映射系统模块：<b style="color:#fff;">②③ 输入/输出</b> → 数据契约；<b style="color:#fff;">⑤ SOP</b> → 处理逻辑；<b style="color:#fff;">⑥ 检验</b> → 质量闸门；<b style="color:#fff;">⑦ 标定</b> → 监控指标；<b style="color:#fff;">⑧ 自动化路线</b> → 实现优先级。
+      施工从附录 C 标「需开发」的缺口切入：<span class="mod-tag todo">多平台适配器</span> <span class="mod-tag todo">私信助手</span>，逐工序把 L1 升级到 L2/L3。
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  面试咨询 · IP 工厂图纸 v2 · 2026-06-06 &nbsp;·&nbsp; 图纸 → 施工 · 所有标定值【待校准】
+</footer>
+
+</body>
+</html>

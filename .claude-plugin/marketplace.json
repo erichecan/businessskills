@@ -187,6 +187,16 @@
       "category": "content-creation",
       "keywords": ["xiaohongshu", "coach", "workflow", "orchestrator", "full-pipeline", "chinese"],
       "skills": ["./skills/eric-xhs-coach"]
+    },
+    {
+      "name": "eric-boshang",
+      "description": "博商工业化质检员。用博商「四齿轮」标准（产能 × 内容公式 × 赛马 × 漏斗）给内容生产每道工序做质检，不达标就打回。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": ["boshang", "qc", "industrial", "horse-racing", "funnel", "quality-control", "chinese"],
+      "skills": ["./skills/eric-boshang"]
     }
   ]
 }
