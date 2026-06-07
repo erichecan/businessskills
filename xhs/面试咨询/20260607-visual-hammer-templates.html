@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>视觉锤 · 封面模板库</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    :root { --ink:#1a1a1a; --gold:#e8d5a3; --paper:#f5f4f0; --line:#e8e6df; --red:#e05555; --muted:#888; }
+    body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; background:var(--paper); color:var(--ink); line-height:1.7; }
+    .hero { background:var(--ink); color:#fff; padding:54px 40px 40px; text-align:center; position:relative; overflow:hidden; }
+    .hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(232,213,163,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(232,213,163,.06) 1px,transparent 1px);background-size:28px 28px;}
+    .hero>*{position:relative;z-index:1;}
+    .hero .tag{display:inline-block;background:var(--gold);color:var(--ink);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:4px 14px;border-radius:2px;margin-bottom:16px;}
+    .hero h1{font-size:32px;font-weight:800;margin-bottom:10px;}
+    .hero .sub{color:var(--gold);font-size:15px;font-weight:600;}
+    .container{max-width:920px;margin:0 auto;padding:0 24px 80px;}
+    .section-header{display:flex;align-items:center;gap:14px;margin:48px 0 18px;}
+    .section-num{width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--gold);font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .section-title{font-size:21px;font-weight:800;}
+    .section-sub{font-size:13px;color:var(--muted);}
+
+    .why{background:var(--ink);color:#fff;border-radius:12px;padding:22px;margin-top:26px;}
+    .why .big{font-size:17px;font-weight:800;color:var(--gold);}
+    .why p{font-size:13.5px;color:#ddd;margin-top:8px;line-height:1.7;}
+    .why p b{color:#fff;}
+
+    /* 封面网格 */
+    .covers{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+    @media(max-width:780px){.covers{grid-template-columns:repeat(2,1fr);}}
+    @media(max-width:460px){.covers{grid-template-columns:1fr;}}
+
+    .cover{aspect-ratio:3/4;border-radius:12px;overflow:hidden;position:relative;display:flex;flex-direction:column;background:linear-gradient(160deg,#1a1a1a 60%,#2e2614);box-shadow:0 6px 20px rgba(0,0,0,.18);}
+    .cover::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(232,213,163,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(232,213,163,.05) 1px,transparent 1px);background-size:18px 18px;}
+    .cover>*{position:relative;z-index:1;}
+    .cv-corner{padding:11px 13px 0;}
+    .cv-badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:1px;padding:3px 8px;border-radius:4px;background:var(--gold);color:var(--ink);}
+    .cv-badge.warn{background:var(--red);color:#fff;}
+    .cv-main{flex:1;display:flex;align-items:center;padding:6px 16px;}
+    .cv-title{color:#fff;font-size:21px;font-weight:900;line-height:1.32;letter-spacing:-.3px;}
+    .cv-title em{color:var(--gold);font-style:normal;}
+    .cv-foot{border-top:1px solid rgba(232,213,163,.25);padding:9px 14px;display:flex;align-items:center;gap:7px;}
+    .cv-dot{width:16px;height:16px;border-radius:50%;background:var(--gold);color:var(--ink);font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;}
+    .cv-sign{color:var(--gold);font-size:11px;font-weight:700;}
+    .cv-cap{text-align:center;font-size:12px;color:var(--muted);margin-top:8px;}
+
+    /* 规格表 */
+    .spec{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;font-size:13.5px;}
+    .spec th{background:var(--ink);color:var(--gold);padding:11px 14px;text-align:left;font-size:12px;}
+    .spec td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top;}
+    .spec tr:last-child td{border-bottom:none;}
+    .spec .k{font-weight:800;width:130px;background:#fafaf8;}
+    code{background:var(--paper);padding:1px 7px;border-radius:4px;font-family:"SF Mono",Menlo,monospace;font-size:.9em;}
+    .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:5px;border:1px solid rgba(0,0,0,.1);}
+
+    .steps{list-style:none;counter-reset:s;}
+    .steps li{background:#fff;border-radius:8px;padding:12px 16px 12px 46px;margin-bottom:8px;position:relative;font-size:14px;}
+    .steps li::before{counter-increment:s;content:counter(s);position:absolute;left:12px;top:11px;width:22px;height:22px;background:var(--ink);color:var(--gold);border-radius:6px;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+    .rule{background:#eef9f2;border-left:4px solid #2e9e6b;border-radius:8px;padding:14px 18px;font-size:13.5px;margin-top:10px;}
+    .rule b{color:#2e9e6b;}
+    footer{text-align:center;padding:32px 0 48px;font-size:12px;color:#bbb;}
+  </style>
+</head>
+<body>
+<div class="hero">
+  <div class="tag">视觉锤 · 封面模板库</div>
+  <h1>一眼认出是你</h1>
+  <div class="sub">统一封面 = IP 识别度 + 前腾讯面试官信任感</div>
+</div>
+
+<div class="container">
+
+  <div class="why">
+    <div class="big">视觉锤的作用:不靠记住你的名字,靠"看到这个封面长相就知道是你"。</div>
+    <p>博商每个 IP 都有统一"视觉锤"。你的视觉锤 = <b>墨黑底 + 金色钉字 + "前腾讯面试官"署名条</b>。刷到第 3 条时,用户就开始记住你。<b>每次只换中间的大字钉,其余永远不变</b>——这才叫模板,才能批量、才有识别度。</p>
+  </div>
+
+  <!-- 模板样板 -->
+  <div class="section-header"><div class="section-num">1</div><div><div class="section-title">4 个封面样板(直接照着做)</div><div class="section-sub">同一套骨架 · 只换角标颜色和大字钉</div></div></div>
+
+  <div class="covers">
+    <div>
+      <div class="cover">
+        <div class="cv-corner"><span class="cv-badge warn">⚠ 面试送命话</span></div>
+        <div class="cv-main"><div class="cv-title">离职原因<br>说这<em>3 句</em><br>当场被划掉</div></div>
+        <div class="cv-foot"><span class="cv-dot">腾</span><span class="cv-sign">前腾讯面试官</span></div>
+      </div>
+      <div class="cv-cap">送命话系列(红角标)</div>
+    </div>
+
+    <div>
+      <div class="cover">
+        <div class="cv-corner"><span class="cv-badge">面试官在想什么</span></div>
+        <div class="cv-main"><div class="cv-title">他说<br><em>"具体讲讲"</em><br>到底想听啥</div></div>
+        <div class="cv-foot"><span class="cv-dot">腾</span><span class="cv-sign">前腾讯面试官</span></div>
+      </div>
+      <div class="cv-cap">解码器系列(金角标)</div>
+    </div>
+
+    <div>
+      <div class="cover">
+        <div class="cv-corner"><span class="cv-badge">谈薪</span></div>
+        <div class="cv-main"><div class="cv-title">被问<em>期望薪资</em><br>先反问<br>这一句</div></div>
+        <div class="cv-foot"><span class="cv-dot">腾</span><span class="cv-sign">前腾讯面试官</span></div>
+      </div>
+      <div class="cv-cap">谈薪系列(金角标)</div>
+    </div>
+
+    <div>
+      <div class="cover">
+        <div class="cv-corner"><span class="cv-badge">现场表达</span></div>
+        <div class="cv-main"><div class="cv-title">最怕被追问?<br>追问是<br><em>给你机会</em></div></div>
+        <div class="cv-foot"><span class="cv-dot">腾</span><span class="cv-sign">前腾讯面试官</span></div>
+      </div>
+      <div class="cv-cap">应对追问(金角标)</div>
+    </div>
+  </div>
+
+  <!-- 规格 -->
+  <div class="section-header"><div class="section-num">2</div><div><div class="section-title">规格(Canva 里照着设)</div><div class="section-sub">固定不变的部分</div></div></div>
+
+  <table class="spec">
+    <tr><td class="k">尺寸</td><td>小红书竖版 <code>3:4</code>(1242 × 1656 px),视频号封面再裁一版</td></tr>
+    <tr><td class="k">背景</td><td><span class="sw" style="background:#1a1a1a"></span>墨黑 <code>#1a1a1a</code> → 右下微金渐变 <code>#2e2614</code> + 淡金网格纹理(透明度 5%)</td></tr>
+    <tr><td class="k">高亮金</td><td><span class="sw" style="background:#e8d5a3"></span><code>#e8d5a3</code> —— 只给最关键的词(数字/动作词)上色</td></tr>
+    <tr><td class="k">角标(左上)</td><td>系列标签。送命话用<span class="sw" style="background:#e05555"></span>红 <code>#e05555</code>,其余用金。固定位置、固定样式</td></tr>
+    <tr><td class="k">大字钉(中央)</td><td>苹方/思源黑体 <b>Heavy</b>,字号撑满,关键词金色;3-4 行,每行 ≤ 6 字</td></tr>
+    <tr><td class="k">署名条(底部)</td><td>金色圆标「腾」+ <b>前腾讯面试官</b>(金色)。<b>每张都有,位置永不变</b>——这是识别核心</td></tr>
+    <tr><td class="k">字数红线</td><td>封面总字数 ≤ 15,一眼读完。多余信息放正文</td></tr>
+  </table>
+
+  <!-- 落地 -->
+  <div class="section-header"><div class="section-num">3</div><div><div class="section-title">明天到公司怎么做</div><div class="section-sub">30 分钟搭出可复用模板</div></div></div>
+
+  <ol class="steps">
+    <li>Canva 新建 <code>1242×1656</code> 画布,铺墨黑底 + 右下金渐变,叠一层淡金网格(或纯黑也行,先跑起来)</li>
+    <li>放好<b>三个固定元素</b>:左上角标框、中央大字文本框、底部署名条「腾 · 前腾讯面试官」</li>
+    <li>把它<b>存为 Canva 模板</b>——以后每条笔记:复制模板 → 只改角标文字 + 中央大字钉,2 分钟出一张</li>
+    <li>先做 <b>4 张</b>(对应明天 5 条内容的标题),验证视觉锤在信息流里够不够"跳"</li>
+    <li>(可选)想要插画/照片风,把规格丢给 <code>eric-xhs-cover</code> 出 nanobanana 提示词,但<b>起步纯文字封面最快、最稳</b></li>
+  </ol>
+
+  <div class="rule">
+    <b>视觉锤铁律:</b>结构(底色/角标位/署名条/字体)<b>永远不变</b>,变的只有中央大字钉和角标文字。一旦改结构,识别度就归零。先用这套跑 4 周,有数据了再迭代。
+  </div>
+
+</div>
+<footer>视觉锤 · 封面模板库 · 2026-06-07 · 墨黑 + 金钉 + 前腾讯面试官署名条</footer>
+</body>
+</html>
