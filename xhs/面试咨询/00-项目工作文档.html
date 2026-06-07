@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>面试咨询 IP · 完整工作文档</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    :root { --ink:#1a1a1a; --gold:#e8d5a3; --paper:#f5f4f0; --line:#e8e6df; --green:#2e9e6b; --green-bg:#eef9f2; --red:#e05555; --red-bg:#fdf2f2; --muted:#888; }
+    body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; background:var(--paper); color:var(--ink); line-height:1.75; }
+    .hero { background:var(--ink); color:#fff; padding:64px 40px 48px; text-align:center; position:relative; overflow:hidden; }
+    .hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(232,213,163,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(232,213,163,.06) 1px,transparent 1px);background-size:28px 28px;}
+    .hero>*{position:relative;z-index:1;}
+    .hero .tag{display:inline-block;background:var(--gold);color:var(--ink);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:4px 14px;border-radius:2px;margin-bottom:18px;}
+    .hero h1{font-size:36px;font-weight:800;margin-bottom:12px;letter-spacing:-.5px;}
+    .hero .sub{color:var(--gold);font-size:16px;font-weight:600;}
+    .hero .meta{color:#999;font-size:12.5px;margin-top:14px;}
+    .container{max-width:920px;margin:0 auto;padding:0 24px 90px;}
+
+    .toc{background:#fff;border-radius:14px;padding:22px 26px;margin-top:34px;box-shadow:0 2px 12px rgba(0,0,0,.04);}
+    .toc h3{font-size:13px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:12px;}
+    .toc ol{list-style:none;counter-reset:t;columns:2;column-gap:34px;}
+    @media(max-width:640px){.toc ol{columns:1;}}
+    .toc li{counter-increment:t;padding:5px 0 5px 30px;position:relative;font-size:14px;break-inside:avoid;}
+    .toc li::before{content:counter(t);position:absolute;left:0;top:5px;width:20px;height:20px;background:var(--ink);color:var(--gold);border-radius:6px;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+    .toc a{color:var(--ink);text-decoration:none;border-bottom:1px solid transparent;}
+    .toc a:hover{border-bottom-color:var(--gold);}
+
+    .section-header{display:flex;align-items:center;gap:14px;margin:52px 0 18px;scroll-margin-top:20px;}
+    .section-num{width:42px;height:42px;border-radius:50%;background:var(--ink);color:var(--gold);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .section-title{font-size:22px;font-weight:800;}
+    .section-sub{font-size:13px;color:var(--muted);}
+
+    p.lead{font-size:15px;color:#333;margin:0 0 14px;}
+    .card{background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.04);}
+    .card h4{font-size:15.5px;font-weight:800;margin-bottom:6px;}
+    .card p{font-size:14px;color:#444;}
+    .card p+p{margin-top:8px;}
+
+    .dark{background:var(--ink);color:#fff;border-radius:12px;padding:24px 26px;margin-bottom:16px;}
+    .dark .big{font-size:18px;font-weight:800;color:var(--gold);line-height:1.5;}
+    .dark p{font-size:14px;color:#ddd;margin-top:10px;}
+    .dark p b{color:#fff;}
+    .dark strong{color:var(--gold);}
+
+    .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:6px;}
+    @media(max-width:680px){.pillars{grid-template-columns:1fr;}}
+    .pillar{background:#fff;border-radius:10px;padding:16px 18px;border-top:3px solid var(--gold);}
+    .pillar .n{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:1px;}
+    .pillar h5{font-size:15px;font-weight:800;margin:4px 0 6px;}
+    .pillar p{font-size:13px;color:#555;}
+
+    .gears{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+    @media(max-width:600px){.gears{grid-template-columns:1fr;}}
+    .gear{background:#fff;border-radius:10px;padding:15px 18px;border-left:4px solid var(--ink);}
+    .gear h5{font-size:14.5px;font-weight:800;}
+    .gear p{font-size:13px;color:#555;margin-top:3px;}
+
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;font-size:13.5px;box-shadow:0 2px 10px rgba(0,0,0,.04);}
+    th{background:var(--ink);color:var(--gold);padding:11px 14px;text-align:left;font-size:12px;}
+    td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top;}
+    tr:last-child td{border-bottom:none;}
+    td.k{font-weight:800;white-space:nowrap;}
+    td a{color:var(--ink);font-weight:700;text-decoration:none;border-bottom:1.5px solid var(--gold);}
+    .pill{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:5px;}
+    .pill.ok{background:var(--green-bg);color:var(--green);}
+    .pill.no{background:var(--red-bg);color:var(--red);}
+    .pill.dev{background:#fff6e5;color:#b8860b;}
+
+    .deliv{background:#fff;border-radius:12px;padding:18px 22px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.04);border-left:5px solid var(--gold);}
+    .deliv .top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+    .deliv .fn{font-size:15px;font-weight:800;}
+    .deliv .fn a{color:var(--ink);text-decoration:none;border-bottom:2px solid var(--gold);}
+    .deliv .stage{font-size:11px;background:var(--ink);color:var(--gold);padding:2px 9px;border-radius:5px;font-weight:700;}
+    .deliv p{font-size:13.5px;color:#444;margin-top:7px;}
+
+    .timeline{list-style:none;}
+    .timeline li{background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:10px;position:relative;padding-left:48px;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+    .timeline li::before{content:"→";position:absolute;left:16px;top:13px;color:var(--gold);font-weight:900;font-size:16px;}
+    .timeline h5{font-size:14.5px;font-weight:800;margin-bottom:3px;}
+    .timeline p{font-size:13px;color:#555;}
+    .timeline em{color:var(--ink);font-style:normal;font-weight:700;background:var(--gold);padding:0 5px;border-radius:3px;}
+
+    .steps{list-style:none;counter-reset:s;}
+    .steps li{background:#fff;border-radius:8px;padding:12px 16px 12px 48px;margin-bottom:8px;position:relative;font-size:14px;box-shadow:0 1px 6px rgba(0,0,0,.04);}
+    .steps li::before{counter-increment:s;content:counter(s);position:absolute;left:13px;top:11px;width:24px;height:24px;background:var(--ink);color:var(--gold);border-radius:7px;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+
+    .next{background:var(--green-bg);border-left:4px solid var(--green);border-radius:8px;padding:16px 20px;font-size:14px;}
+    .next ul{list-style:none;}
+    .next li{padding:5px 0 5px 24px;position:relative;}
+    .next li::before{content:"○";position:absolute;left:2px;color:var(--green);font-weight:800;}
+
+    .redline{background:var(--red-bg);border-left:4px solid var(--red);border-radius:8px;padding:16px 20px;font-size:13.5px;}
+    .redline b{color:var(--red);}
+    footer{text-align:center;padding:36px 0 56px;font-size:12px;color:#bbb;}
+  </style>
+</head>
+<body>
+<div class="hero">
+  <div class="tag">完整工作文档 · MASTER DOC</div>
+  <h1>面试咨询 IP 项目</h1>
+  <div class="sub">前腾讯面试官 · 教你面试表达力 —— 从战略到第一周开干的全景总纲</div>
+  <div class="meta">最后更新 2026-06-07 · 本文档是总索引,串起全部讨论结论与交付物</div>
+</div>
+
+<div class="container">
+
+  <div class="toc">
+    <h3>本文档导航</h3>
+    <ol>
+      <li><a href="#s1">项目一句话 + 你是谁</a></li>
+      <li><a href="#s2">定位结论(能力为体·场景为用)</a></li>
+      <li><a href="#s3">差异化护城河</a></li>
+      <li><a href="#s4">核心方法论(博商四齿轮)</a></li>
+      <li><a href="#s5">可迁移性红线</a></li>
+      <li><a href="#s6">交付物全景</a></li>
+      <li><a href="#s7">资产真实能力(诚实清单)</a></li>
+      <li><a href="#s8">关键决策记录</a></li>
+      <li><a href="#s9">第一周怎么开干</a></li>
+      <li><a href="#s10">下一步 Backlog</a></li>
+    </ol>
+  </div>
+
+  <!-- 1 -->
+  <div class="section-header" id="s1"><div class="section-num">1</div><div><div class="section-title">项目一句话 + 你是谁</div><div class="section-sub">所有判断的锚点</div></div></div>
+  <div class="dark">
+    <div class="big">用博商的工业化打法,做一个「前腾讯面试官,教你面试表达力」的小红书 IP,最终交付「帮人拿 offer」的确定性结果。</div>
+    <p><b>你是谁:</b>前腾讯产品经理 / 面试官,做计算机·产品经理方向的求职辅导。真实腾讯背景、能交付结果、手握在岗导师网络——这三样都是<strong>真实的</strong>,是别人抄不走的底座。</p>
+  </div>
+
+  <!-- 2 -->
+  <div class="section-header" id="s2"><div class="section-num">2</div><div><div class="section-title">定位结论 · 能力为体,场景为用</div><div class="section-sub">这是项目最核心的一次校准</div></div></div>
+  <p class="lead">最容易跑偏的地方:要么只讲「面试技巧」(太通用、没壁垒),要么只盯「拿 offer」(把自己做成中介,没复购)。最终校准为一句话:</p>
+  <div class="dark">
+    <div class="big">能力为体 · 场景为用</div>
+    <p><b>能力(体):</b>教<strong>面试表达力</strong>——这是核心、是差异化、是别人没占的位。</p>
+    <p><b>场景(用):</b><strong>求职拿 offer</strong> 是第一个落地场景、是结果交付;<strong>职场表达</strong>是能力延伸线、是复购。</p>
+    <p>先用「拿 offer」这个最痛的场景把人引进来、做出结果建立信任,再把能力延伸到更长的职场表达,完成从一次性到长期的跨越。</p>
+  </div>
+  <p class="lead">详见 → <a href="20260606-ip-positioning.html" style="color:#1a1a1a;border-bottom:2px solid #e8d5a3;text-decoration:none;font-weight:700;">IP 定位文档</a></p>
+
+  <!-- 3 -->
+  <div class="section-header" id="s3"><div class="section-num">3</div><div><div class="section-title">差异化护城河</div><div class="section-sub">为什么用户选你,而不是满屏的面试 / 简历博主</div></div></div>
+  <p class="lead">市场现状:讲面试技巧的多(太通用,用户觉得"没说到我的问题"),讲改简历的也多(讲的是纸面包装)。<b>几乎没人从"现场表达"切入。</b></p>
+  <div class="dark">
+    <div class="big">差异点:现场表达</div>
+    <p>教用户怎么把<strong>自己真实做过的事,当场讲出亮点、扛得住追问</strong>。面试现场真正的命门不是技巧——是"说几句就卡壳、怕被追问、讲不清自己的贡献"。这正是通用技巧和简历模板都解决不了的。</p>
+    <p><b>打法:</b>用「面试送命话 / 避雷图鉴」这类逆向钩子起号(易传播),内核是<strong>表达解码器框架</strong>(教用户听懂面试官想听什么),原料是<strong>你的真实学员案例库</strong>。</p>
+  </div>
+  <div class="pillars">
+    <div class="pillar"><div class="n">护城河 01</div><h5>真实腾讯背景</h5><p>前腾讯 PM / 面试官,信任感天然,新人难复制。</p></div>
+    <div class="pillar"><div class="n">护城河 02</div><h5>可交付的结果</h5><p>不止讲内容,能把人带到拿 offer,结果可衡量。</p></div>
+    <div class="pillar"><div class="n">护城河 03</div><h5>在岗导师网络</h5><p>1v1 在岗导师资源,是交付端的硬壁垒。</p></div>
+  </div>
+
+  <!-- 4 -->
+  <div class="section-header" id="s4"><div class="section-num">4</div><div><div class="section-title">核心方法论 · 博商工业化四齿轮</div><div class="section-sub">整个工厂图纸都建在这四个齿轮上</div></div></div>
+  <p class="lead">博商打法的精髓,被提炼成四个互相咬合的齿轮,也是 <code style="background:#fff;padding:1px 7px;border-radius:4px;">eric-boshang</code> 质检 skill 的四道关:</p>
+  <div class="gears">
+    <div class="gear"><h5>⚙️ 产能</h5><p>1 个母体 → 切 N 条;靠量不靠单条。"撒网捕鱼"不是"钓鱼"。</p></div>
+    <div class="gear"><h5>⚙️ 内容公式</h5><p>语言钉标题 + 冲突故事 + 模糊结论(导流)+ 视觉锤。</p></div>
+    <div class="gear"><h5>⚙️ 赛马</h5><p>多版本同发 → 看数据择优 → 复制爆款结构(AI 降维做 AB)。</p></div>
+    <div class="gear"><h5>⚙️ 漏斗</h5><p>产品阶梯 + 单粉价值核算;每 N 条引流插 1 条变现。</p></div>
+  </div>
+  <p class="lead" style="margin-top:14px;">质检 skill → <a href="../../skills/eric-boshang/SKILL.md" style="color:#1a1a1a;border-bottom:2px solid #e8d5a3;text-decoration:none;font-weight:700;">eric-boshang/SKILL.md</a>(每道工序的"质检员",不达标打回)</p>
+
+  <!-- 5 -->
+  <div class="section-header" id="s5"><div class="section-num">5</div><div><div class="section-title">可迁移性红线</div><div class="section-sub">博商哪些能抄、哪些不能抄——别照搬大厂打法烧死自己</div></div></div>
+  <div class="pillars">
+    <div class="pillar" style="border-top-color:var(--green);"><div class="n" style="color:var(--green);">✓ 可迁移</div><h5>逻辑与方法</h5><p>漏斗钩子 / 单粉价值 / 赛马式 AB / 长尾不丢人 / 用大众语言讲专业。</p></div>
+    <div class="pillar" style="border-top-color:var(--red);"><div class="n" style="color:var(--red);">✗ 不可迁移</div><h5>人海与资本</h5><p>百账号矩阵 / 亿级投流 / 电销人海 / 多老师线下大课——个人做不了。</p></div>
+    <div class="pillar" style="border-top-color:#b8860b;"><div class="n" style="color:#b8860b;">⚠ 赛道命门</div><h5>求职特有</h5><p>用户买"确定性结果"非内容;退费率高需双轨合同;合规红线(禁裸宣传"100%保offer")。</p></div>
+  </div>
+
+  <!-- 6 -->
+  <div class="section-header" id="s6"><div class="section-num">6</div><div><div class="section-title">交付物全景</div><div class="section-sub">本项目已产出的全部文档与工具,点文件名直接打开</div></div></div>
+
+  <div class="deliv">
+    <div class="top"><span class="fn"><a href="20260605-ip-team-strategy.html">20260605 · IP 团队战略手册</a></span><span class="stage">战略 v1</span></div>
+    <p>项目最初的战略蓝本(已保留,后续被定位文档迭代)。记录最早的团队化设想。</p>
+  </div>
+
+  <div class="deliv">
+    <div class="top"><span class="fn"><a href="20260606-ip-positioning.html">20260606 · IP 定位文档</a></span><span class="stage">定位 v2</span></div>
+    <p>项目的"宪法":能力为体场景为用、三层护城河、同行验证、产品阶梯、交付命门、合规红线、三阶段路线、增长飞轮。<b>所有内容都要回到这份定位。</b></p>
+  </div>
+
+  <div class="deliv">
+    <div class="top"><span class="fn"><a href="20260606-ip-factory-blueprint.html">20260606 · IP 工厂图纸</a></span><span class="stage">图纸 · 核心</span></div>
+    <p>工业级生产图纸。13 道工序全部写成"X 步作业书",每道工序含 8 字段工序卡(输入/输出/负责人/SOP/检验标准/数据标定/自动化路线 L0-L3)。三车间:内容生产(P-C1~C7)、增长转化(P-G1~G2)、变现承接(P-M1~M4)。</p>
+  </div>
+
+  <div class="deliv">
+    <div class="top"><span class="fn"><a href="20260606-L1-runthrough.html">20260606 · L1 全流程跑通示范</a></span><span class="stage">验证案例</span></div>
+    <p>拿一个真实案例(3年PM·讲项目被追问卡壳)走完 P-C1→P-C7 全流程,产出含一条仿真成品笔记。用来验证方向的独特性确实跑得通。</p>
+  </div>
+
+  <div class="deliv">
+    <div class="top"><span class="fn"><a href="20260607-week1-action-plan.html">20260607 · 第一周作战计划</a></span><span class="stage">执行</span></div>
+    <p>Day1-7 按天作战:1 母体 → 5 条 → 发布 → 看数据。含开跑前轻装备、成功基准线、博商红线(别堆号/别投流/别卖课/别憋完美/别焦虑涨粉)。</p>
+  </div>
+
+  <div class="deliv">
+    <div class="top"><span class="fn"><a href="20260607-visual-hammer-templates.html">20260607 · 视觉锤封面模板库</a></span><span class="stage">执行</span></div>
+    <p>统一封面 = 墨黑底 + 金色钉字 + "前腾讯面试官"署名条。4 个封面样板 + 规格表 + Canva 落地步骤 + 铁律(结构永不变,只换大字钉)。</p>
+  </div>
+
+  <div class="deliv">
+    <div class="top"><span class="fn"><a href="20260607-kit-scripts-cases.html">20260607 · 第一周开干物料包</a></span><span class="stage">执行</span></div>
+    <p>① 私信首响话术(3 场景 + 4 原则 + 打标);② 案例库填空模板(7 字段 + 1 填好示范 + 3 空卡)。Day6-7 接私信、攒内容原料直接用。</p>
+  </div>
+
+  <div class="deliv">
+    <div class="top"><span class="fn"><a href="../../skills/eric-boshang/SKILL.md">skills/eric-boshang · 博商工业化质检员</a></span><span class="stage">工具 · Skill</span></div>
+    <p>四齿轮质检 skill(选题/内容/赛马/漏斗四道关 + 可迁移性红线)。每道工序的质检员,不达标打回。已注册进 marketplace.json。<b>注:新 skill 需重启 Claude Code 后 /eric-boshang 才生效。</b></p>
+  </div>
+
+  <div class="deliv">
+    <div class="top"><span class="fn"><a href="../../docs/superpowers/specs/2026-06-06-ip-factory-blueprint-design.md">docs/.../ip-factory-blueprint-design.md</a></span><span class="stage">设计 spec</span></div>
+    <p>图纸的设计 spec(早期"面试咨询"版本)。<b>注:尚未同步到 v2 定位,在 backlog。</b></p>
+  </div>
+
+  <!-- 7 -->
+  <div class="section-header" id="s7"><div class="section-num">7</div><div><div class="section-title">资产真实能力 · 诚实清单</div><div class="section-sub">不假设、不夸大——这是踩过坑后逐个验证出来的</div></div></div>
+  <table>
+    <tr><th>资产</th><th>真实能力</th><th>状态</th></tr>
+    <tr><td class="k">eric-content</td><td>只做内容诊断,<b>不代写</b></td><td><span class="pill ok">可用·诊断</span></td></tr>
+    <tr><td class="k">eric-hook</td><td>需已有正文才能加钩子</td><td><span class="pill ok">可用·有限</span></td></tr>
+    <tr><td class="k">eric-xhs-deconstruct</td><td>拆别人爆款结构,<b>不能自动切片</b></td><td><span class="pill ok">可用·有限</span></td></tr>
+    <tr><td class="k">eric-xhs-title</td><td>75 标题公式,可用</td><td><span class="pill ok">可用</span></td></tr>
+    <tr><td class="k">eric-xhs-cover</td><td>出 nanobanana 提示词,<b>不直接生图</b></td><td><span class="pill ok">可用</span></td></tr>
+    <tr><td class="k">eric-ai-check</td><td>22 特征 AI 味检测,可用</td><td><span class="pill ok">可用</span></td></tr>
+    <tr><td class="k">app · scrape 抓取</td><td>只支持微信公众号(via RSSHub),<b>非全平台</b></td><td><span class="pill dev">受限</span></td></tr>
+    <tr><td class="k">app · 多数 API</td><td>多为"提示词组装机",<b>非真自动化</b></td><td><span class="pill dev">受限</span></td></tr>
+    <tr><td class="k">app · video API</td><td>硬编码"中年男性情感视频号",<b>不匹配面试赛道</b></td><td><span class="pill no">不可用</span></td></tr>
+    <tr><td class="k">多平台分发</td><td>尚不存在</td><td><span class="pill no">待开发</span></td></tr>
+  </table>
+  <p class="lead" style="margin-top:12px;color:var(--muted);font-size:13px;">→ 因此图纸 P-C1 选题工序配了"数据源可行性表 + 人工兜底",不假装全自动。第一周以人工为主,AI 渐进接管。</p>
+
+  <!-- 8 -->
+  <div class="section-header" id="s8"><div class="section-num">8</div><div><div class="section-title">关键决策记录</div><div class="section-sub">项目过程中的几次重要转折,记下来防止以后又跑偏</div></div></div>
+  <ul class="timeline">
+    <li><h5>从"大方向对但不够细"到工业级图纸</h5><p>博商核心玩法方向认可,但要求做到有<em>图纸 / 检验标准 / 数据标定 / AI 自动化 / 放大化</em>的工业级别,且产出为 HTML(可浏览性强)。</p></li>
+    <li><h5>诚实能力审计,而非假设</h5><p>一度按"多平台自动抓取""eric-content 能代写"来写 SOP。逐个读代码 / 派 agent 验证后发现并非如此,全部改为<em>写实 + 人工兜底</em>。原则确立:<em>先验证再写</em>。</p></li>
+    <li><h5>业务底座的全面重建</h5><p>一度把项目做窄成"只教面试表达",丢了业务底座。结合外部博商调研报告,确认真实业务 = 前腾讯 PM 求职辅导(真背景+结果交付+导师网络),<em>全面重建</em>定位 v2。</p></li>
+    <li><h5>回归"能力为体场景为用"</h5><p>重建后又过度偏向"拿 offer 中介"。再校准:不能只有面试,要回归<em>教面试表达</em>这个能力内核——最终定型为能力为体、场景为用。</p></li>
+    <li><h5>抄袭顾虑的破解</h5><p>担心"逆向选题易被抄"。结论:护城河不在单条内容保密,而在<em>解码器方法论 + 真实案例库 + 信任交付 + 博商赛马体系</em>的组合。</p></li>
+    <li><h5>每道工序补成"X 步作业书"</h5><p>选题不能只有方向、没有步骤。要求<em>每一道工序都按统一标准补成 X 步作业书</em>,13 道工序全部落地为可执行 SOP。</p></li>
+    <li><h5>用真实案例跑通 L1 验证独特性</h5><p>需要一个真实案例跑通全流程,验证"现场表达"方向确实做得出别人做不出的内容(无通用技巧、无简历模板套话)。</p></li>
+  </ul>
+
+  <!-- 9 -->
+  <div class="section-header" id="s9"><div class="section-num">9</div><div><div class="section-title">第一周怎么开干</div><div class="section-sub">物料已齐,照着这条线走</div></div></div>
+  <p class="lead">第一周只赌一件事:<b>把 1 个母体 → 5 条内容 → 发出去 → 看数据。</b>不追求爆款,追求跑通流程 + 验证方向。</p>
+  <ol class="steps">
+    <li>开跑前装备:账号(小红书主+视频号)、视觉锤模板、3-5 个真实案例(脱敏)、私信首响话术 —— 物料都在交付物里</li>
+    <li>Day1 选题:锁母题"现场表达",拆 5 个具体场景,每个配一个真实案例,起语言钉标题</li>
+    <li>Day2 母体:对着 5 个选题一次性口述录制(不写稿),AI 转写存母体库</li>
+    <li>Day3 脚本+切片:转四段式脚本(痛点→观点→案例→行动),留私信钩子,切 5 条</li>
+    <li>Day4 成品:套封面模板,过 AI 味检测,<b>每条发布前过 eric-boshang 四齿轮质检</b></li>
+    <li>Day5 发布:错峰发小红书+视频号,挂私信钩子,本周只引流不卖货</li>
+    <li>Day6-7 承接+复盘:回收数据(私信数最重要),用话术接住+打标,复制数据最好的结构</li>
+  </ol>
+  <div class="redline" style="margin-top:12px;">
+    <b>成功基准线(达到任一即"方向跑通"):</b>5 条全部产出发布(底线)/ 单条 24h 赞藏破 100-200 或带来 5-10 个私信加微 / 评论区出现"求模板、怎么找你、说到我了"。
+  </div>
+
+  <!-- 10 -->
+  <div class="section-header" id="s10"><div class="section-num">10</div><div><div class="section-title">下一步 Backlog</div><div class="section-sub">随时回来做,不影响第一周开干</div></div></div>
+  <div class="next">
+    <ul>
+      <li>把"现场表达"差异点正式写进定位文档第 3 节(目前内核已有,表述待补强)</li>
+      <li>图纸补 L3 交付车间:简历精修 / 模拟面试 / 内推 / 在岗导师 1v1 网络</li>
+      <li>图纸补附录:单粉价值 / LTV 测算 / 合规层 / 三阶段路线</li>
+      <li>设计 spec(md)同步到 v2 定位</li>
+      <li>跑完第一周后,用真实数据校准图纸里的"数据标定"占位值(目前是行业基准占位)</li>
+    </ul>
+  </div>
+
+</div>
+<footer>面试咨询 IP · 完整工作文档 · 2026-06-07 · 墨黑 + 金 · 前腾讯面试官,教你面试表达力</footer>
+</body>
+</html>
