@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>内容形态作业书 · 录屏 + 真人画外音</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    :root { --ink:#1a1a1a; --gold:#e8d5a3; --paper:#f5f4f0; --line:#e8e6df; --green:#2e9e6b; --green-bg:#eef9f2; --red:#e05555; --red-bg:#fdf2f2; --muted:#888; }
+    body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif; background:var(--paper); color:var(--ink); line-height:1.75; }
+    .hero { background:var(--ink); color:#fff; padding:58px 40px 44px; text-align:center; position:relative; overflow:hidden; }
+    .hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(232,213,163,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(232,213,163,.06) 1px,transparent 1px);background-size:28px 28px;}
+    .hero>*{position:relative;z-index:1;}
+    .hero .tag{display:inline-block;background:var(--gold);color:var(--ink);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:4px 14px;border-radius:2px;margin-bottom:16px;}
+    .hero h1{font-size:32px;font-weight:800;margin-bottom:10px;}
+    .hero .sub{color:var(--gold);font-size:15px;font-weight:600;}
+    .container{max-width:880px;margin:0 auto;padding:0 24px 80px;}
+    .section-header{display:flex;align-items:center;gap:14px;margin:48px 0 18px;}
+    .section-num{width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--gold);font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .section-title{font-size:21px;font-weight:800;}
+    .section-sub{font-size:13px;color:var(--muted);}
+
+    .why{background:var(--ink);color:#fff;border-radius:12px;padding:24px;margin-top:28px;}
+    .why .big{font-size:18px;font-weight:800;color:var(--gold);line-height:1.5;}
+    .why p{font-size:14px;color:#ddd;margin-top:10px;}
+    .why b{color:#fff;}
+    .why .three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;}
+    @media(max-width:600px){.why .three{grid-template-columns:1fr;}}
+    .why .three div{background:rgba(232,213,163,.1);border-radius:8px;padding:11px 13px;font-size:12.5px;color:#eee;}
+    .why .three b{color:var(--gold);display:block;margin-bottom:2px;}
+
+    .kit{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    @media(max-width:600px){.kit{grid-template-columns:1fr;}}
+    .kcard{background:#fff;border-radius:10px;padding:16px 18px;border-left:4px solid var(--gold);}
+    .kcard h4{font-size:14.5px;font-weight:800;margin-bottom:5px;}
+    .kcard p{font-size:13px;color:#555;}
+    .kcard .lo{color:var(--green);font-weight:700;}
+
+    /* 5步作业书 */
+    .step{background:#fff;border-radius:12px;border:1px solid var(--line);margin-bottom:12px;overflow:hidden;}
+    .step-head{display:flex;align-items:center;gap:12px;padding:13px 20px;background:#242424;color:#fff;}
+    .step-no{width:28px;height:28px;border-radius:8px;background:var(--gold);color:var(--ink);font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .step-title{font-size:15.5px;font-weight:800;flex:1;}
+    .step-time{font-size:11px;color:#bbb;}
+    .step-body{padding:14px 20px;}
+    ul.do{list-style:none;font-size:14px;}
+    ul.do li{padding:6px 0 6px 24px;position:relative;line-height:1.55;}
+    ul.do li::before{content:"▸";position:absolute;left:2px;color:var(--gold);font-weight:800;}
+    .spec{background:var(--paper);border-radius:8px;padding:10px 14px;margin-top:10px;font-size:12.5px;color:#555;}
+    .spec b{color:var(--ink);}
+
+    .redline{background:var(--red-bg);border-left:4px solid var(--red);border-radius:8px;padding:18px 22px;}
+    .redline h4{color:var(--red);font-size:15px;margin-bottom:10px;}
+    .redline ul{list-style:none;font-size:13.5px;}
+    .redline li{padding:5px 0 5px 26px;position:relative;}
+    .redline li::before{content:"✕";position:absolute;left:2px;color:var(--red);font-weight:800;}
+    .redline b{color:var(--red);}
+
+    .safe{background:var(--green-bg);border-left:4px solid var(--green);border-radius:8px;padding:18px 22px;margin-top:12px;}
+    .safe h4{color:var(--green);font-size:15px;margin-bottom:10px;}
+    .safe ul{list-style:none;font-size:13.5px;}
+    .safe li{padding:5px 0 5px 26px;position:relative;}
+    .safe li::before{content:"✓";position:absolute;left:2px;color:var(--green);font-weight:800;}
+
+    .check{background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 2px 10px rgba(0,0,0,.04);}
+    ul.ck{list-style:none;font-size:14px;}
+    ul.ck li{padding:7px 0 7px 28px;position:relative;border-bottom:1px solid var(--line);}
+    ul.ck li:last-child{border-bottom:none;}
+    ul.ck li::before{content:"☐";position:absolute;left:2px;color:var(--gold);font-weight:800;font-size:15px;}
+    code{background:var(--paper);padding:1px 7px;border-radius:4px;font-family:"SF Mono",Menlo,monospace;font-size:.9em;}
+    footer{text-align:center;padding:32px 0 48px;font-size:12px;color:#bbb;}
+  </style>
+</head>
+<body>
+<div class="hero">
+  <div class="tag">内容形态作业书 · 已定调</div>
+  <h1>录屏 + 真人画外音</h1>
+  <div class="sub">不露脸 · 躲 AI 限流 · 和"口述母体"工作流天然咬合</div>
+</div>
+
+<div class="container">
+
+  <div class="why">
+    <div class="big">为什么所有内容都走这个形态?一次解决三件事。</div>
+    <p>面试咨询是<b>强信任赛道</b>,但你不想露脸——录屏 + 真人画外音是最优解:屏幕承载专业内容(简历/案例/拆解),你的<b>真实声音</b>承载真人信号和信任感。</p>
+    <div class="three">
+      <div><b>① 躲 AI 限流</b>录屏文件元数据是录屏软件生成,不带 AI 水印;真人声音是最强真实信号。</div>
+      <div><b>② 不用露脸</b>脸藏起来,声音用真的——性价比最高的不露脸组合。</div>
+      <div><b>③ 零额外工作流</b>你本来就"对选题口述、不写稿",现在只是加一块屏幕画面同步录下来。</div>
+    </div>
+  </div>
+
+  <!-- 1 装备 -->
+  <div class="section-header"><div class="section-num">0</div><div><div class="section-title">开跑前 · 装备清单</div><div class="section-sub">先用手头有的起步,别为设备拖延</div></div></div>
+  <div class="kit">
+    <div class="kcard"><h4>🖥️ 录屏软件</h4><p>Mac 自带 <b>QuickTime</b> 或 <b>CleanShot</b>;进阶用 <b>OBS</b>(免费、可分区)。手机内容用系统自带录屏。<span class="lo">先用免费的,够第一周。</span></p></div>
+    <div class="kcard"><h4>🎙️ 麦克风</h4><p>起步:<b>AirPods / 手机耳机麦</b>即可。进阶:百元级领夹麦或电容麦,声音干净度直接决定完播。</p></div>
+    <div class="kcard"><h4>✂️ 剪辑</h4><p><b>剪映专业版</b>(免费、自动字幕)。掐头去尾 + 加字幕 + 套封面就够,别追求花哨。</p></div>
+    <div class="kcard"><h4>🔒 隐私脱敏</h4><p>录屏前先把简历/聊天里的<b>真名、公司、电话</b>打码或替换。脱敏是铁律,不是可选项。</p></div>
+  </div>
+
+  <!-- 5步 -->
+  <div class="section-header"><div class="section-num">1</div><div><div class="section-title">5 步作业书(一条内容怎么出)</div><div class="section-sub">对应图纸 P-C2 母体 + P-C5 成品</div></div></div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-no">1</span><span class="step-title">备素材 · 屏幕上放什么</span><span class="step-time">5 分钟/条</span></div>
+    <div class="step-body">
+      <ul class="do">
+        <li>每个选题准备 1 屏"主角":一份脱敏简历 / 一段对话截图 / 一页白板要点 / 一个面试问题</li>
+        <li>屏幕背景干净,关掉无关窗口和通知,字号调大(手机竖屏也看得清)</li>
+        <li>把要圈点的地方先想好——录的时候用光标/手写笔指着讲</li>
+      </ul>
+      <div class="spec"><b>检验:</b>素材已脱敏 + 一屏信息不超过 3 个重点(多了观众看不过来)</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-no">2</span><span class="step-title">搭画面 · 竖屏录屏设置</span><span class="step-time">一次性设好</span></div>
+    <div class="step-body">
+      <ul class="do">
+        <li>录制区域设成<b>竖屏 9:16</b>(小红书/视频号主版),或录横屏后期裁竖屏</li>
+        <li>顶部留一条位置给标题字幕,底部留给"前腾讯面试官"署名条(和视觉锤一致)</li>
+        <li>光标放大、开启点击高亮(讲到哪指到哪,观众跟得上)</li>
+      </ul>
+      <div class="spec"><b>检验:</b>导出分辨率 ≥ 1080×1920;画面里没有隐私信息漏出</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-no">3</span><span class="step-title">口述录制 · 真声音讲(不写稿)</span><span class="step-time">本周一次录 5 条</span></div>
+    <div class="step-body">
+      <ul class="do">
+        <li>对着选题<b>口述</b>,边操作屏幕边讲(这就是你的"母体生产"——不写逐字稿)</li>
+        <li>每条讲清三件事:<b>面试官在评估什么 → 那个真实案例 → 到底该怎么说</b></li>
+        <li>一次性录完 5 条,卡壳了重录那一句即可,不追求一镜到底</li>
+        <li>结尾留<b>私信钩子</b>(模糊结论:"完整模板私信领")</li>
+      </ul>
+      <div class="spec"><b>检验:</b>用真人声音(<b>禁用 AI 配音</b>);每条单独一个文件,命名=选题</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-no">4</span><span class="step-title">剪辑成片 · 套统一视觉</span><span class="step-time">10 分钟/条</span></div>
+    <div class="step-body">
+      <ul class="do">
+        <li>掐头去尾,删掉"嗯啊"长停顿(剪映一键)</li>
+        <li>自动生成字幕,<b>人工校一遍专业词</b>(面试官/岗位名别错)</li>
+        <li>开头套<b>视觉锤封面</b>(墨黑+金钉,Canva 文字封面,不带 AI 水印)</li>
+        <li>底部固定"前腾讯面试官"署名条,保持 IP 识别度</li>
+      </ul>
+      <div class="spec"><b>检验:</b>封面用文字模板(非 AI 生图);字幕无错别字;时长 60-90 秒为宜</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-no">5</span><span class="step-title">导出 + 合规自检 · 发布前最后一关</span><span class="step-time">2 分钟/条</span></div>
+    <div class="step-body">
+      <ul class="do">
+        <li>从剪映/QuickTime 正常导出(<b>非 AI 视频工具导出</b>,避免被写入 AI 元数据)</li>
+        <li>文案过 <code>eric-ai-check</code>,AI 味超标改口语化</li>
+        <li>过 <code>eric-boshang</code> 四齿轮质检,不达标打回</li>
+        <li>若该条确实用了任何 AI 合成元素 → 发布页<b>主动勾选 AI 声明</b></li>
+      </ul>
+      <div class="spec"><b>检验:</b>素材全干净(无 AI 水印)→ 不必标;有 AI 元素 → 必须如实标</div>
+    </div>
+  </div>
+
+  <!-- 合规铁律 -->
+  <div class="section-header"><div class="section-num">2</div><div><div class="section-title">AI 合规铁律</div><div class="section-sub">来自《人工智能生成合成内容标识办法》(2025.9.1 施行)+ 小红书强制标识</div></div></div>
+
+  <div class="redline">
+    <h4>这三样绝对不碰(碰了 = 带 AI 水印 / 违规限流)</h4>
+    <ul>
+      <li><b>AI 文生图</b>当封面/配图——工具会在元数据写入 C2PA + 隐形水印,平台一读就知道</li>
+      <li><b>AI 配音</b>替代真人口播——TTS 多带标识,且平台能识别 AI 语音</li>
+      <li><b>删改 AI 隐式标识</b>骗过检测——法规明令不得删除/篡改,这是<b>违法</b>不只是违规</li>
+    </ul>
+  </div>
+
+  <div class="safe">
+    <h4>这些天然干净(放心用)</h4>
+    <ul>
+      <li>录屏文件(录屏软件生成,非 AI)</li>
+      <li>真人画外音(你的真实声音)</li>
+      <li>手机实拍照片/视频(相机元数据)</li>
+      <li>Canva 文字封面 / 真实截图 / 手写白板</li>
+      <li>AI 只做"转写、整理、润色",不从零生成 → 文字本是你说的话,AI 味天然低</li>
+    </ul>
+  </div>
+
+  <!-- 发布前清单 -->
+  <div class="section-header"><div class="section-num">3</div><div><div class="section-title">每条发布前 · 60 秒自检清单</div><div class="section-sub">逐条打勾再发</div></div></div>
+  <div class="check">
+    <ul class="ck">
+      <li>画面是录屏/实拍,<b>没有 AI 文生图</b></li>
+      <li>声音是<b>真人画外音</b>,没有 AI 配音</li>
+      <li>简历/对话里的隐私信息已脱敏</li>
+      <li>封面是文字视觉锤模板,带"前腾讯面试官"署名条</li>
+      <li>字幕校对无错,结尾有私信钩子</li>
+      <li>过了 eric-ai-check + eric-boshang 质检</li>
+      <li>(如含 AI 元素)已在发布页勾选 AI 声明</li>
+    </ul>
+  </div>
+
+</div>
+<footer>内容形态作业书 · 录屏 + 真人画外音 · 2026-06-07 定调 · 配合 IP 工厂图纸 P-C2 / P-C5</footer>
+</body>
+</html>
