@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>男声试听对比 — 职场表达力</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #111;
+    color: #e8d5a3;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 48px 32px;
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #fff;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: rgba(232,213,163,0.5);
+    margin-bottom: 48px;
+  }
+  .voice-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(232,213,163,0.12);
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    transition: border-color 0.2s;
+  }
+  .voice-card:hover { border-color: rgba(232,213,163,0.3); }
+  .voice-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #e8d5a3;
+    margin-bottom: 4px;
+  }
+  .voice-desc {
+    font-size: 12px;
+    color: rgba(232,213,163,0.45);
+    margin-bottom: 20px;
+  }
+  .samples {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .sample {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .sample-label {
+    font-size: 11px;
+    color: rgba(232,213,163,0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    width: 32px;
+    flex-shrink: 0;
+  }
+  .sample-text {
+    font-size: 13px;
+    color: rgba(232,213,163,0.6);
+    flex: 1;
+    line-height: 1.5;
+  }
+  .play-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(232,213,163,0.3);
+    background: transparent;
+    color: #e8d5a3;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .play-btn:hover { background: rgba(232,213,163,0.12); border-color: #e8d5a3; }
+  .play-btn.playing { background: #e8d5a3; color: #111; border-color: #e8d5a3; }
+  .divider { height: 1px; background: rgba(232,213,163,0.07); margin: 10px 0; }
+</style>
+</head>
+<body>
+<h1>男声试听对比</h1>
+<p class="subtitle">4 个 zh-CN 男声 · 语速 +20% · 点击 ▶ 播放，再点停止</p>
+
+<div class="voice-card">
+  <div class="voice-name">云健 · Yunjian</div>
+  <div class="voice-desc">zh-CN-YunjianNeural — 成熟沉稳，适合叙事</div>
+  <div class="samples">
+    <div class="sample">
+      <span class="sample-label">S1</span>
+      <span class="sample-text">上次开会，你鼓起勇气发言，说完之后，全场沉默…</span>
+      <button class="play-btn" onclick="togglePlay(this, '../test/20260608-voice-audition/yunjian_s1.wav')">▶</button>
+    </div>
+    <div class="divider"></div>
+    <div class="sample">
+      <span class="sample-label">S6</span>
+      <span class="sample-text">这就是结论先行。三句话公式：我的结论是什么…</span>
+      <button class="play-btn" onclick="togglePlay(this, '../test/20260608-voice-audition/yunjian_s6.wav')">▶</button>
+    </div>
+  </div>
+</div>
+
+<div class="voice-card">
+  <div class="voice-name">云希 · Yunxi</div>
+  <div class="voice-desc">zh-CN-YunxiNeural — 活泼自然，年轻感强</div>
+  <div class="samples">
+    <div class="sample">
+      <span class="sample-label">S1</span>
+      <span class="sample-text">上次开会，你鼓起勇气发言，说完之后，全场沉默…</span>
+      <button class="play-btn" onclick="togglePlay(this, '../test/20260608-voice-audition/yunxi_s1.wav')">▶</button>
+    </div>
+    <div class="divider"></div>
+    <div class="sample">
+      <span class="sample-label">S6</span>
+      <span class="sample-text">这就是结论先行。三句话公式：我的结论是什么…</span>
+      <button class="play-btn" onclick="togglePlay(this, '../test/20260608-voice-audition/yunxi_s6.wav')">▶</button>
+    </div>
+  </div>
+</div>
+
+<div class="voice-card">
+  <div class="voice-name">云夏 · Yunxia</div>
+  <div class="voice-desc">zh-CN-YunxiaNeural — 温和清晰，偏年轻</div>
+  <div class="samples">
+    <div class="sample">
+      <span class="sample-label">S1</span>
+      <span class="sample-text">上次开会，你鼓起勇气发言，说完之后，全场沉默…</span>
+      <button class="play-btn" onclick="togglePlay(this, '../test/20260608-voice-audition/yunxia_s1.wav')">▶</button>
+    </div>
+    <div class="divider"></div>
+    <div class="sample">
+      <span class="sample-label">S6</span>
+      <span class="sample-text">这就是结论先行。三句话公式：我的结论是什么…</span>
+      <button class="play-btn" onclick="togglePlay(this, '../test/20260608-voice-audition/yunxia_s6.wav')">▶</button>
+    </div>
+  </div>
+</div>
+
+<div class="voice-card">
+  <div class="voice-name">云扬 · Yunyang</div>
+  <div class="voice-desc">zh-CN-YunyangNeural — 新闻播报风，权威有力</div>
+  <div class="samples">
+    <div class="sample">
+      <span class="sample-label">S1</span>
+      <span class="sample-text">上次开会，你鼓起勇气发言，说完之后，全场沉默…</span>
+      <button class="play-btn" onclick="togglePlay(this, '../test/20260608-voice-audition/yunyang_s1.wav')">▶</button>
+    </div>
+    <div class="divider"></div>
+    <div class="sample">
+      <span class="sample-label">S6</span>
+      <span class="sample-text">这就是结论先行。三句话公式：我的结论是什么…</span>
+      <button class="play-btn" onclick="togglePlay(this, '../test/20260608-voice-audition/yunyang_s6.wav')">▶</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentAudio = null;
+let currentBtn = null;
+
+function togglePlay(btn, src) {
+  if (currentAudio && !currentAudio.paused) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    if (currentBtn) { currentBtn.textContent = '▶'; currentBtn.classList.remove('playing'); }
+    if (currentBtn === btn) { currentAudio = null; currentBtn = null; return; }
+  }
+  const audio = new Audio(src);
+  currentAudio = audio;
+  currentBtn = btn;
+  btn.textContent = '■';
+  btn.classList.add('playing');
+  audio.play();
+  audio.onended = () => {
+    btn.textContent = '▶';
+    btn.classList.remove('playing');
+    currentAudio = null;
+    currentBtn = null;
+  };
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>职场表达力 — 说话的顺序错了</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #1a1a1a;
+      }
+
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: linear-gradient(160deg, #1a1a1a 60%, #2e2614 100%);
+        font-family: system-ui, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      }
+
+      /* Gold micro-grid texture */
+      #root::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(232, 213, 163, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(232, 213, 163, 0.05) 1px, transparent 1px);
+        background-size: 60px 60px;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ── BADGE ── */
+      #badge {
+        position: absolute;
+        top: 36px;
+        left: 52px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 10;
+      }
+      .badge-dot { width: 7px; height: 7px; border-radius: 50%; background: #e8d5a3; flex-shrink: 0; }
+      .badge-text { font-size: 21px; font-weight: 600; letter-spacing: 0.12em; color: rgba(232,213,163,0.65); }
+      .badge-sep { width: 1px; height: 16px; background: rgba(232,213,163,0.25); flex-shrink: 0; }
+
+      /* ── SIGNATURE STRIP ── */
+      #sig {
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 58px;
+        background: rgba(232,213,163,0.04);
+        border-top: 1px solid rgba(232,213,163,0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 28px;
+        z-index: 10;
+      }
+      .sig-line { width: 40px; height: 1px; background: rgba(232,213,163,0.22); }
+      .sig-text { font-size: 19px; font-weight: 500; letter-spacing: 0.18em; color: rgba(232,213,163,0.65); }
+
+      /* ── FLASH / VIGNETTE / LIGHT-LEAK ── */
+      #flash { position: absolute; inset: 0; background: #fff; z-index: 80; pointer-events: none; opacity: 0; }
+      #vignette {
+        position: absolute; inset: 0;
+        background: radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.72) 100%);
+        pointer-events: none; z-index: 6;
+      }
+      #light-leak {
+        position: absolute; inset: 0;
+        background:
+          radial-gradient(ellipse at 5% 10%, rgba(255,215,130,0.72) 0%, transparent 42%),
+          radial-gradient(ellipse at 95% 88%, rgba(232,180,80,0.52) 0%, transparent 36%);
+        mix-blend-mode: screen;
+        pointer-events: none; z-index: 7; opacity: 0;
+      }
+
+      /* ── GRAIN ── */
+      @keyframes hf-grain {
+        0%,100% { transform: translate(0,0); }
+        10%  { transform: translate(-5%,-5%); }
+        20%  { transform: translate(-10%,5%); }
+        30%  { transform: translate(5%,-10%); }
+        40%  { transform: translate(-5%,15%); }
+        50%  { transform: translate(-10%,5%); }
+        60%  { transform: translate(15%,0); }
+        70%  { transform: translate(0,10%); }
+        80%  { transform: translate(-15%,0); }
+        90%  { transform: translate(10%,5%); }
+      }
+      #grain { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 100; }
+      #grain::after {
+        content: "";
+        position: absolute;
+        top: -50%; left: -50%;
+        width: 200%; height: 200%;
+        background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        opacity: 0.038;
+        animation: hf-grain 0.5s steps(1) infinite;
+      }
+
+      /* ── COMMON SCENE BASE ── */
+      .scene {
+        position: absolute; inset: 0; z-index: 5;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+      }
+
+      /* ── S1: HOOK — aspirational open ── */
+      #s1-label {
+        font-size: 26px; font-weight: 700;
+        letter-spacing: 0.38em; color: rgba(232,213,163,0.42);
+        margin-bottom: 32px;
+      }
+      #s1-line1 {
+        font-size: 114px; font-weight: 900; color: #e8d5a3;
+        letter-spacing: 0.05em; line-height: 1;
+        text-shadow: 0 0 80px rgba(232,213,163,0.28);
+        margin-bottom: 4px;
+      }
+      #s1-line2 {
+        font-size: 114px; font-weight: 900; color: #e8d5a3;
+        letter-spacing: 0.05em; line-height: 1;
+        text-shadow: 0 0 80px rgba(232,213,163,0.28);
+        margin-bottom: 40px;
+      }
+      #s1-sub {
+        font-size: 42px; font-weight: 400;
+        color: rgba(232,213,163,0.45); letter-spacing: 0.22em;
+      }
+
+      /* ── S2: PAIN — left-aligned comparison ── */
+      #s2 .pain-bar {
+        position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+        width: 6px; height: 280px;
+        background: linear-gradient(to bottom, transparent, rgba(232,213,163,0.6), transparent);
+      }
+      #s2 .inner { width: 100%; padding: 0 220px; }
+      #s2-tag {
+        font-size: 24px; font-weight: 700;
+        letter-spacing: 0.38em; color: rgba(232,213,163,0.35);
+        margin-bottom: 48px;
+      }
+      .pain-row { display: flex; align-items: center; gap: 24px; margin-bottom: 28px; }
+      .pain-dash { font-size: 40px; font-weight: 300; color: rgba(232,213,163,0.28); flex-shrink: 0; line-height: 1; }
+      .pain-text { font-size: 64px; font-weight: 700; color: #e8d5a3; letter-spacing: 0.04em; line-height: 1; }
+
+      /* ── S3: INSIGHT — pivot moment ── */
+      #s3-tag {
+        font-size: 26px; font-weight: 700;
+        letter-spacing: 0.45em; color: rgba(232,213,163,0.38);
+        margin-bottom: 38px;
+      }
+      #s3-main {
+        font-size: 120px; font-weight: 900; color: #e8d5a3;
+        letter-spacing: 0.06em; text-align: center;
+        text-shadow: 0 0 100px rgba(232,213,163,0.45);
+        margin-bottom: 16px;
+      }
+      #s3-bar { width: 72px; height: 2px; background: rgba(232,213,163,0.35); margin: 24px auto; }
+      #s3-sub {
+        font-size: 46px; font-weight: 400;
+        color: rgba(232,213,163,0.5); letter-spacing: 0.25em; text-align: center;
+      }
+
+      /* ── S4: MECHANISM — 3-second window ── */
+      #s4-tag {
+        font-size: 26px; font-weight: 700;
+        letter-spacing: 0.32em; color: rgba(232,213,163,0.38);
+        margin-bottom: 36px;
+      }
+      #s4-num {
+        font-size: 200px; font-weight: 900; color: #e8d5a3;
+        letter-spacing: 0.06em; line-height: 1;
+        text-shadow: 0 0 120px rgba(232,213,163,0.55);
+        margin-bottom: 28px;
+      }
+      #s4-focus {
+        font-size: 56px; font-weight: 400; color: rgba(232,213,163,0.65);
+        letter-spacing: 0.06em; margin-bottom: 20px;
+        text-align: center;
+      }
+      #s4-note {
+        font-size: 38px; font-weight: 400;
+        color: rgba(232,213,163,0.38); letter-spacing: 0.14em;
+        text-align: center;
+      }
+
+      /* ── S5: CASE — vertical before / after ── */
+      #s5-tag {
+        font-size: 24px; font-weight: 700;
+        letter-spacing: 0.45em; color: rgba(232,213,163,0.42);
+        margin-bottom: 40px;
+      }
+      #s5-v-compare {
+        display: flex; flex-direction: column; gap: 24px;
+        width: 1280px;
+      }
+      .vcmp-card {
+        padding: 32px 60px;
+        display: flex; align-items: center; gap: 52px;
+      }
+      .vcmp-card.bad {
+        background: rgba(200,80,80,0.04);
+        border: 1px solid rgba(200,100,100,0.18);
+      }
+      .vcmp-card.good {
+        background: rgba(232,213,163,0.04);
+        border: 1px solid rgba(232,213,163,0.2);
+      }
+      .vcmp-badge {
+        font-size: 22px; font-weight: 900;
+        letter-spacing: 0.22em; flex-shrink: 0;
+        width: 160px;
+      }
+      .vcmp-badge.bad { color: rgba(220,130,130,0.7); }
+      .vcmp-badge.good { color: rgba(232,213,163,0.8); }
+      .vcmp-quote {
+        font-size: 46px; font-weight: 400; flex: 1;
+        letter-spacing: 0.03em; line-height: 1.55;
+      }
+      .vcmp-quote.bad { color: rgba(220,190,190,0.55); }
+      .vcmp-quote.good { color: rgba(232,213,163,0.85); }
+      .vcmp-result {
+        font-size: 30px; font-weight: 700;
+        flex-shrink: 0; letter-spacing: 0.12em;
+        width: 200px; text-align: right;
+      }
+      .vcmp-result.bad { color: rgba(220,130,130,0.55); }
+      .vcmp-result.good { color: rgba(232,213,163,0.7); text-shadow: 0 0 40px rgba(232,213,163,0.4); }
+
+      /* ── S6: FORMULA ── */
+      #s6-tag {
+        font-size: 28px; font-weight: 700;
+        letter-spacing: 0.42em; color: rgba(232,213,163,0.5);
+        margin-bottom: 52px;
+      }
+      #s6-list { width: 860px; }
+      .f-row { display: flex; align-items: center; gap: 36px; margin-bottom: 28px; }
+      .f-num {
+        font-size: 38px; font-weight: 900; color: rgba(232,213,163,0.55);
+        width: 56px; flex-shrink: 0; text-align: center;
+      }
+      .f-text { font-size: 62px; font-weight: 700; color: #e8d5a3; letter-spacing: 0.04em; }
+      #s6-sub {
+        font-size: 38px; font-weight: 400;
+        color: rgba(232,213,163,0.42); letter-spacing: 0.2em;
+        margin-top: 44px; text-align: center;
+      }
+
+      /* ── S7: COMPARE A vs B — split panels ── */
+      #s7 {
+        flex-direction: row; align-items: stretch;
+        justify-content: center;
+        padding: 100px 60px 80px; gap: 0;
+      }
+      .cpanel {
+        flex: 1; max-width: 880px;
+        display: flex; flex-direction: column;
+        padding: 52px 72px;
+      }
+      .cpanel.bad {
+        background: rgba(200,80,80,0.04);
+        border: 1px solid rgba(200,100,100,0.14);
+        border-right: none;
+      }
+      .cpanel.good {
+        background: rgba(232,213,163,0.04);
+        border: 1px solid rgba(232,213,163,0.18);
+      }
+      .cpanel-label { font-size: 28px; font-weight: 900; letter-spacing: 0.28em; margin-bottom: 32px; }
+      .cpanel-label.bad { color: rgba(220,130,130,0.7); }
+      .cpanel-label.good { color: rgba(232,213,163,0.8); }
+      .cpanel-quote { font-size: 42px; font-weight: 400; line-height: 1.75; letter-spacing: 0.02em; flex: 1; }
+      .cpanel-quote.bad { color: rgba(220,190,190,0.6); }
+      .cpanel-quote.good { color: rgba(232,213,163,0.8); }
+      .cpanel-verdict { margin-top: 28px; font-size: 30px; font-weight: 700; letter-spacing: 0.28em; }
+      .cpanel-verdict.bad { color: rgba(220,130,130,0.5); }
+      .cpanel-verdict.good { color: rgba(232,213,163,0.65); }
+      #s7-divider { width: 2px; background: rgba(232,213,163,0.12); flex-shrink: 0; align-self: stretch; }
+
+      /* ── S8: DEPTH — contrast statements ── */
+      #s8-tag { font-size: 26px; letter-spacing: 0.42em; color: rgba(232,213,163,0.38); margin-bottom: 52px; }
+      .depth-row { display: flex; align-items: center; gap: 30px; margin-bottom: 20px; }
+      .depth-icon { font-size: 50px; flex-shrink: 0; line-height: 1; }
+      .depth-icon.x { color: rgba(220,120,120,0.6); }
+      .depth-icon.chk { color: rgba(140,220,140,0.65); }
+      .depth-txt { font-size: 64px; font-weight: 700; letter-spacing: 0.04em; }
+      .depth-txt.dim { color: rgba(232,213,163,0.4); }
+      .depth-txt.lit { color: #e8d5a3; }
+      #s8-sub { font-size: 40px; font-weight: 400; color: rgba(232,213,163,0.42); letter-spacing: 0.22em; margin-top: 40px; text-align: center; }
+
+      /* ── S9: PROOF — large stats ── */
+      #s9-tag { font-size: 24px; letter-spacing: 0.48em; color: rgba(232,213,163,0.38); margin-bottom: 40px; }
+      #s9-stats { display: flex; align-items: baseline; gap: 32px; margin-bottom: 40px; }
+      .stat-num {
+        font-size: 168px; font-weight: 900; color: #e8d5a3;
+        letter-spacing: 0.04em; line-height: 1;
+        text-shadow: 0 0 120px rgba(232,213,163,0.45);
+      }
+      .stat-sep { font-size: 80px; font-weight: 300; color: rgba(232,213,163,0.25); line-height: 1; }
+      #s9-sub1 { font-size: 44px; font-weight: 500; color: rgba(232,213,163,0.52); letter-spacing: 0.22em; margin-bottom: 16px; }
+      #s9-sub2 { font-size: 36px; font-weight: 400; color: rgba(232,213,163,0.35); letter-spacing: 0.18em; }
+
+      /* ── S10: CTA ── */
+      #s10-tag { font-size: 28px; font-weight: 700; letter-spacing: 0.42em; color: rgba(232,213,163,0.5); margin-bottom: 28px; }
+      #s10-main {
+        font-size: 144px; font-weight: 900; color: #e8d5a3;
+        letter-spacing: 0.1em; line-height: 1;
+        text-shadow: 0 0 120px rgba(232,213,163,0.65), 0 0 260px rgba(232,213,163,0.22);
+        margin-bottom: 28px;
+      }
+      #s10-sub { font-size: 46px; font-weight: 400; color: rgba(232,213,163,0.52); letter-spacing: 0.22em; }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="116.5"
+      data-width="1920"
+      data-height="1080"
+      data-fps="30"
+    >
+      <!-- ── PERSISTENT CHROME ── -->
+      <div id="badge">
+        <div class="badge-dot"></div>
+        <span class="badge-text">职场表达力</span>
+        <div class="badge-sep"></div>
+        <span class="badge-text">EP · 01</span>
+      </div>
+
+      <div id="sig">
+        <div class="sig-line"></div>
+        <span class="sig-text">前腾讯资深中层</span>
+        <div class="sig-line"></div>
+        <span class="sig-text">职场表达力训练营</span>
+        <div class="sig-line"></div>
+      </div>
+
+      <div id="flash"></div>
+      <div id="vignette"></div>
+      <div id="light-leak"></div>
+      <div id="grain"></div>
+
+      <!-- ── AUDIO TRACKS ── -->
+      <audio class="clip" id="vo1"  data-start="0.4"   data-duration="9.576"  data-track-index="1" src="assets/vo1.wav"></audio>
+      <audio class="clip" id="vo2"  data-start="11.1"  data-duration="9.624"  data-track-index="1" src="assets/vo2.wav"></audio>
+      <audio class="clip" id="vo3"  data-start="21.9"  data-duration="7.080"  data-track-index="1" src="assets/vo3.wav"></audio>
+      <audio class="clip" id="vo4"  data-start="30.2"  data-duration="11.808" data-track-index="1" src="assets/vo4.wav"></audio>
+      <audio class="clip" id="vo5"  data-start="43.2"  data-duration="13.224" data-track-index="1" src="assets/vo5.wav"></audio>
+      <audio class="clip" id="vo6"  data-start="57.6"  data-duration="9.984"  data-track-index="1" src="assets/vo6.wav"></audio>
+      <audio class="clip" id="vo7"  data-start="68.9"  data-duration="19.224" data-track-index="1" src="assets/vo7.wav"></audio>
+      <audio class="clip" id="vo8"  data-start="89.5"  data-duration="8.376"  data-track-index="1" src="assets/vo8.wav"></audio>
+      <audio class="clip" id="vo9"  data-start="99.1"  data-duration="9.120"  data-track-index="1" src="assets/vo9.wav"></audio>
+      <audio class="clip" id="vo10" data-start="109.4" data-duration="5.928"  data-track-index="1" src="assets/vo10.wav"></audio>
+
+      <!-- ── S1: HOOK  0 – 10.6s ── -->
+      <div class="clip scene" id="s1" data-start="0" data-duration="10.6" data-track-index="0">
+        <div id="s1-label">— 你见过这种人吗 —</div>
+        <div id="s1-line1">开口</div>
+        <div id="s1-line2">全场停下来</div>
+        <div id="s1-sub">这不是天赋，是方法</div>
+      </div>
+
+      <!-- ── S2: PAIN  10.7 – 21.4s ── -->
+      <div class="clip scene" id="s2" data-start="10.7" data-duration="10.7" data-track-index="0">
+        <div class="pain-bar" id="s2-bar"></div>
+        <div class="inner">
+          <div id="s2-tag">// 你有没有遇到过</div>
+          <div class="pain-row" id="s2-r1">
+            <span class="pain-dash">—</span>
+            <span class="pain-text">你说出来：没人接话</span>
+          </div>
+          <div class="pain-row" id="s2-r2">
+            <span class="pain-dash">—</span>
+            <span class="pain-text">同事说出来：全场点头</span>
+          </div>
+          <div class="pain-row" id="s2-r3">
+            <span class="pain-dash">—</span>
+            <span class="pain-text">内容几乎一样，结果天壤之别</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── S3: INSIGHT  21.5 – 29.7s ── -->
+      <div class="clip scene" id="s3" data-start="21.5" data-duration="8.2" data-track-index="0">
+        <div id="s3-tag">— 只有一个原因 —</div>
+        <div id="s3-main">结论放最后</div>
+        <div id="s3-bar"></div>
+        <div id="s3-sub">不是口才，是顺序</div>
+      </div>
+
+      <!-- ── S4: MECHANISM  29.8 – 42.7s ── -->
+      <div class="clip scene" id="s4" data-start="29.8" data-duration="12.9" data-track-index="0">
+        <div id="s4-tag">注意力窗口只有</div>
+        <div id="s4-num">3 秒</div>
+        <div id="s4-focus">大脑只判断一件事：「这跟我有关系吗？」</div>
+        <div id="s4-note">如果你还在铺背景——门已经关上了</div>
+      </div>
+
+      <!-- ── S5: CASE  42.8 – 57.1s ── -->
+      <div class="clip scene" id="s5" data-start="42.8" data-duration="14.3" data-track-index="0">
+        <div id="s5-tag">· 学员真实改变 ·</div>
+        <div id="s5-v-compare">
+          <div class="vcmp-card bad" id="s5-bad">
+            <span class="vcmp-badge bad">❌ 以前</span>
+            <span class="vcmp-quote bad">「最近项目遇到了一些挑战……」</span>
+            <span class="vcmp-result bad">→ 被打断</span>
+          </div>
+          <div class="vcmp-card good" id="s5-good">
+            <span class="vcmp-badge good">✓ 改变后</span>
+            <span class="vcmp-quote good">「老板，我需要你帮我做一个决定……」</span>
+            <span class="vcmp-result good">→ 放下手机</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── S6: FORMULA  57.2 – 68.4s ── -->
+      <div class="clip scene" id="s6" data-start="57.2" data-duration="11.2" data-track-index="0">
+        <div id="s6-tag">结论先行 · 核心逻辑</div>
+        <div id="s6-list">
+          <div class="f-row" id="s6-f1">
+            <span class="f-num">①</span>
+            <span class="f-text">先说你的结论</span>
+          </div>
+          <div class="f-row" id="s6-f2">
+            <span class="f-num">②</span>
+            <span class="f-text">再给出理由</span>
+          </div>
+        </div>
+        <div id="s6-sub">不是技巧——是替对方节省时间</div>
+      </div>
+
+      <!-- ── S7: COMPARE A vs B  68.5 – 89.0s ── -->
+      <div class="clip scene" id="s7" data-start="68.5" data-duration="20.5" data-track-index="0">
+        <div class="cpanel bad" id="s7-bad">
+          <div class="cpanel-label bad">❌ 说法 A</div>
+          <div class="cpanel-quote bad">
+            最近用户反馈比较多，<br>
+            我觉得可能是产品体验的问题，<br>
+            所以我们是不是应该考虑<br>
+            做一次优化？
+          </div>
+          <div class="cpanel-verdict bad" id="s7-bad-v">模糊 · 被动 · 没有主张</div>
+        </div>
+        <div id="s7-divider"></div>
+        <div class="cpanel good" id="s7-good">
+          <div class="cpanel-label good">✓ 说法 B</div>
+          <div class="cpanel-quote good">
+            建议下周启动产品优化，<br>
+            我整理了三个核心用户痛点，<br>
+            预计两周完成。
+          </div>
+          <div class="cpanel-verdict good" id="s7-good-v">清晰 · 主动 · 有推进力</div>
+        </div>
+      </div>
+
+      <!-- ── S8: DEPTH  89.1 – 98.6s ── -->
+      <div class="clip scene" id="s8" data-start="89.1" data-duration="9.5" data-track-index="0">
+        <div id="s8-tag">别人对你的判断</div>
+        <div class="depth-row" id="s8-r1">
+          <span class="depth-icon x">✗</span>
+          <span class="depth-txt dim">这个人很努力</span>
+        </div>
+        <div class="depth-row" id="s8-r2">
+          <span class="depth-icon chk">✓</span>
+          <span class="depth-txt lit">这个人说话有逻辑</span>
+        </div>
+        <div id="s8-sub">我知道该怎么配合他</div>
+      </div>
+
+      <!-- ── S9: PROOF  98.7 – 108.9s ── -->
+      <div class="clip scene" id="s9" data-start="98.7" data-duration="10.2" data-track-index="0">
+        <div id="s9-tag">真实数据</div>
+        <div id="s9-stats">
+          <span class="stat-num" id="s9-n1">7年</span>
+          <span class="stat-sep">·</span>
+          <span class="stat-num" id="s9-n2">500+</span>
+        </div>
+        <div id="s9-sub1">从基层员工到总监级别</div>
+        <div id="s9-sub2">改变他们的，是一套清晰的表达结构</div>
+      </div>
+
+      <!-- ── S10: CTA  109.0 – 116.5s ── -->
+      <div class="clip scene" id="s10" data-start="109.0" data-duration="7.5" data-track-index="0">
+        <div id="s10-tag">想要完整方法？</div>
+        <div id="s10-main">评论区扣 1</div>
+        <div id="s10-sub">我发给你完整的表达框架</div>
+      </div>
+
+      <script>
+        window.__timelines = window.__timelines || {};
+        var tl = gsap.timeline({ paused: true });
+        var flash = document.getElementById("flash");
+
+        function flashWithLeak(t) {
+          tl.to(flash, { opacity: 1, duration: 0.08, ease: "power2.in", overwrite: "auto" }, t);
+          tl.to(flash, { opacity: 0, duration: 0.22, ease: "power2.out", overwrite: "auto" }, t + 0.08);
+          tl.to("#light-leak", { opacity: 1, duration: 0.25, ease: "power2.out", overwrite: "auto" }, t + 0.18);
+          tl.to("#light-leak", { opacity: 0, duration: 0.55, ease: "power3.in", overwrite: "auto" }, t + 0.43);
+        }
+        function fadeOut(id, t) {
+          tl.to(id, { opacity: 0, duration: 0.28, ease: "power2.in" }, t);
+        }
+
+        /* ═══════════════════════════════════════════════
+           S1 — HOOK  (0 – 10.6s)
+        ═══════════════════════════════════════════════ */
+        tl.from("#s1-label", { y: -22, opacity: 0, duration: 0.44, ease: "power3.out" }, 0.1);
+        tl.from("#s1-line1", { y: 80, scaleY: 1.55, transformOrigin: "center bottom", duration: 0.3, ease: "power4.out" }, 0.24);
+        tl.from("#s1-line2", { y: 80, scaleY: 1.55, transformOrigin: "center bottom", duration: 0.3, ease: "power4.out" }, 0.36);
+        tl.from("#s1-sub",   { y: 18, opacity: 0, duration: 0.5, ease: "power3.out" }, 0.56);
+
+        fadeOut("#s1", 9.2);
+        flashWithLeak(10.0);
+
+        /* ═══════════════════════════════════════════════
+           S2 — PAIN  (10.7 – 21.4s)
+        ═══════════════════════════════════════════════ */
+        tl.from("#s2-bar", { scaleY: 0, transformOrigin: "center center", duration: 0.55, ease: "power3.out" }, 10.8);
+        tl.from("#s2-tag", { opacity: 0, x: -40, duration: 0.4, ease: "power2.out" }, 10.8);
+        tl.fromTo("#s2-r1",
+          { filter: "blur(16px)", opacity: 0, x: -60 },
+          { filter: "blur(0px)", opacity: 1, x: 0, duration: 0.52, ease: "power3.out" }, 11.05);
+        tl.fromTo("#s2-r2",
+          { filter: "blur(16px)", opacity: 0, x: -60 },
+          { filter: "blur(0px)", opacity: 1, x: 0, duration: 0.52, ease: "power3.out" }, 11.9);
+        tl.fromTo("#s2-r3",
+          { filter: "blur(16px)", opacity: 0, x: -60 },
+          { filter: "blur(0px)", opacity: 1, x: 0, duration: 0.52, ease: "power3.out" }, 12.8);
+
+        fadeOut("#s2", 20.0);
+        flashWithLeak(20.8);
+
+        /* ═══════════════════════════════════════════════
+           S3 — INSIGHT  (21.5 – 29.7s)
+        ═══════════════════════════════════════════════ */
+        tl.from("#s3-tag",  { y: -20, opacity: 0, duration: 0.44, ease: "power3.out" }, 21.6);
+        tl.from("#s3-main", { scale: 0.78, opacity: 0, duration: 0.58, ease: "back.out(1.8)" }, 21.75);
+        tl.from("#s3-bar",  { scaleX: 0, transformOrigin: "center", duration: 0.5, ease: "power3.out" }, 22.3);
+        tl.from("#s3-sub",  { y: 16, opacity: 0, duration: 0.45, ease: "power3.out" }, 22.5);
+        tl.to("#s3-main",   { textShadow: "0 0 180px rgba(232,213,163,0.85), 0 0 360px rgba(232,213,163,0.3)", duration: 0.8, ease: "power2.inOut" }, 23.4);
+
+        fadeOut("#s3", 28.3);
+        flashWithLeak(29.1);
+
+        /* ═══════════════════════════════════════════════
+           S4 — MECHANISM  (29.8 – 42.7s)
+           Big "3秒" slams in, then details fade
+        ═══════════════════════════════════════════════ */
+        tl.from("#s4-tag",   { opacity: 0, y: -20, duration: 0.4, ease: "power3.out" }, 29.9);
+        tl.from("#s4-num",   { scale: 0.65, opacity: 0, duration: 0.55, ease: "back.out(2)" }, 30.1);
+        tl.from("#s4-focus", { opacity: 0, y: 24, duration: 0.5, ease: "power3.out" }, 31.2);
+        tl.from("#s4-note",  { opacity: 0, y: 16, duration: 0.5, ease: "power3.out" }, 33.0);
+
+        fadeOut("#s4", 41.3);
+        flashWithLeak(42.1);
+
+        /* ═══════════════════════════════════════════════
+           S5 — CASE  (42.8 – 57.1s)
+           Tag → bad card → good card
+        ═══════════════════════════════════════════════ */
+        tl.from("#s5-tag",  { y: -20, opacity: 0, duration: 0.44, ease: "power3.out" }, 42.9);
+        tl.from("#s5-bad",  { x: -60, opacity: 0, duration: 0.55, ease: "power3.out" }, 43.2);
+        tl.from("#s5-good", { x: 60,  opacity: 0, duration: 0.55, ease: "power3.out" }, 47.5);
+
+        fadeOut("#s5", 55.7);
+        flashWithLeak(56.5);
+
+        /* ═══════════════════════════════════════════════
+           S6 — FORMULA  (57.2 – 68.4s)
+        ═══════════════════════════════════════════════ */
+        tl.from("#s6-tag", { y: -20, opacity: 0, duration: 0.44, ease: "power3.out" }, 57.3);
+        tl.from("#s6-f1",  { y: 36, opacity: 0, duration: 0.5, ease: "power3.out" }, 57.6);
+        tl.from("#s6-f2",  { y: 36, opacity: 0, duration: 0.5, ease: "power3.out" }, 58.4);
+        tl.from("#s6-sub", { opacity: 0, y: 18, duration: 0.5, ease: "power3.out" }, 60.5);
+
+        fadeOut("#s6", 67.0);
+        flashWithLeak(67.8);
+
+        /* ═══════════════════════════════════════════════
+           S7 — COMPARE A vs B  (68.5 – 89.0s)
+           Bad slides from left → divider → good from right
+           Verdicts appear near end of VO
+        ═══════════════════════════════════════════════ */
+        tl.from("#s7-bad",      { x: -80, opacity: 0, duration: 0.65, ease: "power3.out" }, 68.7);
+        tl.from("#s7-divider",  { opacity: 0, duration: 0.4 }, 69.2);
+        tl.set("#s7-bad-v",  { opacity: 0 });
+        tl.set("#s7-good-v", { opacity: 0 });
+        tl.from("#s7-good",     { x: 80,  opacity: 0, duration: 0.65, ease: "power3.out" }, 77.3);
+        tl.to("#s7-bad-v",   { opacity: 1, duration: 0.4 }, 83.7);
+        tl.to("#s7-good-v",  { opacity: 1, duration: 0.4 }, 84.3);
+
+        fadeOut("#s7", 87.6);
+        flashWithLeak(88.4);
+
+        /* ═══════════════════════════════════════════════
+           S8 — DEPTH  (89.1 – 98.6s)
+        ═══════════════════════════════════════════════ */
+        tl.from("#s8-tag", { opacity: 0, y: -18, duration: 0.42, ease: "power3.out" }, 89.2);
+        tl.from("#s8-r1",  { opacity: 0, x: -50, duration: 0.5,  ease: "power3.out" }, 89.5);
+        tl.from("#s8-r2",  { opacity: 0, x: -50, duration: 0.5,  ease: "power3.out" }, 90.7);
+        tl.from("#s8-sub", { opacity: 0, y: 20,  duration: 0.48, ease: "power3.out" }, 91.9);
+
+        fadeOut("#s8", 97.2);
+        flashWithLeak(98.0);
+
+        /* ═══════════════════════════════════════════════
+           S9 — PROOF  (98.7 – 108.9s)
+        ═══════════════════════════════════════════════ */
+        tl.from("#s9-tag",  { opacity: 0, y: -18, duration: 0.42, ease: "power3.out" }, 98.8);
+        tl.from("#s9-n1",   { y: 60, scale: 0.7, opacity: 0, transformOrigin: "center bottom", duration: 0.52, ease: "back.out(2)" }, 99.1);
+        tl.from("#s9-n2",   { y: 60, scale: 0.7, opacity: 0, transformOrigin: "center bottom", duration: 0.52, ease: "back.out(2)" }, 99.6);
+        tl.from("#s9-sub1", { opacity: 0, y: 18, duration: 0.48, ease: "power3.out" }, 100.4);
+        tl.from("#s9-sub2", { opacity: 0, y: 14, duration: 0.48, ease: "power3.out" }, 101.2);
+
+        fadeOut("#s9", 107.5);
+        flashWithLeak(108.3);
+
+        /* ═══════════════════════════════════════════════
+           S10 — CTA  (109.0 – 116.5s)
+        ═══════════════════════════════════════════════ */
+        tl.from("#s10-tag",  { y: -22, opacity: 0, duration: 0.44, ease: "power3.out" }, 109.1);
+        tl.from("#s10-main", { scale: 0.6, opacity: 0, duration: 0.65, ease: "elastic.out(1, 0.5)" }, 109.3);
+        tl.from("#s10-sub",  { y: 22, opacity: 0, duration: 0.5,  ease: "power3.out" }, 109.9);
+        tl.to("#s10-main",   { textShadow: "0 0 200px rgba(232,213,163,1), 0 0 400px rgba(232,213,163,0.4)", duration: 0.8, ease: "power2.inOut" }, 110.7);
+        fadeOut("#s10", 115.8);
+
+        window.__timelines["main"] = tl;
+      </script>
+    </div>
+  </body>
+</html>

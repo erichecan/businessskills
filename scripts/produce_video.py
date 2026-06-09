@@ -74,6 +74,7 @@ def build_command(
             f"[{i}:v]"
             f"scale=1080:1920:force_original_aspect_ratio=increase,"
             f"crop=1080:1920,"
+            f"format=yuv420p,"
             f"fps={fps},"
             f"setpts=PTS-STARTPTS"
             f"[v{i}]"
@@ -107,7 +108,8 @@ def build_command(
         "-map", "[video]",
         "-map", "[audio]",
         "-c:v", "libx264",
-        "-preset", "medium",
+        "-pix_fmt", "yuv420p",
+        "-preset", "fast",
         "-crf", "23",
         "-c:a", "aac",
         "-b:a", "192k",

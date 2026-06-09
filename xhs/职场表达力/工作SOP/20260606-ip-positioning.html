@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>职场表达力 · IP 定位 v3</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink: #1a1a1a; --gold: #e8d5a3; --paper: #f5f4f0; --line: #e8e6df;
+      --green: #2e9e6b; --green-bg: #eef9f2; --red: #e05555; --red-bg: #fdf2f2;
+      --blue: #3a7bd5; --blue-bg: #eef3fc; --muted: #888;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; background: var(--paper); color: var(--ink); line-height: 1.7; }
+
+    .hero { background: var(--ink); color: #fff; padding: 70px 40px 56px; text-align: center; position: relative; overflow: hidden; }
+    .hero::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(232,213,163,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(232,213,163,0.06) 1px, transparent 1px); background-size: 28px 28px; }
+    .hero > * { position: relative; z-index: 1; }
+    .hero .tag { display: inline-block; background: var(--gold); color: var(--ink); font-size: 12px; font-weight: 700; letter-spacing: 2px; padding: 4px 14px; border-radius: 2px; margin-bottom: 22px; }
+    .hero h1 { font-size: 38px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 16px; }
+    .hero .sub { max-width: 680px; margin: 0 auto; font-size: 16px; color: var(--gold); font-weight: 600; line-height: 1.6; }
+    .hero .meta { color: #888; font-size: 13px; margin-top: 18px; }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 0 24px 90px; }
+    .section-header { display: flex; align-items: center; gap: 16px; margin: 58px 0 22px; }
+    .section-num { width: 42px; height: 42px; border-radius: 50%; background: var(--ink); color: var(--gold); font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .section-title { font-size: 22px; font-weight: 800; }
+    .section-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    .callout { background: var(--ink); color: #fff; border-radius: 14px; padding: 28px 32px; }
+    .callout .big { font-size: 20px; font-weight: 800; line-height: 1.6; }
+    .callout .big .gold { color: var(--gold); }
+    .callout p { font-size: 13.5px; color: #ccc; margin-top: 12px; line-height: 1.8; }
+    .callout p b { color: #fff; }
+
+    /* 翻译四场景 */
+    .translate-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 20px; }
+    @media (max-width: 720px) { .translate-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 480px) { .translate-grid { grid-template-columns: 1fr; } }
+    .tcol { background: #fff; border-radius: 10px; padding: 16px; border-top: 3px solid var(--gold); }
+    .tcol .scene { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 1px; margin-bottom: 6px; }
+    .tcol .decode { font-size: 13px; font-weight: 800; color: var(--ink); margin-bottom: 6px; }
+    .tcol .arrow { color: var(--gold); font-weight: 800; margin: 4px 0; font-size: 13px; }
+    .tcol .say { font-size: 12.5px; color: #555; }
+
+    /* 护城河 */
+    .moat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+    @media (max-width: 720px) { .moat-grid { grid-template-columns: 1fr; } }
+    .moat { background: #fff; border-radius: 12px; padding: 22px; border-top: 4px solid var(--gold); }
+    .moat .n { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+    .moat h4 { font-size: 16px; font-weight: 800; margin: 6px 0 8px; }
+    .moat p { font-size: 13px; color: #555; line-height: 1.6; }
+    .moat .diff { background: var(--paper); border-radius: 6px; padding: 8px 10px; font-size: 12px; color: #444; margin-top: 10px; border-left: 3px solid var(--gold); }
+
+    /* 客群三层 */
+    .audience-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+    @media (max-width: 720px) { .audience-grid { grid-template-columns: 1fr; } }
+    .acol { background: #fff; border-radius: 12px; padding: 20px; }
+    .acol.main { border-top: 4px solid var(--red); }
+    .acol.mid { border-top: 4px solid var(--gold); }
+    .acol.top { border-top: 4px solid var(--blue); }
+    .acol .tier { font-size: 11px; font-weight: 800; letter-spacing: 1px; margin-bottom: 6px; }
+    .acol.main .tier { color: var(--red); }
+    .acol.mid .tier { color: #997000; }
+    .acol.top .tier { color: var(--blue); }
+    .acol h4 { font-size: 15px; font-weight: 800; margin-bottom: 8px; }
+    .acol .pain { font-size: 13px; color: #555; margin-bottom: 8px; }
+    .acol .scene-tag { display: inline-block; background: var(--paper); color: #555; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin: 2px 2px 0 0; }
+    .acol .note { margin-top: 10px; font-size: 12px; color: #888; font-style: italic; }
+
+    /* 场景路线图 */
+    .roadmap { display: flex; gap: 0; margin-top: 20px; }
+    @media (max-width: 680px) { .roadmap { flex-direction: column; } }
+    .rphase { flex: 1; background: #fff; padding: 18px; border-right: 1px solid var(--line); }
+    .rphase:last-child { border-right: none; }
+    .rphase .pt { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 1px; margin-bottom: 6px; }
+    .rphase h4 { font-size: 15px; font-weight: 800; margin-bottom: 6px; }
+    .rphase .status { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; margin-bottom: 8px; }
+    .rphase .status.now { background: #fff0f0; color: var(--red); }
+    .rphase .status.next { background: var(--green-bg); color: var(--green); }
+    .rphase .status.later { background: var(--paper); color: var(--muted); }
+    .rphase p { font-size: 12.5px; color: #555; line-height: 1.6; }
+    .roadmap { border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+
+    /* 通用表 */
+    .gtable { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; font-size: 13px; }
+    .gtable th { background: var(--ink); color: var(--gold); padding: 11px 14px; text-align: left; font-size: 12px; letter-spacing: 0.5px; }
+    .gtable td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .gtable tr:last-child td { border-bottom: none; }
+    .gtable tr:hover td { background: #fafaf8; }
+    .gtable .price { font-weight: 800; color: var(--ink); white-space: nowrap; }
+    .gtable .tbd { color: var(--muted); font-style: italic; }
+
+    /* 内容风格 */
+    .hook-row { display: grid; grid-template-columns: 140px 1fr; gap: 0; background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); margin-bottom: 10px; }
+    .hook-label { background: var(--ink); color: var(--gold); padding: 14px 16px; font-size: 13px; font-weight: 800; display: flex; align-items: center; }
+    .hook-eg { padding: 14px 16px; font-size: 13px; color: #333; display: flex; align-items: center; }
+
+    /* 风险 */
+    .risk { background: var(--red-bg); border-left: 4px solid var(--red); border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; font-size: 13.5px; line-height: 1.7; }
+    .risk b { color: var(--red); }
+
+    /* 阶段路线 */
+    .phase-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+    @media (max-width: 720px) { .phase-grid { grid-template-columns: 1fr; } }
+    .phase { background: #fff; border-radius: 12px; padding: 20px; border-top: 4px solid var(--gold); }
+    .phase .t { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 1px; }
+    .phase h4 { font-size: 15px; font-weight: 800; margin: 6px 0 10px; }
+    .phase ul { list-style: none; font-size: 12.5px; }
+    .phase li { padding: 5px 0 5px 16px; position: relative; color: #444; border-bottom: 1px solid var(--paper); }
+    .phase li:last-child { border-bottom: none; }
+    .phase li::before { content: "·"; position: absolute; left: 4px; color: var(--gold); font-weight: 800; }
+    .phase .base { margin-top: 10px; background: var(--paper); border-radius: 6px; padding: 8px 10px; font-size: 11.5px; color: #666; }
+    .phase .base b { color: var(--ink); }
+
+    .badge { display: inline-block; background: #fff4d6; color: #997000; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; vertical-align: middle; }
+
+    footer { text-align: center; padding: 36px 0 48px; font-size: 12px; color: #bbb; }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="tag">职场表达力 · IP 定位 v3</div>
+  <h1>前腾讯资深中层，教职场表达力</h1>
+  <div class="sub">职场表达的本质是翻译——把你的能力，翻译成对方听得懂、愿意买单的语言。</div>
+  <div class="meta">2026-06-08 · v3 方向重建（面试咨询 → 职场表达力品牌）</div>
+</div>
+
+<div class="container">
+
+  <!-- 0 定位宣言 -->
+  <div class="section-header">
+    <div class="section-num">0</div>
+    <div>
+      <div class="section-title">定位宣言</div>
+      <div class="section-sub">宪法级文件 · 所有产品、内容、话术都从这里生长</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="big">
+      <span class="gold">职场表达力</span>是品牌主体，<span class="gold">面试</span>是第一个切入场景。
+    </div>
+    <p>
+      <b>旧逻辑（错）：</b>面试表达力是主，职场表达是「复购延伸线」。<br>
+      <b>新逻辑（对）：</b>职场表达力是底层能力品牌，面试是它最痛的入口场景，谈薪是紧随其后的第二场景，汇报与向上管理是后续扩展。<br><br>
+      这不是换个名字，是<b>战略方向的重建</b>：我们在建一个可以覆盖职场全周期的表达力品牌，而不是一个求职工具账号。
+    </p>
+  </div>
+
+  <!-- 1 核心方法论 -->
+  <div class="section-header">
+    <div class="section-num">1</div>
+    <div>
+      <div class="section-title">核心方法论：翻译</div>
+      <div class="section-sub">所有场景有同一个底层逻辑</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="big">先解码对方的决策框架，再用对方能接受的语言，达成自己的目标。</div>
+    <p>这套逻辑不是某个场景的技巧——它是一种<b>可迁移的底层能力</b>。能力建立了，从面试到谈薪到汇报到向上管理，都是同一套肌肉在发力。这是我们与「教技巧」「教模板」的同行最根本的区别。</p>
+  </div>
+
+  <div class="translate-grid" style="margin-top:16px;">
+    <div class="tcol">
+      <div class="scene">场景一 · 面试</div>
+      <div class="decode">解码：面试官在筛什么</div>
+      <div class="arrow">↓</div>
+      <div class="say">用项目经历精准对上，让对方觉得你就是答案</div>
+    </div>
+    <div class="tcol">
+      <div class="scene">场景二 · 谈薪</div>
+      <div class="decode">解码：对方的预算空间和决策逻辑</div>
+      <div class="arrow">↓</div>
+      <div class="say">用锚定 + 数据争取最大值，不靠运气靠策略</div>
+    </div>
+    <div class="tcol">
+      <div class="scene">场景三 · 汇报</div>
+      <div class="decode">解码：老板要的结论是什么</div>
+      <div class="arrow">↓</div>
+      <div class="say">结构化表达，让老板高效拍板、记住你的工作</div>
+    </div>
+    <div class="tcol">
+      <div class="scene">场景四 · 向上管理</div>
+      <div class="decode">解码：上级的压力和偏好</div>
+      <div class="arrow">↓</div>
+      <div class="say">用他的语言让你的贡献被看见、被记住、被晋升</div>
+    </div>
+  </div>
+
+  <!-- 2 IP 身份与护城河 -->
+  <div class="section-header">
+    <div class="section-num">2</div>
+    <div>
+      <div class="section-title">IP 身份与护城河</div>
+      <div class="section-sub">为什么是你，而不是任何一个「大厂前员工」</div>
+    </div>
+  </div>
+
+  <div class="moat-grid">
+    <div class="moat">
+      <div class="n">护城河一</div>
+      <h4>前腾讯资深中层</h4>
+      <p>不是普通员工，是做过真实管理的中层。经历过<b>向上管理（对接高 P 和老板）</b>和<b>向下管理（带团队、面试候选人）</b>，有完整的双向视角。</p>
+      <div class="diff">别人只有一个视角，你有两个：你知道老板想听什么，也知道执行层说不清什么。</div>
+    </div>
+    <div class="moat">
+      <div class="n">护城河二</div>
+      <h4>双向翻译能力</h4>
+      <p>见过太多聪明人因为表达力毁掉好机会。你教的不是套路，是帮人把自己的真实能力翻译出来——面试时、谈薪时、汇报时、向上沟通时，都是同一套肌肉。</p>
+      <div class="diff">抄得走话术，抄不走见过几百个真实职场案例的判断力。</div>
+    </div>
+    <div class="moat">
+      <div class="n">护城河三</div>
+      <h4>结果可衡量</h4>
+      <p>不卖感觉，卖结果。面试场景：offer 截图、改前改后对比。谈薪场景：涨薪金额、谈判复盘。每一个案例都是护城河，也是内容原料。</p>
+      <div class="diff">求职用户会验证结果，在职用户会传播结果——案例就是最强的信任锤。</div>
+    </div>
+  </div>
+
+  <!-- 3 目标客群 -->
+  <div class="section-header">
+    <div class="section-num">3</div>
+    <div>
+      <div class="section-title">目标客群：三层</div>
+      <div class="section-sub">主力引流 + 训练营主力 + 高端一对一，三层各有策略</div>
+    </div>
+  </div>
+
+  <div class="audience-grid">
+    <div class="acol main">
+      <div class="tier">主力层 · 引流入口</div>
+      <h4>刚毕业 / 1–3 年</h4>
+      <div class="pain">最痛的是「进不了场」——面试表达不清，项目讲不出亮点，被追问就卡壳。</div>
+      <div><span class="scene-tag">面试表达力</span><span class="scene-tag">谈薪表达力</span></div>
+      <div class="note">量最大、付费意愿强、内容传播力高。用面试场景做入口，谈薪做连续转化。</div>
+    </div>
+    <div class="acol mid">
+      <div class="tier">扩展层 · 训练营主力</div>
+      <h4>3–5 年</h4>
+      <div class="pain">进场了，但升不上去。汇报没说到点、老板不重视自己、换工作谈薪没底气。</div>
+      <div><span class="scene-tag">面试表达力</span><span class="scene-tag">谈薪表达力</span><span class="scene-tag">汇报表达力</span></div>
+      <div class="note">多场景痛点并发，客单价高，是训练营的核心付费人群。</div>
+    </div>
+    <div class="acol top">
+      <div class="tier">高端层 · 仅接一对一</div>
+      <h4>5 年以上</h4>
+      <div class="pain">问题综合、职场固化习惯深，训练营的通用方法论对他们效果有限。</div>
+      <div><span class="scene-tag">向上管理</span><span class="scene-tag">高端一对一</span></div>
+      <div class="note">不纳入训练营。只接一对一，深度定制，高客单。</div>
+    </div>
+  </div>
+
+  <!-- 4 场景产品路线图 -->
+  <div class="section-header">
+    <div class="section-num">4</div>
+    <div>
+      <div class="section-title">场景产品路线图</div>
+      <div class="section-sub">先上面试，紧跟谈薪 · 四个场景独立产品独立定价</div>
+    </div>
+  </div>
+
+  <div class="roadmap">
+    <div class="rphase">
+      <div class="pt">Phase 1 · 现在</div>
+      <h4>面试表达力训练营</h4>
+      <div class="status now">立即上线</div>
+      <p>入口场景，痛点最深，转化最快。用来验证内容方向 + 跑通生产流程。</p>
+    </div>
+    <div class="rphase">
+      <div class="pt">Phase 2 · 紧跟</div>
+      <h4>谈薪表达力训练营</h4>
+      <div class="status next">面试验证后上线</div>
+      <p>与面试客群高度重叠（同一批人，同一时期需要）。独立产品，独立定价，可连续购买。</p>
+    </div>
+    <div class="rphase">
+      <div class="pt">Phase 3 · 后续</div>
+      <h4>汇报表达力训练营</h4>
+      <div class="status later">待规划</div>
+      <p>面向 3–5 年在职人群，复购场景。内容方向验证后再上线。</p>
+    </div>
+    <div class="rphase">
+      <div class="pt">Phase 4 · 后续</div>
+      <h4>向上管理表达力</h4>
+      <div class="status later">待规划</div>
+      <p>高端场景，主要承接 5 年以上一对一客户，以及汇报场景的深度延伸。</p>
+    </div>
+  </div>
+
+  <!-- 5 产品阶梯 -->
+  <div class="section-header">
+    <div class="section-num">5</div>
+    <div>
+      <div class="section-title">产品阶梯</div>
+      <div class="section-sub">定价待单独讨论后补全 <span class="badge">TBD</span></div>
+    </div>
+  </div>
+
+  <table class="gtable">
+    <thead><tr><th>层级</th><th>产品</th><th>定价</th><th>交付方式</th><th>目标客群</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>钩子品</td>
+        <td>免费资料包 / 公开答疑（面试 / 谈薪场景各一套）</td>
+        <td class="price">0 元</td>
+        <td>自动发放，引私域</td>
+        <td>全层</td>
+      </tr>
+      <tr>
+        <td>引流品</td>
+        <td>面试表达力训练营</td>
+        <td class="tbd">待定</td>
+        <td>小班直播 + 作业批改 + 案例拆解</td>
+        <td>1–3 年</td>
+      </tr>
+      <tr>
+        <td>引流品</td>
+        <td>谈薪表达力训练营</td>
+        <td class="tbd">待定</td>
+        <td>小班直播 + 实战演练 + 话术模板</td>
+        <td>1–5 年</td>
+      </tr>
+      <tr>
+        <td>利润品</td>
+        <td>汇报表达力训练营（待上线）</td>
+        <td class="tbd">待定</td>
+        <td>小班直播 + 场景模拟</td>
+        <td>3–5 年</td>
+      </tr>
+      <tr>
+        <td>高客单</td>
+        <td>5 年以上 · 全程一对一</td>
+        <td class="tbd">待定</td>
+        <td>深度定制，按问题维度设计方案</td>
+        <td>5 年以上</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 6 内容风格 -->
+  <div class="section-header">
+    <div class="section-num">6</div>
+    <div>
+      <div class="section-title">内容风格：目击者视角</div>
+      <div class="section-sub">读者在偷听一个故事，不是在接受教育 · 详见《内容钩子系统》</div>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-bottom:16px;">
+    <div class="big">专家视角已死。真实故事才有人点。</div>
+    <p>不用「面试官不会告诉你的……」这类烂大街的钩子。用<b>目击者视角</b>——讲你见过的、经历过的、或者学员身上发生的真实故事。读者不是在学习，而是在偷听，然后忍不住想知道结局。</p>
+  </div>
+
+  <div class="hook-row">
+    <div class="hook-label">认知反转钩</div>
+    <div class="hook-eg">我以为是面试官态度差，结果是我毁了自己</div>
+  </div>
+  <div class="hook-row">
+    <div class="hook-label">数字悬念钩</div>
+    <div class="hook-eg">沉默 11 秒，多谈了两万</div>
+  </div>
+  <div class="hook-row">
+    <div class="hook-label">旁观目击钩</div>
+    <div class="hook-eg">迟到 15 分钟的那个人，我们录了</div>
+  </div>
+  <div class="hook-row">
+    <div class="hook-label">细节震撼钩</div>
+    <div class="hook-eg">面试官放下笔的那一刻</div>
+  </div>
+  <div class="hook-row">
+    <div class="hook-label">常识颠覆钩</div>
+    <div class="hook-eg">越努力表现，越容易被拒</div>
+  </div>
+  <div class="hook-row">
+    <div class="hook-label">身份错位钩</div>
+    <div class="hook-eg">面试我的，是我前同事</div>
+  </div>
+
+  <p style="font-size:13px;color:#666;margin-top:12px;">完整标题公式与叙事结构见 <b>《内容钩子系统》20260608-content-hooks.html</b></p>
+
+  <!-- 7 三阶段落地路线 -->
+  <div class="section-header">
+    <div class="section-num">7</div>
+    <div>
+      <div class="section-title">三阶段落地路线</div>
+      <div class="section-sub">先用面试场景验证最小闭环，再扩产品线</div>
+    </div>
+  </div>
+
+  <div class="phase-grid">
+    <div class="phase">
+      <div class="t">0–3 月 · 验证 MVP</div>
+      <h4>面试场景跑通</h4>
+      <ul>
+        <li>内容：录屏 + 真人画外音，6 种钩子赛马</li>
+        <li>铺小红书 + 视频号各 1 号</li>
+        <li>上线面试表达力训练营（小班）</li>
+        <li>收集真实案例，建案例库</li>
+      </ul>
+      <div class="base"><b>基准线：</b>单条内容带来 5–10 私信 / 评论有真实共鸣 = 方向跑通</div>
+    </div>
+    <div class="phase">
+      <div class="t">1–4 月 · 上线谈薪场景</div>
+      <h4>第二产品线启动</h4>
+      <ul>
+        <li>面试客群自然延伸到谈薪需求</li>
+        <li>上线谈薪表达力训练营（独立产品）</li>
+        <li>双产品连续购买路径打通</li>
+        <li>私域分层：求职中 / 已入职 / 谈薪中</li>
+      </ul>
+      <div class="base"><b>基准线：</b>面试→谈薪连购率 &gt; 20% = 场景扩展成立</div>
+    </div>
+    <div class="phase">
+      <div class="t">4–12 月 · 扩品牌厚度</div>
+      <h4>汇报 + 向上管理落地</h4>
+      <ul>
+        <li>汇报表达力训练营上线（面向 3–5 年）</li>
+        <li>高端一对一规范化（5 年以上）</li>
+        <li>「职场表达力」品牌身份建立完成</li>
+        <li>上岸学员发展为兼职导师</li>
+      </ul>
+      <div class="base"><b>目标：</b>品牌不再等于「求职」，而是「职场全周期表达力」</div>
+    </div>
+  </div>
+
+  <!-- 8 合规红线 -->
+  <div class="section-header">
+    <div class="section-num">8</div>
+    <div>
+      <div class="section-title">合规红线</div>
+      <div class="section-sub">做得越大越要守 · 违反任何一条都可能毁掉信任</div>
+    </div>
+  </div>
+
+  <div class="risk"><b>保 offer 是高压线：</b>行业退费率极高，监管与口碑风险大。只做「辅导」，不做「保证结果」宣传。用真实案例建信任，不用承诺建信任。</div>
+  <div class="risk"><b>Title 不能注水：</b>「前腾讯资深中层」是你的真实经历，守住它。同行因夸大头衔被质疑的案例很多，你的优势是真实，别拿它做交换。</div>
+  <div class="risk"><b>AI 合规：</b>禁 AI 文生图、禁 AI 配音、禁删改 AI 标识。录屏 + 真人画外音是已定调的内容形态，不要因为「省事」破例。</div>
+  <div class="risk"><b>平台政策：</b>2026 年起教育培训类目管控趋严，不做百号矩阵打法。单账号做深，私域做稳，比铺量更安全。</div>
+
+  <!-- 9 完整飞轮 -->
+  <div class="section-header">
+    <div class="section-num">9</div>
+    <div>
+      <div class="section-title">完整飞轮</div>
+      <div class="section-sub">内容引流 → 结果交付 → 案例反哺，越转越厚</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <p style="color:#fff; font-size:14px; line-height:2;">
+      真实腾讯中层背景内容（目击者视角 / 真实故事 / 6 种钩子）
+      <b style="color:var(--gold)"> → </b>小红书 + 视频号矩阵分发
+      <b style="color:var(--gold)"> → </b>私信承接 + 免费资料引流私域
+      <b style="color:var(--gold)"> → </b>面试表达力训练营（首购）
+      <b style="color:var(--gold)"> → </b>谈薪表达力训练营（连购）
+      <b style="color:var(--gold)"> → </b><b>学员拿到结果（offer / 涨薪）</b>
+      <b style="color:var(--gold)"> → </b>案例反哺内容 + 转介绍
+      <b style="color:var(--gold)"> → </b>更低成本的新流量进入飞轮
+    </p>
+  </div>
+
+</div>
+
+<footer>
+  职场表达力 · IP 定位 v3 · 2026-06-08 · 定价部分待单独讨论后补全
+</footer>
+
+</body>
+</html>
