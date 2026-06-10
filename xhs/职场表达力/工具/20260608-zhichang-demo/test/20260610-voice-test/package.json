@@ -1,0 +1,9 @@
+{
+  "name": "test-voice-s1",
+  "version": "1.0.0",
+  "scripts": {
+    "render": "npx hyperframes@0.6.81 render . --output ../../renders/20260610-voice-test.mp4",
+    "lint": "npx hyperframes@0.6.81 lint .",
+    "check": "npx hyperframes@0.6.81 lint ."
+  }
+}
