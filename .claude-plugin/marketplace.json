@@ -197,6 +197,16 @@
       "category": "content-creation",
       "keywords": ["boshang", "qc", "industrial", "horse-racing", "funnel", "quality-control", "chinese"],
       "skills": ["./skills/eric-boshang"]
+    },
+    {
+      "name": "eric-coach",
+      "description": "文彬教练 — 简历 + 面试一体辅导。诊断式求职辅导：揭示招聘本质、改简历、备面试。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "business-diagnostics",
+      "keywords": ["resume", "interview", "coaching", "job-search", "chinese"],
+      "skills": ["./skills/eric-coach"]
     }
   ]
 }
