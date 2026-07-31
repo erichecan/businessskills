@@ -110,11 +110,24 @@ def notify(title, text):
         pass
 
 
+def check_draft_quality(alerts):
+    try:
+        r = subprocess.run(
+            [sys.executable, str(Path(__file__).parent / "draft_check.py")],
+            capture_output=True, text=True, timeout=60,
+        )
+        if r.returncode != 0:
+            alerts.append("成稿机械及格线违规：\n" + r.stdout.strip())
+    except Exception as e:
+        alerts.append(f"成稿机械检查无法执行：{e}")
+
+
 def main() -> int:
     alerts = []
     check_log_freshness(alerts)
     check_log_schema(alerts)
     check_audit_gate(alerts)
+    check_draft_quality(alerts)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     if not alerts:
