@@ -34,6 +34,8 @@ export default function TrendsPage() {
   const [formUrl, setFormUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   const fetchTopics = useCallback(async () => {
     try {
@@ -77,6 +79,31 @@ export default function TrendsPage() {
     }
   }
 
+  async function syncFromSucai() {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const scrapeRes = await fetch("/api/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: "xiaohongshu" }),
+      });
+      const scrapeData = await scrapeRes.json();
+      if (!scrapeRes.ok) throw new Error(scrapeData.message || "热点同步失败");
+
+      const importRes = await fetch("/api/import/topics", { method: "POST" });
+      const importData = await importRes.json();
+      if (!importRes.ok) throw new Error(importData.message || "选题导入失败");
+
+      setSyncMsg(`热点：新增 ${scrapeData.count}、跳过 ${scrapeData.skipped}；选题：新增 ${importData.count}、跳过 ${importData.skipped}`);
+      fetchTopics();
+    } catch (err) {
+      setSyncMsg(err instanceof Error ? err.message : "同步失败");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function updateStatus(id: string, status: string) {
     try {
       const res = await fetch(`/api/hot-topics/${id}`, {
@@ -105,7 +132,17 @@ export default function TrendsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-white">热点</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-white">热点</h1>
+        <button
+          onClick={syncFromSucai}
+          disabled={syncing}
+          className="px-4 py-2 bg-emerald-700 text-white rounded text-sm font-medium hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {syncing ? "同步中…" : "从素材库同步"}
+        </button>
+      </div>
+      {syncMsg && <p className="text-sm text-zinc-400">{syncMsg}</p>}
 
       {/* 手动输入 */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">

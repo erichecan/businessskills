@@ -15,7 +15,7 @@ export async function GET(
     });
     if (!content) return NextResponse.json({ error: true, message: "内容不存在" }, { status: 404 });
 
-    const systemPrompt = readSkill("eric-diagnosis");
+    const systemPrompt = readSkill("eric-content");
     const topicContext = [
       `选题：${content.topic.title}`,
       content.topic.angle ? `角度：${content.topic.angle}` : null,
@@ -23,7 +23,10 @@ export async function GET(
       content.topic.hotTopic ? `来源热点：${content.topic.hotTopic.title}` : null,
     ].filter(Boolean).join("\n");
 
-    const userMessage = `请对以下选题进行内容诊断分析：\n\n${topicContext}`;
+    const draftText = content.finalDraft || content.draft;
+    const userMessage = draftText
+      ? `请对以下内容做五维诊断（诊断模式，只诊断不代写）：\n\n${topicContext}\n\n--- 稿件 ---\n\n${draftText}`
+      : `请对以下选题做内容诊断分析（尚无稿件，先诊断选题与内容方向）：\n\n${topicContext}`;
 
     return NextResponse.json({ systemPrompt, userMessage, combined: `${systemPrompt}\n\n---\n\n${userMessage}` });
   } catch (error) {

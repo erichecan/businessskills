@@ -13,6 +13,7 @@ type StepDef = {
 const STEPS: StepDef[] = [
   { label: "生成初稿", relay: true,  done: (c) => !!c.draft },
   { label: "定稿",     relay: false, done: (c) => !!c.finalDraft },
+  { label: "内容诊断", relay: true,  done: (c) => !!c.diagnosisResult },
   { label: "AI 检测",  relay: true,  done: (c) => !!c.aiCheckResult },
   { label: "生成标题", relay: true,  done: (c) => !!c.titleOptions },
 ];
@@ -159,7 +160,16 @@ export default function ContentPage() {
       />
 
       <RelayStep
-        title="③ AI 痕迹检测"
+        title="③ 内容诊断"
+        promptEndpoint={`/api/content/${id}/diagnose`}
+        saveEndpoint={`/api/content/${id}/diagnose`}
+        savedResult={content.diagnosisResult}
+        onSaved={(updated) => setContent((c) => c ? { ...c, diagnosisResult: updated.diagnosisResult } : c)}
+        hint="把提示词粘贴到 Claude 对话框，将五维诊断结果粘回这里"
+      />
+
+      <RelayStep
+        title="④ AI 痕迹检测"
         promptEndpoint={`/api/content/${id}/ai-check`}
         saveEndpoint={`/api/content/${id}/ai-check`}
         savedResult={content.aiCheckResult}
@@ -168,7 +178,7 @@ export default function ContentPage() {
       />
 
       <RelayStep
-        title="④ 生成标题"
+        title="⑤ 生成标题"
         promptEndpoint={`/api/content/${id}/title`}
         saveEndpoint={`/api/content/${id}/title`}
         savedResult={content.titleOptions}
