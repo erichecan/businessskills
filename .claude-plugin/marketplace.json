@@ -199,6 +199,16 @@
       "skills": ["./skills/eric-boshang"]
     },
     {
+      "name": "eric-xhs-audit",
+      "description": "小红书爆款审核员。给待发笔记加权打分（100分7维）+ 红线判定 + 预测能否过晋级线 + 最高优先级『改一句话』。各诊断 skill 之上的总分汇总层，发布前最后一道闸。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": ["xiaohongshu", "audit", "score", "viral", "review", "quality-gate", "chinese"],
+      "skills": ["./skills/eric-xhs-audit"]
+    },
+    {
       "name": "eric-coach",
       "description": "文彬教练 — 简历 + 面试一体辅导。诊断式求职辅导：揭示招聘本质、改简历、备面试。",
       "source": "./",
