@@ -48,6 +48,7 @@ xhs/素材库/选题库.csv
 xhs/素材库/运行日志.csv
 xhs/素材库/待激活素材库.csv
 xhs/素材库/scripts/produce_config.env
+xhs/素材库/备份归档_*.tar.gz
 
 # 生成产出物：图片 / 音频 / 视频（只保留代码和文档）
 *.png
@@ -62,3 +63,7 @@ xhs/素材库/scripts/produce_config.env
 *.m4a
 *.aac
 # 如需保留某张特定资源图，用 !path/to/file.png 解除忽略
+
+# 本地开发数据库
+app/prisma/dev.db
+app/prisma/dev.db-journal
