@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>职场表达力 · 知识框架</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0e0e0e;
+    color: #e8d5a3;
+    font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    min-height: 100vh;
+    padding: 40px 20px 80px;
+  }
+
+  .container { max-width: 960px; margin: 0 auto; }
+
+  /* HEADER */
+  .brand-bar {
+    display: flex; align-items: center; gap: 16px;
+    border-bottom: 1px solid #e8d5a322;
+    padding-bottom: 24px; margin-bottom: 40px;
+  }
+  .brand-icon {
+    width: 48px; height: 48px;
+    background: #e8d5a3;
+    color: #1a1a1a;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 900;
+    flex-shrink: 0;
+  }
+  .brand-text h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.04em; }
+  .brand-text p { font-size: 13px; color: #888; margin-top: 3px; }
+
+  /* POSITIONING CARD */
+  .position-card {
+    background: linear-gradient(135deg, #1a1a1a 0%, #222 100%);
+    border: 1px solid #e8d5a355;
+    border-radius: 16px;
+    padding: 32px 36px;
+    margin-bottom: 32px;
+    position: relative; overflow: hidden;
+  }
+  .position-card::before {
+    content: '翻译';
+    position: absolute; right: -10px; top: -20px;
+    font-size: 140px; font-weight: 900;
+    color: #e8d5a308;
+    line-height: 1;
+    pointer-events: none;
+  }
+  .position-card .tagline {
+    font-size: 22px; font-weight: 700; line-height: 1.5;
+    margin-bottom: 14px;
+  }
+  .position-card .tagline em {
+    color: #e8d5a3; font-style: normal;
+    border-bottom: 2px solid #e8d5a366;
+  }
+  .position-card .mission {
+    font-size: 14px; color: #ccc; line-height: 1.8; max-width: 640px;
+  }
+
+  /* AUDIENCE TIERS */
+  .tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+  .tier {
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .tier .tier-label {
+    font-size: 11px; letter-spacing: 0.08em;
+    color: #888; margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .tier .tier-who { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .tier .tier-pain { font-size: 13px; color: #bbb; line-height: 1.5; }
+  .tier.t1 { border-color: #e8d5a355; }
+  .tier.t1 .tier-who { color: #e8d5a3; }
+
+  /* SECTION HEADER */
+  .sec-title {
+    font-size: 13px; letter-spacing: 0.15em;
+    color: #666; text-transform: uppercase;
+    margin: 40px 0 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .sec-title::after { content: ''; flex: 1; height: 1px; background: #222; }
+
+  /* CONTENT PILLARS */
+  .pillars { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pillar {
+    background: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .pillar:hover { border-color: #e8d5a344; }
+  .pillar.main {
+    border-color: #e8d5a355;
+    grid-column: span 2;
+    background: #181510;
+  }
+  .pillar .pnum {
+    font-size: 11px; color: #555; letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+  .pillar .ptitle {
+    font-size: 16px; font-weight: 700;
+    color: #e8d5a3; margin-bottom: 8px;
+  }
+  .pillar.main .ptitle { font-size: 18px; }
+  .pillar .pbadge {
+    display: inline-block;
+    background: #e8d5a322;
+    color: #e8d5a3;
+    font-size: 11px; font-weight: 600;
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin-bottom: 10px;
+    letter-spacing: 0.06em;
+  }
+  .pillar .psubs {
+    list-style: none;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .pillar .psubs li {
+    font-size: 13px; color: #bbb;
+    padding-left: 14px; position: relative; line-height: 1.5;
+  }
+  .pillar .psubs li::before {
+    content: '·'; position: absolute; left: 0; color: #e8d5a388;
+  }
+
+  /* METHODOLOGY */
+  .methods { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .method {
+    background: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .method .mname {
+    font-size: 14px; font-weight: 700; color: #e8d5a3;
+    margin-bottom: 8px;
+  }
+  .method .mdesc { font-size: 13px; color: #aaa; line-height: 1.6; }
+  .method .msteps {
+    list-style: none; margin-top: 10px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .method .msteps li {
+    font-size: 12px; color: #999;
+    display: flex; align-items: flex-start; gap: 8px;
+  }
+  .method .msteps li .step-num {
+    background: #e8d5a322; color: #e8d5a3;
+    font-size: 10px; font-weight: 700;
+    border-radius: 3px; padding: 1px 5px;
+    flex-shrink: 0; margin-top: 1px;
+  }
+
+  /* HOOKS */
+  .hooks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .hook {
+    background: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .hook .hnum { font-size: 11px; color: #555; margin-bottom: 4px; }
+  .hook .htype { font-size: 13px; font-weight: 700; color: #e8d5a3; margin-bottom: 6px; }
+  .hook .hexample { font-size: 12px; color: #999; font-style: italic; line-height: 1.5; }
+
+  /* RED LINES */
+  .redlines {
+    background: #180a0a;
+    border: 1px solid #8b000044;
+    border-radius: 12px;
+    padding: 24px 28px;
+  }
+  .rl-item {
+    display: flex; gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid #2a1010;
+  }
+  .rl-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .rl-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .rl-text { font-size: 13px; color: #cc8888; line-height: 1.6; }
+  .rl-text strong { color: #e8a0a0; }
+
+  /* MONETIZATION FUNNEL */
+  .funnel {
+    display: flex; align-items: center; gap: 0;
+    overflow-x: auto; padding-bottom: 8px;
+  }
+  .funnel-step {
+    flex-shrink: 0;
+    background: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 14px 18px;
+    text-align: center;
+    min-width: 120px;
+  }
+  .funnel-step .fs-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+  .funnel-step .fs-name { font-size: 13px; font-weight: 700; color: #e8d5a3; }
+  .funnel-step .fs-desc { font-size: 11px; color: #888; margin-top: 4px; line-height: 1.4; }
+  .funnel-arrow {
+    color: #444; font-size: 18px; flex-shrink: 0; padding: 0 6px;
+  }
+
+  /* VISUAL STANDARDS */
+  .visual-box {
+    background: #1a1a1a;
+    border: 2px solid #e8d5a3;
+    border-radius: 12px;
+    padding: 28px;
+    display: flex; gap: 40px; align-items: flex-start;
+  }
+  .cover-preview {
+    flex-shrink: 0;
+    width: 120px; height: 160px;
+    background: #1a1a1a;
+    border: 2px solid #e8d5a3;
+    border-radius: 8px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 12px;
+    gap: 8px;
+  }
+  .cover-preview .cp-main {
+    font-size: 13px; font-weight: 900; color: #e8d5a3;
+    text-align: center; line-height: 1.4;
+  }
+  .cover-preview .cp-bar {
+    width: 80%; height: 1px; background: #e8d5a344;
+  }
+  .cover-preview .cp-name {
+    font-size: 9px; color: #e8d5a388; text-align: center;
+  }
+  .visual-rules { flex: 1; }
+  .vr-row {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .vr-row:last-child { margin-bottom: 0; }
+  .vr-key {
+    flex-shrink: 0; font-size: 11px; color: #666;
+    width: 64px; padding-top: 2px;
+  }
+  .vr-val { font-size: 13px; color: #ccc; line-height: 1.6; }
+  .swatch {
+    display: inline-block; width: 12px; height: 12px;
+    border-radius: 3px; vertical-align: middle; margin-right: 4px;
+    border: 1px solid #444;
+  }
+
+  /* SCORE FORMULA */
+  .score-formula {
+    background: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  }
+  .sf-item { text-align: center; }
+  .sf-item .sv { font-size: 28px; font-weight: 900; color: #e8d5a3; }
+  .sf-item .sk { font-size: 11px; color: #777; margin-top: 2px; }
+  .sf-op { font-size: 22px; color: #555; }
+  .sf-cond {
+    margin-top: 16px; padding-top: 16px;
+    border-top: 1px solid #222;
+    display: flex; gap: 12px; flex-wrap: wrap;
+    width: 100%;
+  }
+  .sf-cond-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px;
+  }
+  .sf-cond-item .ci-num {
+    font-size: 16px; font-weight: 700;
+  }
+  .sf-cond-item.veto { color: #cc8888; }
+  .sf-cond-item.pass { color: #88cc88; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="brand-bar">
+    <div class="brand-icon">表</div>
+    <div class="brand-text">
+      <h1>职场表达力 · 知识框架</h1>
+      <p>内容生产大脑 · v3 · 2026-06-25 定稿</p>
+    </div>
+  </div>
+
+  <!-- POSITIONING -->
+  <div class="position-card">
+    <div class="tagline">前腾讯资深中层，教你把"能力"<em>翻译</em>成对方愿意买单的语言。</div>
+    <div class="mission">职场表达的本质是"翻译"——先解码对方的决策框架，再用对方听得懂的语言，达成你的目标。<br>同行教技巧、教模板，我教<strong style="color:#e8d5a3">判断力</strong>——话术抄得走，判断力抄不走。</div>
+    <div class="tiers">
+      <div class="tier t1">
+        <div class="tier-label">引流主力 · 量最大</div>
+        <div class="tier-who">刚毕业 / 1-3年</div>
+        <div class="tier-pain">进不了场：面试讲不出亮点、被追问就卡壳</div>
+      </div>
+      <div class="tier">
+        <div class="tier-label">训练营主力 · 高客单</div>
+        <div class="tier-who">3-5年</div>
+        <div class="tier-pain">进了场升不上去：汇报没说到点、谈薪没底气</div>
+      </div>
+      <div class="tier">
+        <div class="tier-label">高端一对一 · 深度定制</div>
+        <div class="tier-who">5年以上</div>
+        <div class="tier-pain">只接深度定制，不进训练营</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT PILLARS -->
+  <div class="sec-title">核心内容板块</div>
+  <div class="pillars">
+    <div class="pillar main">
+      <div class="pnum">01</div>
+      <div class="ptitle">面试表达</div>
+      <div class="pbadge">主攻 · 第一上线</div>
+      <ul class="psubs">
+        <li><strong style="color:#e8d5a3">解码器</strong>——教读者听懂面试官真正想听什么（潜台词）</li>
+        <li><strong style="color:#e8d5a3">送命话</strong>——面试避雷 / 逆向（什么话不能说、老实人怎么"选着说"）</li>
+        <li><strong style="color:#e8d5a3">亮点公式</strong>——把真实经历当场讲出亮点、扛住追问（现场表达，非简历模板）</li>
+      </ul>
+    </div>
+    <div class="pillar">
+      <div class="pnum">02</div>
+      <div class="ptitle">谈薪表达</div>
+      <div class="pbadge">紧跟上线 · 高客单</div>
+      <ul class="psubs">
+        <li>应对追问、报价锚定</li>
+        <li>沉默与让步话术</li>
+      </ul>
+    </div>
+    <div class="pillar">
+      <div class="pnum">03</div>
+      <div class="ptitle">汇报表达</div>
+      <div class="pbadge">规划中</div>
+      <ul class="psubs">
+        <li>向上汇报结论先行</li>
+        <li>把工作讲成价值</li>
+      </ul>
+    </div>
+    <div class="pillar">
+      <div class="pnum">04</div>
+      <div class="ptitle">向上管理 / 高情商措辞</div>
+      <div class="pbadge">规划中</div>
+      <ul class="psubs">
+        <li>把"对抗"改成"对齐"</li>
+        <li>冲突化解、措辞顺序</li>
+      </ul>
+    </div>
+    <div class="pillar">
+      <div class="pnum">05</div>
+      <div class="ptitle">自我介绍 / 个人品牌</div>
+      <div class="pbadge">贯穿各场景</div>
+      <ul class="psubs">
+        <li>30秒讲清身份+亮点+钩子</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- METHODOLOGY -->
+  <div class="sec-title">核心方法论</div>
+  <div class="methods">
+    <div class="method">
+      <div class="mname">翻译框架（顶层）</div>
+      <ul class="msteps">
+        <li><span class="step-num">1</span>解码对方的决策框架</li>
+        <li><span class="step-num">2</span>用对方能接受的语言</li>
+        <li><span class="step-num">3</span>达成自己的目标</li>
+      </ul>
+    </div>
+    <div class="method">
+      <div class="mname">内容四段式公式</div>
+      <ul class="msteps">
+        <li><span class="step-num">1</span>痛点场景开头</li>
+        <li><span class="step-num">2</span>反常识 / 专业观点</li>
+        <li><span class="step-num">3</span>真实案例验证</li>
+        <li><span class="step-num">4</span>行动指令</li>
+      </ul>
+    </div>
+    <div class="method">
+      <div class="mname">亮点结构（STAR升级版）</div>
+      <ul class="msteps">
+        <li><span class="step-num">1</span>背景冲突（难在哪）</li>
+        <li><span class="step-num">2</span>关键动作（我的决策）</li>
+        <li><span class="step-num">3</span>可量化结果</li>
+        <li><span class="step-num">4</span>一句沉淀</li>
+      </ul>
+    </div>
+    <div class="method">
+      <div class="mname">高情商 = 换顺序</div>
+      <ul class="msteps">
+        <li><span class="step-num">1</span>先认同情绪 / 事实</li>
+        <li><span class="step-num">2</span>再给信息 / 边界</li>
+        <li><span class="step-num">3</span>最后给方案</li>
+      </ul>
+      <div class="mdesc" style="margin-top:10px">让对方"被接住"，话才听得进。</div>
+    </div>
+    <div class="method" style="grid-column: span 2;">
+      <div class="mname">选题三维打分</div>
+      <div class="score-formula">
+        <div class="sf-item"><div class="sv">痛点</div><div class="sk">1-5分</div></div>
+        <div class="sf-op">×</div>
+        <div class="sf-item"><div class="sv">搜索量</div><div class="sk">1-5分</div></div>
+        <div class="sf-op">×</div>
+        <div class="sf-item"><div class="sv">购买意愿</div><div class="sk">1-5分</div></div>
+        <div class="sf-op">=</div>
+        <div class="sf-item"><div class="sv" style="font-size:20px">满分125</div><div class="sk">≥27 才立项</div></div>
+        <div class="sf-cond">
+          <div class="sf-cond-item veto">
+            <span class="ci-num">＜3</span>
+            <span>任一维度低于3，一票否决</span>
+          </div>
+          <div class="sf-cond-item pass">
+            <span class="ci-num">≥27</span>
+            <span>综合分达标才立项</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOOKS -->
+  <div class="sec-title">爆款标题钩子（6类）</div>
+  <div class="hooks">
+    <div class="hook">
+      <div class="hnum">① 认知反转</div>
+      <div class="htype">我以为A，结果B</div>
+      <div class="hexample">「越努力越被拒」</div>
+    </div>
+    <div class="hook">
+      <div class="hnum">② 数字悬念</div>
+      <div class="htype">具体数字制造张力</div>
+      <div class="hexample">「沉默11秒多谈了两万」</div>
+    </div>
+    <div class="hook">
+      <div class="hnum">③ 旁观目击</div>
+      <div class="htype">我见过 / 我亲历</div>
+      <div class="hexample">「迟到那个人我们录了」</div>
+    </div>
+    <div class="hook">
+      <div class="hnum">④ 细节震撼</div>
+      <div class="htype">一个具体画面</div>
+      <div class="hexample">「面试官放下笔那一刻」</div>
+    </div>
+    <div class="hook">
+      <div class="hnum">⑤ 常识颠覆</div>
+      <div class="htype">打破理所当然</div>
+      <div class="hexample">「面试开口前你已经输了」</div>
+    </div>
+    <div class="hook">
+      <div class="hnum">⑥ 身份错位</div>
+      <div class="htype">意外的角色关系</div>
+      <div class="hexample">「面试我的是我前同事」</div>
+    </div>
+  </div>
+
+  <!-- VISUAL STANDARDS -->
+  <div class="sec-title">封面视觉铁律</div>
+  <div class="visual-box">
+    <div class="cover-preview">
+      <div class="cp-main">面试最后<br>5分钟<br>才是真正<br>考你的时候</div>
+      <div class="cp-bar"></div>
+      <div class="cp-name">前腾讯资深中层 · 职场表达</div>
+    </div>
+    <div class="visual-rules">
+      <div class="vr-row">
+        <div class="vr-key">底色</div>
+        <div class="vr-val"><span class="swatch" style="background:#1a1a1a"></span>#1A1A1A 墨黑</div>
+      </div>
+      <div class="vr-row">
+        <div class="vr-key">主字</div>
+        <div class="vr-val"><span class="swatch" style="background:#e8d5a3"></span>#E8D5A3 金色</div>
+      </div>
+      <div class="vr-row">
+        <div class="vr-key">送命话系列</div>
+        <div class="vr-val">红色角标，其余用金</div>
+      </div>
+      <div class="vr-row">
+        <div class="vr-key">比例</div>
+        <div class="vr-val">3:4（小红书标准竖版）</div>
+      </div>
+      <div class="vr-row">
+        <div class="vr-key">封面字数</div>
+        <div class="vr-val">≤ 15字，只换中央大字</div>
+      </div>
+      <div class="vr-row">
+        <div class="vr-key">署名条</div>
+        <div class="vr-val">前腾讯资深中层（固定不变）</div>
+      </div>
+      <div class="vr-row">
+        <div class="vr-key">内容形态</div>
+        <div class="vr-val">录屏 + 真人画外音（不露脸）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RED LINES -->
+  <div class="sec-title">红线（硬性）</div>
+  <div class="redlines">
+    <div class="rl-item">
+      <div class="rl-icon">🚫</div>
+      <div class="rl-text"><strong>不碰"保offer/保结果"承诺</strong>——只做辅导，不做结果保证（退费与监管风险）</div>
+    </div>
+    <div class="rl-item">
+      <div class="rl-icon">🚫</div>
+      <div class="rl-text"><strong>不注水Title</strong>——"前腾讯资深中层"是真实经历，守住它</div>
+    </div>
+    <div class="rl-item">
+      <div class="rl-icon">🚫</div>
+      <div class="rl-text"><strong>不教撒谎/编造经历</strong>——"选着说 ≠ 说假话"，只做诚实表达的取舍</div>
+    </div>
+    <div class="rl-item">
+      <div class="rl-icon">🚫</div>
+      <div class="rl-text"><strong>不蹭负面热点、不抄同行原句</strong>——素材只作灵感，必须用本框架重写</div>
+    </div>
+    <div class="rl-item">
+      <div class="rl-icon">🚫</div>
+      <div class="rl-text"><strong>不做纯鸡汤、不卖焦虑套路逼单</strong>——求职用户理性，过度套路反噬专业人设</div>
+    </div>
+    <div class="rl-item">
+      <div class="rl-icon">🚫</div>
+      <div class="rl-text"><strong>烂大街标题直接放弃</strong>——"面试官不会告诉你的…""99%的人都不知道…""干货/避坑/攻略"开头</div>
+    </div>
+    <div class="rl-item">
+      <div class="rl-icon">🚫</div>
+      <div class="rl-text"><strong>AI合规</strong>——不用AI文生图当封面、不用AI配音冒充真人、不删改AI标识</div>
+    </div>
+  </div>
+
+  <!-- MONETIZATION -->
+  <div class="sec-title">变现漏斗</div>
+  <div class="funnel">
+    <div class="funnel-step">
+      <div class="fs-label">钩子品</div>
+      <div class="fs-name">免费资料/答疑</div>
+      <div class="fs-desc">引私域</div>
+    </div>
+    <div class="funnel-arrow">→</div>
+    <div class="funnel-step">
+      <div class="fs-label">引流品</div>
+      <div class="fs-name">面试表达训练营</div>
+      <div class="fs-desc">主力变现</div>
+    </div>
+    <div class="funnel-arrow">→</div>
+    <div class="funnel-step">
+      <div class="fs-label">连购</div>
+      <div class="fs-name">谈薪训练营</div>
+      <div class="fs-desc">复购</div>
+    </div>
+    <div class="funnel-arrow">→</div>
+    <div class="funnel-step">
+      <div class="fs-label">利润品</div>
+      <div class="fs-name">汇报训练营</div>
+      <div class="fs-desc">高利润</div>
+    </div>
+    <div class="funnel-arrow">→</div>
+    <div class="funnel-step">
+      <div class="fs-label">高客单</div>
+      <div class="fs-name">一对一深度定制</div>
+      <div class="fs-desc">5年以上</div>
+    </div>
+  </div>
+  <p style="font-size:12px; color:#555; margin-top:12px; text-align:center;">约每9条引流插1条变现 · 付费用户提问→下周选题 · 成功案例→素材</p>
+
+</div>
+</body>
+</html>

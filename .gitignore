@@ -34,6 +34,21 @@ Thumbs.db
 # 工具临时产物
 .playwright-mcp/
 
+# xhs/素材库：定时任务的运行时数据不入库，只提交规则/大脑文件与成稿
+xhs/素材库/*.xlsx
+xhs/素材库/*.docx
+xhs/素材库/*.bak_*
+xhs/素材库/.~lock*
+xhs/素材库/*_[0-9][0-9][0-9][0-9]run*
+xhs/素材库/_*
+xhs/素材库/scripts_tmp/
+xhs/素材库/职场面试_记忆库.csv
+xhs/素材库/关键词池.csv
+xhs/素材库/选题库.csv
+xhs/素材库/运行日志.csv
+xhs/素材库/待激活素材库.csv
+xhs/素材库/scripts/produce_config.env
+
 # 生成产出物：图片 / 音频 / 视频（只保留代码和文档）
 *.png
 *.jpg

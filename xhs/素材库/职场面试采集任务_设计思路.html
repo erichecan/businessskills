@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>职场/面试笔记采集任务 · 设计思路</title>
+<style>
+  :root{
+    --ink:#1d2330; --sub:#5b6678; --line:#e6e9f0; --bg:#f6f7fb;
+    --blue:#2f5496; --blue-soft:#e8eef7;
+    --green:#2e7d4f; --green-soft:#eaf3ea;
+    --amber:#b8860b; --amber-soft:#fbf3e5;
+    --red:#b3403a; --red-soft:#faeaea;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif;
+    line-height:1.7;}
+  .wrap{max-width:860px;margin:0 auto;padding:48px 24px 80px;}
+  header.hero{margin-bottom:40px;}
+  .tag{display:inline-block;font-size:13px;letter-spacing:.04em;color:var(--blue);
+    background:var(--blue-soft);padding:4px 12px;border-radius:999px;font-weight:600;}
+  h1{font-size:30px;margin:16px 0 8px;line-height:1.3;}
+  .lede{color:var(--sub);font-size:16px;margin:0;}
+  .meta{color:var(--sub);font-size:13px;margin-top:14px;}
+  section{background:#fff;border:1px solid var(--line);border-radius:16px;
+    padding:28px 30px;margin:22px 0;box-shadow:0 1px 3px rgba(20,30,60,.04);}
+  h2{font-size:21px;margin:0 0 6px;display:flex;align-items:center;gap:10px;}
+  h2 .n{font-size:14px;width:28px;height:28px;flex:0 0 28px;border-radius:50%;
+    background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;}
+  h3{font-size:16px;margin:22px 0 6px;color:var(--ink);}
+  p{margin:8px 0;}
+  .sub{color:var(--sub);font-size:14px;margin-top:2px;}
+  .problem{border-left:3px solid var(--red);background:var(--red-soft);
+    padding:12px 16px;border-radius:0 10px 10px 0;margin:14px 0;font-size:15px;}
+  .problem b{color:var(--red);}
+  .fix{border-left:3px solid var(--green);background:var(--green-soft);
+    padding:12px 16px;border-radius:0 10px 10px 0;margin:14px 0;font-size:15px;}
+  .fix b{color:var(--green);}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0;}
+  .card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:#fcfdff;}
+  .card h4{margin:0 0 6px;font-size:15px;}
+  .card p{margin:0;font-size:14px;color:var(--sub);}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0;}
+  .step{background:var(--blue-soft);color:var(--blue);font-weight:600;font-size:13px;
+    padding:7px 12px;border-radius:8px;white-space:nowrap;}
+  .arrow{color:var(--sub);font-weight:700;}
+  .pool{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0;}
+  .pill{font-size:13px;padding:6px 13px;border-radius:999px;font-weight:600;border:1px solid transparent;}
+  .seed{background:var(--blue-soft);color:var(--blue);border-color:#cbd8ee;}
+  .active{background:var(--green-soft);color:var(--green);border-color:#cfe6d4;}
+  .cand{background:var(--amber-soft);color:var(--amber);border-color:#ecdcb4;}
+  .retire{background:#eef0f3;color:#8a94a4;border-color:#e0e3ea;text-decoration:line-through;}
+  .legend{font-size:13px;color:var(--sub);margin-top:6px;}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top;}
+  th{background:var(--blue);color:#fff;font-weight:600;}
+  tbody tr:nth-child(even){background:#f9fafd;}
+  .caveat{border:1px dashed var(--amber);background:var(--amber-soft);border-radius:12px;
+    padding:16px 18px;margin:18px 0;font-size:14.5px;}
+  .caveat b{color:var(--amber);}
+  ul.clean{margin:8px 0;padding-left:20px;}
+  ul.clean li{margin:5px 0;}
+  footer{color:var(--sub);font-size:13px;text-align:center;margin-top:36px;}
+  code{background:#eef1f6;padding:1px 6px;border-radius:5px;font-size:13px;
+    font-family:"SF Mono",Menlo,Consolas,monospace;}
+  @media(max-width:620px){.grid{grid-template-columns:1fr;}.wrap{padding:32px 16px 60px;}h1{font-size:24px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <span class="tag">定时任务设计文档</span>
+    <h1>职场 / 面试笔记采集任务 · 设计思路</h1>
+    <p class="lede">从"每天死板地搜 4 个固定词"演进为一个会去重、会学结构、还会自己长出新关键词并淘汰无效词的采集系统。</p>
+    <p class="meta">任务 ID：xiaohongshu-career-interview-digest　·　每 6 小时运行一次（0 / 6 / 12 / 18 点，cron <code>0 0,6,12,18 * * *</code>）　·　来源：网页搜索 + 小红书网页版</p>
+  </header>
+
+  <section>
+    <h2><span class="n">0</span>出发点：原始任务的三个硬伤</h2>
+    <p class="sub">最初版本逻辑很直接——每天搜同样 4 个关键词，列表里抓标题/作者/点赞，整理成表格。跑过一次后，暴露出三个问题。</p>
+    <div class="problem"><b>① 会天天重复。</b>每次都是全新会话、没有跨天记忆；网页那一半多是常青文章，小红书"综合"排序又偏向高赞老笔记，所以明天大概率还是同一批内容。</div>
+    <div class="problem"><b>② 只抄观点，学不到结构。</b>只读了搜索列表页，从没点进正文，所谓"核心要点"是从标题猜的——根本没看到高赞笔记到底是怎么写的。</div>
+    <div class="problem"><b>③ 关键词死板且不见得有效。</b>4 个词写死，无法覆盖话题的自然延展，也没有机制判断哪个词其实在产出垃圾。</div>
+  </section>
+
+  <section>
+    <h2><span class="n">1</span>改进一：从"重复抓取"到"增量 + 学结构"</h2>
+
+    <h3>① 用文件做跨天记忆，实现去重增量</h3>
+    <p>会话没有记忆，但文件有。每次运行先读 outputs 里的 <code>职场面试_记忆库.csv</code>，网页和小红书都<b>只收记忆库里没有的新内容</b>，表里用"新增/已收"列标注，跑完再把当天条目追加回去。</p>
+    <div class="fix"><b>效果：</b>不再天天重复那几篇常青文章，每天的表格都是真正的增量。</div>
+
+    <h3>② 小红书优先"最新"排序</h3>
+    <p>先用"最新"捞当天/近期新发的笔记，再切"综合"看高赞，兼顾<b>新鲜度</b>与<b>质量</b>。</p>
+
+    <h3>③ 真正点进正文，学高热结构</h3>
+    <p>每个关键词选当天可见的<b>最高赞 2 篇 + 最低赞 1–2 篇</b>，打开单篇正文逐条拆解，并累积进 <code>高热结构库.md</code>（越往后越精炼）。拆解维度：</p>
+    <div class="grid">
+      <div class="card"><h4>标题套路</h4><p>数字 / emoji / 悬念缺口 / 身份标签</p></div>
+      <div class="card"><h4>开头钩子</h4><p>第一句怎么勾住人继续读</p></div>
+      <div class="card"><h4>正文骨架</h4><p>清单体 / 故事体 / 前后对比 / 步骤拆解</p></div>
+      <div class="card"><h4>篇幅 & 结尾</h4><p>长短节奏、有无引导互动</p></div>
+    </div>
+
+    <div class="caveat"><b>诚实性前提：点赞是被污染的信号。</b>一篇 8 万赞可能只是因为账号大、发布时间好或纯运气，未必结构更优；一篇 500 赞的小号笔记也未必差。所以比较结构时尽量<b>在相近体量账号之间</b>比，结论只当"假设"不当定律。真正可学的"低热雷区"通常是结构性的——标题没钩子、开头铺垫太长、正文没有可复制的框架——这些和账号大小关系不大。</div>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>改进二：让关键词自己进化</h2>
+    <p class="sub">核心思想：关键词不再写死，而是一个有进有出的"池子"。</p>
+
+    <h3>① 四种状态的关键词池</h3>
+    <p>维护 <code>关键词池.csv</code>，每个词带一个状态：</p>
+    <div class="pool">
+      <span class="pill seed">种子 · 永久必跑</span>
+      <span class="pill active">活跃 · 表现好</span>
+      <span class="pill cand">候选 · 待试投</span>
+      <span class="pill retire">退休 · 已淘汰</span>
+    </div>
+    <p class="legend">种子 = 最初那 4 个，永不退休；其余三种会动态升降。</p>
+
+    <h3>② 新词从哪来（自动拓展）</h3>
+    <p>抓小红书时顺手收割三个现成来源，去重 + 相关性过滤后作为"候选"入池：</p>
+    <div class="grid">
+      <div class="card"><h4>大家都在搜</h4><p>搜索页底部的平台联想词，如"职场委婉表达""社招面试自我介绍""线上面试话术"</p></div>
+      <div class="card"><h4>筛选标签</h4><p>页面顶部的话题标签，如高情商、薪资待遇、hr问题、自我介绍</p></div>
+      <div class="card"><h4>高频标题短语</h4><p>反复出现在高赞标题里的词组</p></div>
+      <div class="card"><h4>相关性闸门</h4><p>必须仍属职场表达/沟通/面试主题，跑偏的直接丢弃</p></div>
+    </div>
+
+    <h3>③ 怎么判断有效（自动淘汰）</h3>
+    <p>每个词每次跑完记三个指标，据此升降级：</p>
+    <table>
+      <thead><tr><th>指标</th><th>含义</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td>新增条数</td><td>本次去重后真正新增多少条</td><td>衡量产出新鲜内容的能力</td></tr>
+        <tr><td>平均热度</td><td>结果笔记的平均点赞</td><td>衡量内容质量水位</td></tr>
+        <tr><td>命中率</td><td>新增 / 总抓取</td><td>衡量是否还在产出价值</td></tr>
+      </tbody>
+    </table>
+    <div class="fix"><b>规则：</b>连续约 3 次命中率低或热度持续偏低的词 → 降级"退休"，不再每天跑；表现好的"候选" → 升级"活跃"。种子永不退休。池子因此有进有出，而非无限膨胀。</div>
+
+    <h3>④ 每天跑哪些（控制规模）</h3>
+    <div class="flow">
+      <span class="step">全部种子(4)</span><span class="arrow">+</span>
+      <span class="step">高分活跃词</span><span class="arrow">+</span>
+      <span class="step">候选词轮换试投</span><span class="arrow">=</span>
+      <span class="step">每天约 6–8 个</span>
+    </div>
+    <p class="sub">总数封顶，避免运行时间爆炸；候选词按最近运行日期轮换，优先没试过的。</p>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>每日运行流程总览</h2>
+    <div class="flow">
+      <span class="step">读记忆文件</span><span class="arrow">→</span>
+      <span class="step">选今日关键词</span><span class="arrow">→</span>
+      <span class="step">增量收集(网页+小红书)</span><span class="arrow">→</span>
+      <span class="step">收割新候选词</span><span class="arrow">→</span>
+      <span class="step">精读高/低赞拆结构</span><span class="arrow">→</span>
+      <span class="step">更新评分/升降级</span><span class="arrow">→</span>
+      <span class="step">出 Excel + 回写记忆</span>
+    </div>
+
+    <h3>交付物</h3>
+    <ul class="clean">
+      <li><b>Excel（两个 sheet）</b>：① 内容表（关键词分组，含标题套路 / 结构类型 / 高低热假设列）；② 关键词表现表（本次用了哪些词、各自表现、新发现/升级/退休了哪些词）。</li>
+      <li><b>三个持久记忆文件</b>：<code>关键词池.csv</code>、<code>职场面试_记忆库.csv</code>、<code>高热结构库.md</code>，累积更新、不覆盖历史。</li>
+    </ul>
+    <div class="caveat"><b>给用户的可见性与控制权：</b>关键词表现表会明确列出"本次新发现的候选词"和"被退休的词"，你随时可以否决或保留某个词——自动化但不失控。</div>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>贯穿始终的设计原则</h2>
+    <div class="grid">
+      <div class="card"><h4>无记忆 → 文件记忆</h4><p>会话每次清零，所有"经验"沉淀到 outputs 的持久文件里。</p></div>
+      <div class="card"><h4>增量优先</h4><p>宁缺毋滥，只收新内容，绝不靠重复旧货凑数量。</p></div>
+      <div class="card"><h4>有进有出</h4><p>关键词和内容都能自动新增，也能自动淘汰，系统自我修剪。</p></div>
+      <div class="card"><h4>对信号保持诚实</h4><p>点赞数有偏差，结论当假设，把控制权和可见性留给用户。</p></div>
+    </div>
+  </section>
+
+  <footer>
+    基于定时任务 xiaohongshu-career-interview-digest 的两次迭代整理　·　设计思路文档
+  </footer>
+
+</div>
+</body>
+</html>
