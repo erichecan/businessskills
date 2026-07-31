@@ -41,6 +41,8 @@ model Content {
   finalDraft      String?
   titleOptions    String?
   coverImageUrl   String?
+  videoEpisodeId  String?  // 关联 public/video/<uuid>/ 目录
+  videoUrl        String?  // 成片地址 /video/<uuid>/output.mp4
   status          String   @default("drafting") // "drafting" | "reviewing" | "ready"
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 type Phase =
   | "topic" | "script-loading"
@@ -25,6 +26,17 @@ function activeStepIndex(phase: Phase): number {
 type ImgState = { index: number; url?: string; status: "pending" | "done" | "error" };
 
 export default function VideoPage() {
+  return (
+    <Suspense>
+      <VideoPageInner />
+    </Suspense>
+  );
+}
+
+function VideoPageInner() {
+  const searchParams = useSearchParams();
+  const contentId = searchParams.get("contentId");
+  const [linkedTitle, setLinkedTitle] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>("topic");
   const [topic, setTopic] = useState("");
   const [episodeId, setEpisodeId] = useState("");
@@ -37,6 +49,18 @@ export default function VideoPage() {
   const [error, setError] = useState("");
 
   const active = activeStepIndex(phase);
+
+  useEffect(() => {
+    if (!contentId) return;
+    fetch(`/api/content/${contentId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((c) => {
+        if (!c) return;
+        setLinkedTitle(c.topic?.title ?? null);
+        setTopic((prev) => prev || [c.topic?.title, c.topic?.angle].filter(Boolean).join("——"));
+      })
+      .catch(() => {});
+  }, [contentId]);
 
   const reset = () => {
     setPhase("topic"); setTopic(""); setEpisodeId(""); setScript("");
@@ -51,7 +75,7 @@ export default function VideoPage() {
       const res = await fetch("/api/video/script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic }),
+        body: JSON.stringify({ topic, contentId: contentId || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "生成失败");
@@ -148,6 +172,11 @@ export default function VideoPage() {
       <div className="mb-5">
         <h1 className="text-lg font-bold text-white">视频号生产流水线</h1>
         <p className="text-xs text-zinc-500 mt-0.5">话题 → 口播稿 → 分镜 → 场景图 → 配音 → 合成</p>
+        {linkedTitle && (
+          <p className="text-xs text-emerald-400 mt-1.5">
+            ◉ 已关联内容工坊选题「{linkedTitle}」，成片会自动回写到该内容
+          </p>
+        )}
       </div>
 
       <div className="flex gap-4" style={{ minHeight: 540 }}>

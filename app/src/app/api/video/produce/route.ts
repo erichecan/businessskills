@@ -3,6 +3,7 @@ import { spawn } from 'child_process'
 import path from 'path'
 import { existsSync } from 'fs'
 import { readdir } from 'fs/promises'
+import { prisma } from '@/lib/db'
 
 const PROJECT_ROOT = path.resolve(process.cwd(), '..')
 const SCRIPTS_DIR = path.join(PROJECT_ROOT, 'scripts')
@@ -45,7 +46,13 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: '视频文件未生成，请检查 ffmpeg 是否已安装' }, { status: 500 })
     }
 
-    return Response.json({ videoUrl: `/video/${episodeId}/output.mp4` })
+    const videoUrl = `/video/${episodeId}/output.mp4`
+    await prisma.content.updateMany({
+      where: { videoEpisodeId: episodeId },
+      data: { videoUrl },
+    }).catch((e) => console.error('[video/produce] 回写 Content 失败', e))
+
+    return Response.json({ videoUrl })
   } catch (e) {
     return Response.json({ error: String(e) }, { status: 500 })
   }

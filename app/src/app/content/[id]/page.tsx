@@ -92,6 +92,8 @@ type Content = {
   aiCheckResult: string | null;
   finalDraft: string | null;
   titleOptions: string | null;
+  videoEpisodeId: string | null;
+  videoUrl: string | null;
   status: string;
   topic: {
     title: string;
@@ -185,6 +187,47 @@ export default function ContentPage() {
         onSaved={(updated) => setContent((c) => c ? { ...c, titleOptions: updated.titleOptions } : c)}
         hint="把提示词粘贴到 Claude 对话框，将标题选项粘回这里"
       />
+
+      {content.topic.format === "短视频" && <VideoSection content={content} />}
+    </div>
+  );
+}
+
+// ── Video Section（仅短视频格式的选题显示）─────────────────────────────────
+function VideoSection({ content }: { content: Content }) {
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-white">🎬 视频制作</h2>
+        <a
+          href={`/video?contentId=${content.id}`}
+          className="px-3 py-1 text-xs rounded bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+        >
+          {content.videoEpisodeId ? "重新制作" : "进入视频流水线 →"}
+        </a>
+      </div>
+      {!content.videoEpisodeId && (
+        <p className="text-xs text-zinc-500">
+          这个选题是短视频格式。进入流水线后会自动带上选题信息，成片将回写到这里。
+        </p>
+      )}
+      {content.videoEpisodeId && !content.videoUrl && (
+        <p className="text-xs text-amber-400/80">
+          已关联视频工程（episode {content.videoEpisodeId.slice(0, 8)}…），尚未合成成片
+        </p>
+      )}
+      {content.videoUrl && (
+        <div className="space-y-2">
+          <video controls src={content.videoUrl} className="rounded-lg" style={{ maxHeight: 320 }} />
+          <a
+            href={content.videoUrl}
+            download="video.mp4"
+            className="inline-block px-3 py-1.5 bg-emerald-700 text-white text-xs font-medium rounded hover:bg-emerald-600"
+          >
+            下载成片 MP4
+          </a>
+        </div>
+      )}
     </div>
   );
 }

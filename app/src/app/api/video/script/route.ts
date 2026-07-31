@@ -4,6 +4,7 @@ import { mkdir, writeFile, readFile } from 'fs/promises'
 import path from 'path'
 import { randomUUID } from 'crypto'
 import { existsSync } from 'fs'
+import { prisma } from '@/lib/db'
 
 const PROJECT_ROOT = path.resolve(process.cwd(), '..')
 const SCRIPTS_DIR = path.join(PROJECT_ROOT, 'scripts')
@@ -21,13 +22,20 @@ function runPython(args: string[]): Promise<{ stdout: string; code: number }> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { topic } = await req.json()
+    const { topic, contentId } = await req.json()
     if (!topic?.trim()) return Response.json({ error: '话题不能为空' }, { status: 400 })
 
     const episodeId = randomUUID()
     const episodeDir = path.join(EPISODES_DIR, episodeId)
     await mkdir(episodeDir, { recursive: true })
     await writeFile(path.join(episodeDir, 'topic.txt'), topic.trim())
+
+    if (contentId) {
+      await prisma.content.update({
+        where: { id: contentId },
+        data: { videoEpisodeId: episodeId },
+      }).catch((e) => console.error('[video/script] 关联 Content 失败', e))
+    }
 
     const { stdout, code } = await runPython([
       path.join(SCRIPTS_DIR, 'make_script.py'),
