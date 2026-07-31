@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.eric.wakeclaude</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/usr/local/bin/wake-claude.sh</string>
+    </array>
+
+    <!-- 安装/重启后立即跑一次，把初始的 pmset 唤醒点排好 -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- 每天 4 个触发点 = 用户要的整点前 1 分钟。
+         机器睡眠时由 pmset 在同一时刻唤醒；唤醒后 launchd 立即补跑这些任务。 -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>5</integer><key>Minute</key><integer>59</integer></dict>
+        <dict><key>Hour</key><integer>11</integer><key>Minute</key><integer>59</integer></dict>
+        <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>59</integer></dict>
+        <dict><key>Hour</key><integer>23</integer><key>Minute</key><integer>59</integer></dict>
+    </array>
+
+    <key>StandardOutPath</key>
+    <string>/var/log/wake-claude.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/wake-claude.log</string>
+</dict>
+</plist>
