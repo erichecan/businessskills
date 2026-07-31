@@ -2,9 +2,9 @@
 name: eric
 description: |
   Eric 商业工具箱主入口（基于 dontbesilent 方法论 + Eric 扩展：小红书内容流水线、文彬教练求职辅导）。三种模式：新手教程、任务前路由、任务后导航。
-  触发方式：/eric、/dbs（兼容）、/eric 新手入门、/商业、「帮我看看」、「下一步怎么走」
+  触发方式：/eric、/eric（兼容）、/eric 新手入门、/商业、「帮我看看」、「下一步怎么走」
   Main entry point for Eric's business toolkit. Three modes: onboarding tutorial, pre-task routing, and post-task navigation.
-  Trigger: /eric, /dbs, /eric 新手入门, "help me with my business", "what's next"
+  Trigger: /eric, /eric, /eric 新手入门, "help me with my business", "what's next"
 ---
 
 # eric：商业工具箱
@@ -232,6 +232,8 @@ description: |
 | 结论信号 | 推荐下一步 | 为什么 |
 |---|---|---|
 | 对标找到，下一步进内容执行 | `/eric-content` | 对标有了，接下来看具体内容怎么做 |
+| 对标找到，想深拆他的爆款笔记 | `/eric-xhs-deconstruct` | 把对标的内容规律拆开，结论回写高热结构库 |
+| 竞品格局清楚，想评判自己的选题 | `/eric-xhs-topic` | 看你的选题能不能打进这个格局 |
 | 对标找到，后续需要长期跟踪模仿成效 | `/eric-decision` | 对标后哪些判断真的有效，回填比记忆靠谱 |
 | 问题还没说清楚就想找对标 | `/eric-good-question` | 先把问题写清楚，再决定找谁对标 |
 | 总想跳过模仿颗粒度，找更快的路 | `/eric-slowisfast` | 你不是缺对标，是在贪快 |

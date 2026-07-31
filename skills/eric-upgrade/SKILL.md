@@ -21,11 +21,11 @@ bash scripts/sync-upstream.sh
 脚本行为：
 
 - 拉取 `dontbesilent2025/dbskill` 最新 main
-- 新增 skill：自动复制并做 dbs→eric 改名
+- 新增 skill：自动复制并做 eric→eric 改名
 - 已有 skill 有变化：生成 `upstream-diffs/*.diff` 供人工审查，**不自动覆盖**（本地可能有 Eric 自有改动）
 - 产出一个 `upstream-sync-YYYYMMDD` 分支，审查后自行合并到 main
 
-**注意**：脚本只复制 `SKILL.md`。如果上游新 skill 带 `scripts/`、`tools/`、`templates/` 子目录，需要手动补齐完整目录，并检查 `/dbs` 命令引用是否已改成 `/eric`（macOS 的 sed 不支持 `\b`，脚本的改名可能漏掉这类引用）。
+**注意**：脚本只复制 `SKILL.md`。如果上游新 skill 带 `scripts/`、`tools/`、`templates/` 子目录，需要手动补齐完整目录，并检查 `/eric` 命令引用是否已改成 `/eric`（macOS 的 sed 不支持 `\b`，脚本的改名可能漏掉这类引用）。
 
 ## 层 2：刷新本机安装
 
