@@ -1,132 +1,46 @@
 ---
 name: eric-upgrade
-description: 升级 eric 到最新版本
-trigger: /eric-upgrade、/升级eric、「升级 eric」
+description: |
+  eric 工具箱更新器。两件事：① 同步上游 dontbesilent2025/dbskill 的最新方法论（跑 scripts/sync-upstream.sh，生成待审查分支）；② 把本仓库 skills/ 的最新版本刷新到本机 Claude Code。用户说「更新 eric」「升级 eric」「同步上游」「检查 eric 更新」或输入 /eric-upgrade 时使用。
+  Update Eric's toolkit: sync upstream dbskill methodology via sync script, and refresh local skill links.
 ---
 
-# eric-upgrade
+# eric-upgrade：更新 eric 工具箱
 
-升级 eric 到最新版本，显示更新内容。
+本工具箱是 [dontbesilent2025/dbskill](https://github.com/dontbesilent2025/dbskill) 的 fork（仓库：erichecan/businessskills），含大量 Eric 自有改造。更新分两层，不要混用。
 
-## 使用场景
+## 层 1：同步上游方法论（dbskill → 本仓库）
 
-- 用户主动调用 `/eric-upgrade` 升级
-- 显示版本变化和更新内容
-
-## 升级流程
-
-### Step 1: 检测安装位置
+**唯一入口是仓库自带的同步脚本**，不要直接 git merge 上游（两边历史无关，且本地有自有改动）：
 
 ```bash
-if [ -d "$HOME/.claude/skills/dbs" ]; then
-  INSTALL_DIR="$HOME/.claude/skills"
-  echo "Install location: $INSTALL_DIR"
-else
-  echo "ERROR: eric not found in ~/.claude/skills/"
-  exit 1
-fi
+cd <本仓库根目录>
+bash scripts/sync-upstream.sh
 ```
 
-### Step 2: 获取当前版本
+脚本行为：
+
+- 拉取 `dontbesilent2025/dbskill` 最新 main
+- 新增 skill：自动复制并做 dbs→eric 改名
+- 已有 skill 有变化：生成 `upstream-diffs/*.diff` 供人工审查，**不自动覆盖**（本地可能有 Eric 自有改动）
+- 产出一个 `upstream-sync-YYYYMMDD` 分支，审查后自行合并到 main
+
+**注意**：脚本只复制 `SKILL.md`。如果上游新 skill 带 `scripts/`、`tools/`、`templates/` 子目录，需要手动补齐完整目录，并检查 `/dbs` 命令引用是否已改成 `/eric`（macOS 的 sed 不支持 `\b`，脚本的改名可能漏掉这类引用）。
+
+## 层 2：刷新本机安装
+
+本机通过软链使用（安装方式见 README）。仓库更新后，软链自动生效，无需重复安装。若有新增 skill 目录，补一次软链：
 
 ```bash
-OLD_VERSION=$(cat "$HOME/.claude/skills/eric-upgrade/../../VERSION" 2>/dev/null || echo "unknown")
-echo "Current version: $OLD_VERSION"
+ln -s "<本仓库根目录>/skills"/* ~/.claude/skills/ 2>/dev/null
 ```
 
-### Step 3: 获取远程版本
+## 边界
 
-```bash
-REMOTE_VERSION=$(curl -sL https://raw.githubusercontent.com/dontbesilent2025/eric/main/VERSION || echo "")
-if [ -z "$REMOTE_VERSION" ]; then
-  echo "ERROR: Cannot fetch remote version"
-  exit 1
-fi
-echo "Remote version: $REMOTE_VERSION"
-```
+- 用户只问「有没有更新」→ 只 `git fetch upstream main` 后对比 VERSION，报告差异，不执行同步。
+- 不使用 `npx skills add dontbesilent2025/dbskill`（那会绕过 fork，覆盖 Eric 自有改造）。
+- 同步分支合并前，`upstream-diffs/` 里的 diff 必须人工过目——上游可能删掉 Eric 依赖的段落（如知识包引用、web-access 调研步骤）。
 
-### Step 4: 比较版本
+## 语言
 
-如果 `OLD_VERSION` 等于 `REMOTE_VERSION`，告诉用户已是最新版本，结束。
-
-否则继续升级。
-
-### Step 5: 备份当前版本
-
-```bash
-BACKUP_DIR="$HOME/.claude/skills/.eric-backup-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$BACKUP_DIR"
-cp -r "$HOME/.claude/skills"/dbs* "$BACKUP_DIR/" 2>/dev/null || true
-echo "Backup created: $BACKUP_DIR"
-```
-
-### Step 6: 下载最新版本
-
-```bash
-TMP_DIR=$(mktemp -d)
-git clone --depth 1 https://github.com/dontbesilent2025/eric.git "$TMP_DIR/eric"
-if [ $? -ne 0 ]; then
-  echo "ERROR: Failed to clone repository"
-  exit 1
-fi
-echo "Downloaded to: $TMP_DIR/eric"
-```
-
-### Step 7: 替换旧版本
-
-```bash
-rm -rf "$HOME/.claude/skills"/dbs*
-cp -r "$TMP_DIR/eric/skills"/dbs* "$HOME/.claude/skills/"
-rm -rf "$TMP_DIR"
-echo "Upgrade completed"
-```
-
-如果复制失败，从备份恢复：
-
-```bash
-if [ $? -ne 0 ]; then
-  echo "ERROR: Upgrade failed, restoring from backup..."
-  rm -rf "$HOME/.claude/skills"/dbs*
-  cp -r "$BACKUP_DIR"/* "$HOME/.claude/skills/"
-  echo "Restored from backup"
-  exit 1
-fi
-```
-
-### Step 8: 显示更新内容
-
-读取 `$HOME/.claude/skills/dbs/../../README.md`（如果存在），提取从 `OLD_VERSION` 到 `REMOTE_VERSION` 之间的更新内容。
-
-格式：
-
-```
-eric v{REMOTE_VERSION} — 从 v{OLD_VERSION} 升级成功！
-
-更新内容：
-- [从 README 提取的更新要点]
-
-升级完成！
-```
-
-### Step 9: 清理备份
-
-询问用户是否删除备份：
-
-```bash
-echo "Backup location: $BACKUP_DIR"
-echo "Keep backup? (will be auto-deleted in 7 days if not used)"
-```
-
-不强制删除，让用户自己决定。
-
-## 错误处理
-
-- 网络失败：提示用户检查网络连接
-- Git clone 失败：从备份恢复
-- 文件复制失败：从备份恢复
-
-## 注意事项
-
-- 只支持通过 `~/.claude/skills/` 安装的版本
-- 升级前自动备份，失败时自动恢复
-- 不需要用户手动操作 git
+- 用户用中文就用中文回复，用英文就用英文回复

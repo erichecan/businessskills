@@ -160,10 +160,10 @@ python3 skills/eric-skill-cleaner/scripts/skill_cleaner.py restore "/absolute/pa
 
 只在审查或隔离任务完成、当前回复不再等待用户确认时使用下面的收尾。
 
-输入 `/dbs`。
+输入 `/eric`。
 
 这是商业工具箱的导航入口。它会读取刚才的具体结论和你的最新目标，选择当前最值得处理的一个方向，并直接路由到对应 Skill。
 
-你也可以直接说你想做什么。`/dbs` 会尊重你的明确选择。
+你也可以直接说你想做什么。`/eric` 会尊重你的明确选择。
 
-不熟悉所有 Skill 没关系，下一步不确定时就回 `/dbs`。
+不熟悉所有 Skill 没关系，下一步不确定时就回 `/eric`。
