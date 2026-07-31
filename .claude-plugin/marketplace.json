@@ -15,8 +15,16 @@
       "strict": false,
       "version": "1.0.0",
       "category": "business-diagnostics",
-      "keywords": ["business", "router", "diagnosis", "toolkit", "chinese"],
-      "skills": ["./skills/eric"]
+      "keywords": [
+        "business",
+        "router",
+        "diagnosis",
+        "toolkit",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric"
+      ]
     },
     {
       "name": "eric-diagnosis",
@@ -25,8 +33,16 @@
       "strict": false,
       "version": "1.0.0",
       "category": "business-diagnostics",
-      "keywords": ["business-model", "diagnosis", "consulting", "problem-dissolution", "chinese"],
-      "skills": ["./skills/eric-diagnosis"]
+      "keywords": [
+        "business-model",
+        "diagnosis",
+        "consulting",
+        "problem-dissolution",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-diagnosis"
+      ]
     },
     {
       "name": "eric-benchmark",
@@ -35,8 +51,16 @@
       "strict": false,
       "version": "1.0.0",
       "category": "business-diagnostics",
-      "keywords": ["benchmark", "competitive-analysis", "imitation", "strategy", "chinese"],
-      "skills": ["./skills/eric-benchmark"]
+      "keywords": [
+        "benchmark",
+        "competitive-analysis",
+        "imitation",
+        "strategy",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-benchmark"
+      ]
     },
     {
       "name": "eric-action",
@@ -45,8 +69,16 @@
       "strict": false,
       "version": "1.0.0",
       "category": "business-diagnostics",
-      "keywords": ["psychology", "execution", "procrastination", "adler", "chinese"],
-      "skills": ["./skills/eric-action"]
+      "keywords": [
+        "psychology",
+        "execution",
+        "procrastination",
+        "adler",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-action"
+      ]
     },
     {
       "name": "eric-content",
@@ -55,8 +87,16 @@
       "strict": false,
       "version": "1.0.0",
       "category": "content-creation",
-      "keywords": ["content", "creation", "copywriting", "social-media", "chinese"],
-      "skills": ["./skills/eric-content"]
+      "keywords": [
+        "content",
+        "creation",
+        "copywriting",
+        "social-media",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-content"
+      ]
     },
     {
       "name": "eric-hook",
@@ -65,8 +105,17 @@
       "strict": false,
       "version": "1.0.0",
       "category": "content-creation",
-      "keywords": ["video", "hook", "opening", "short-video", "douyin", "chinese"],
-      "skills": ["./skills/eric-hook"]
+      "keywords": [
+        "video",
+        "hook",
+        "opening",
+        "short-video",
+        "douyin",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-hook"
+      ]
     },
     {
       "name": "eric-xhs-title",
@@ -75,8 +124,17 @@
       "strict": false,
       "version": "1.0.0",
       "category": "content-creation",
-      "keywords": ["xiaohongshu", "RED", "title", "formula", "social-media", "chinese"],
-      "skills": ["./skills/eric-xhs-title"]
+      "keywords": [
+        "xiaohongshu",
+        "RED",
+        "title",
+        "formula",
+        "social-media",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-xhs-title"
+      ]
     },
     {
       "name": "eric-deconstruct",
@@ -85,8 +143,16 @@
       "strict": false,
       "version": "1.0.0",
       "category": "thinking-tools",
-      "keywords": ["wittgenstein", "concepts", "deconstruction", "philosophy", "chinese"],
-      "skills": ["./skills/eric-deconstruct"]
+      "keywords": [
+        "wittgenstein",
+        "concepts",
+        "deconstruction",
+        "philosophy",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-deconstruct"
+      ]
     },
     {
       "name": "eric-atom",
@@ -95,8 +161,15 @@
       "strict": false,
       "version": "1.0.0",
       "category": "knowledge-management",
-      "keywords": ["atoms", "knowledge", "extraction", "chinese"],
-      "skills": ["./skills/eric-atom"]
+      "keywords": [
+        "atoms",
+        "knowledge",
+        "extraction",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-atom"
+      ]
     },
     {
       "name": "eric-chatroom-austrian",
@@ -105,8 +178,17 @@
       "strict": false,
       "version": "1.0.0",
       "category": "thinking-tools",
-      "keywords": ["austrian-economics", "hayek", "mises", "debate", "philosophy", "chinese"],
-      "skills": ["./skills/eric-chatroom-austrian"]
+      "keywords": [
+        "austrian-economics",
+        "hayek",
+        "mises",
+        "debate",
+        "philosophy",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-chatroom-austrian"
+      ]
     },
     {
       "name": "eric-chatroom",
@@ -115,8 +197,16 @@
       "strict": false,
       "version": "1.0.0",
       "category": "thinking-tools",
-      "keywords": ["chatroom", "multi-agent", "debate", "experts", "chinese"],
-      "skills": ["./skills/eric-chatroom"]
+      "keywords": [
+        "chatroom",
+        "multi-agent",
+        "debate",
+        "experts",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-chatroom"
+      ]
     },
     {
       "name": "eric-slowisfast",
@@ -125,8 +215,16 @@
       "strict": false,
       "version": "1.0.0",
       "category": "business-diagnostics",
-      "keywords": ["slow", "friction", "assets", "long-term", "chinese"],
-      "skills": ["./skills/eric-slowisfast"]
+      "keywords": [
+        "slow",
+        "friction",
+        "assets",
+        "long-term",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-slowisfast"
+      ]
     },
     {
       "name": "eric-agent-migration",
@@ -135,8 +233,17 @@
       "strict": false,
       "version": "1.0.0",
       "category": "utilities",
-      "keywords": ["agent", "migration", "claude-code", "codex", "workspace", "chinese"],
-      "skills": ["./skills/eric-agent-migration"]
+      "keywords": [
+        "agent",
+        "migration",
+        "claude-code",
+        "codex",
+        "workspace",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-agent-migration"
+      ]
     },
     {
       "name": "eric-upgrade",
@@ -145,8 +252,14 @@
       "strict": false,
       "version": "1.0.0",
       "category": "utilities",
-      "keywords": ["upgrade", "update", "version"],
-      "skills": ["./skills/eric-upgrade"]
+      "keywords": [
+        "upgrade",
+        "update",
+        "version"
+      ],
+      "skills": [
+        "./skills/eric-upgrade"
+      ]
     },
     {
       "name": "eric-xhs-deconstruct",
@@ -155,8 +268,17 @@
       "strict": false,
       "version": "1.0.0",
       "category": "content-creation",
-      "keywords": ["xiaohongshu", "deconstruct", "viral", "analysis", "atoms", "chinese"],
-      "skills": ["./skills/eric-xhs-deconstruct"]
+      "keywords": [
+        "xiaohongshu",
+        "deconstruct",
+        "viral",
+        "analysis",
+        "atoms",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-xhs-deconstruct"
+      ]
     },
     {
       "name": "eric-xhs-topic",
@@ -165,8 +287,16 @@
       "strict": false,
       "version": "1.0.0",
       "category": "content-creation",
-      "keywords": ["xiaohongshu", "topic", "evaluation", "middle-aged", "chinese"],
-      "skills": ["./skills/eric-xhs-topic"]
+      "keywords": [
+        "xiaohongshu",
+        "topic",
+        "evaluation",
+        "middle-aged",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-xhs-topic"
+      ]
     },
     {
       "name": "eric-xhs-cover",
@@ -175,8 +305,17 @@
       "strict": false,
       "version": "1.0.0",
       "category": "content-creation",
-      "keywords": ["xiaohongshu", "cover", "nanobanana", "prompt", "image", "chinese"],
-      "skills": ["./skills/eric-xhs-cover"]
+      "keywords": [
+        "xiaohongshu",
+        "cover",
+        "nanobanana",
+        "prompt",
+        "image",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-xhs-cover"
+      ]
     },
     {
       "name": "eric-xhs-coach",
@@ -185,8 +324,17 @@
       "strict": false,
       "version": "1.0.0",
       "category": "content-creation",
-      "keywords": ["xiaohongshu", "coach", "workflow", "orchestrator", "full-pipeline", "chinese"],
-      "skills": ["./skills/eric-xhs-coach"]
+      "keywords": [
+        "xiaohongshu",
+        "coach",
+        "workflow",
+        "orchestrator",
+        "full-pipeline",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-xhs-coach"
+      ]
     },
     {
       "name": "eric-boshang",
@@ -195,8 +343,18 @@
       "strict": false,
       "version": "1.0.0",
       "category": "content-creation",
-      "keywords": ["boshang", "qc", "industrial", "horse-racing", "funnel", "quality-control", "chinese"],
-      "skills": ["./skills/eric-boshang"]
+      "keywords": [
+        "boshang",
+        "qc",
+        "industrial",
+        "horse-racing",
+        "funnel",
+        "quality-control",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-boshang"
+      ]
     },
     {
       "name": "eric-xhs-audit",
@@ -205,8 +363,18 @@
       "strict": false,
       "version": "1.0.0",
       "category": "content-creation",
-      "keywords": ["xiaohongshu", "audit", "score", "viral", "review", "quality-gate", "chinese"],
-      "skills": ["./skills/eric-xhs-audit"]
+      "keywords": [
+        "xiaohongshu",
+        "audit",
+        "score",
+        "viral",
+        "review",
+        "quality-gate",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-xhs-audit"
+      ]
     },
     {
       "name": "eric-coach",
@@ -215,8 +383,341 @@
       "strict": false,
       "version": "1.0.0",
       "category": "business-diagnostics",
-      "keywords": ["resume", "interview", "coaching", "job-search", "chinese"],
-      "skills": ["./skills/eric-coach"]
+      "keywords": [
+        "resume",
+        "interview",
+        "coaching",
+        "job-search",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-coach"
+      ]
+    },
+    {
+      "name": "eric-bridge",
+      "description": "多端 skill 桥接。把任意 skill 目录桥接到 Claude Code / Codex / WorkBuddy / Grok，改一处多端同步。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "tools",
+      "keywords": [
+        "bridge",
+        "codex",
+        "grok",
+        "symlink",
+        "multi-agent",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-bridge"
+      ]
+    },
+    {
+      "name": "eric-content-system",
+      "description": "内容结构化系统。把本地文稿、推文、选题、案例搭成可持续生长的内容资产工程：内容单元、主题地图、选题装配。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": [
+        "content-system",
+        "knowledge-units",
+        "topic-map",
+        "assembly",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-content-system"
+      ]
+    },
+    {
+      "name": "eric-knowledge",
+      "description": "文件夹知识库。把本地文件夹变成 Agent 能稳定查找、收录和维护的知识库，含 Source of Truth 导航与分层治理。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "tools",
+      "keywords": [
+        "knowledge-base",
+        "sot",
+        "navigation",
+        "folder",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-knowledge"
+      ]
+    },
+    {
+      "name": "eric-resonate",
+      "description": "文稿共鸣诊断。发稿前怕没流量、怕没戳中受众时，用传播心理学框架诊断哪里没刺中核心、具体怎么改。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": [
+        "resonance",
+        "diagnosis",
+        "psychology",
+        "draft-review",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-resonate"
+      ]
+    },
+    {
+      "name": "eric-script-flow",
+      "description": "短视频逐字稿逻辑延续检查。找出观众会在哪一秒划走：段落衔接、信息密度、口播流畅度。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": [
+        "script",
+        "flow",
+        "short-video",
+        "retention",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-script-flow"
+      ]
+    },
+    {
+      "name": "eric-skill-cleaner",
+      "description": "本地 skill 安全清理器。扫描已安装 skill，识别广告导流、任务劫持、可疑外部调用；先出报告，确认后隔离。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "tools",
+      "keywords": [
+        "security",
+        "audit",
+        "skill-scan",
+        "cleaner",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-skill-cleaner"
+      ]
+    },
+    {
+      "name": "eric-spread",
+      "description": "传播心理解码。用 5 个经典传播学理论解码一段内容为什么能火、打中了什么情绪、受众想听什么。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": [
+        "spread",
+        "psychology",
+        "viral",
+        "emotion",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-spread"
+      ]
+    },
+    {
+      "name": "eric-standard-answer",
+      "description": "历史同构与标准答案研究。把当前困境抽象成结构指纹，在商业史/管理史/职业史中找同构案例与反复有效的解法。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "business-diagnostics",
+      "keywords": [
+        "history",
+        "analogy",
+        "case-study",
+        "standard-answer",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-standard-answer"
+      ]
+    },
+    {
+      "name": "eric-wechat-html",
+      "description": "微信公众号 HTML 生成。把 Markdown 转成可直接粘贴到公众号后台的 HTML，内置 15 种排版风格。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "tools",
+      "keywords": [
+        "wechat",
+        "html",
+        "formatting",
+        "publishing",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-wechat-html"
+      ]
+    },
+    {
+      "name": "eric-ai-check",
+      "description": "AI 写作痕迹检测。识别文案里的 AI 特征词、空洞排比、套路开头，只诊断不代改。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": [
+        "ai-detection",
+        "writing",
+        "diagnosis",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-ai-check"
+      ]
+    },
+    {
+      "name": "eric-goal",
+      "description": "目标清晰化。用维特根斯坦语言哲学审计模糊目标，提取已有约束，只追问会改变执行或验收的关键信息。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "business-diagnostics",
+      "keywords": [
+        "goal",
+        "clarification",
+        "wittgenstein",
+        "audit",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-goal"
+      ]
+    },
+    {
+      "name": "eric-good-question",
+      "description": "好问题生成器。把模糊问题改写成 Agent 可推理、可验证的问题说明书。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "business-diagnostics",
+      "keywords": [
+        "question",
+        "problem-definition",
+        "agent-ready",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-good-question"
+      ]
+    },
+    {
+      "name": "eric-decision",
+      "description": "个人决策系统。四层结构记录重大决策，支持结果回填与规律复盘。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "business-diagnostics",
+      "keywords": [
+        "decision",
+        "tracking",
+        "review",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-decision"
+      ]
+    },
+    {
+      "name": "eric-learning",
+      "description": "交互式学习。把一个课题拆成连续学习文章，根据上一篇反馈调整下一篇的深度与节奏。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "tools",
+      "keywords": [
+        "learning",
+        "course",
+        "interactive",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-learning"
+      ]
+    },
+    {
+      "name": "eric-save",
+      "description": "诊断存档。把当前诊断的关键结论、否决方向、下一步写成结构化文件存到本地。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "tools",
+      "keywords": [
+        "save",
+        "archive",
+        "session",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-save"
+      ]
+    },
+    {
+      "name": "eric-restore",
+      "description": "接续诊断。拉出最近一次存档，接着上次的诊断继续，不用从头讲。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "tools",
+      "keywords": [
+        "restore",
+        "resume",
+        "session",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-restore"
+      ]
+    },
+    {
+      "name": "eric-report",
+      "description": "诊断报告。把多份存档合并成一份可分享、可归档的 markdown 报告。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "tools",
+      "keywords": [
+        "report",
+        "merge",
+        "deliverable",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-report"
+      ]
+    },
+    {
+      "name": "eric-week-program",
+      "description": "8 周职业转型计划。week1 能力盘点 → week3 方向打分 → week4 最小验证设计 → week8 复盘，逐周推进、首尾相接。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "business-diagnostics",
+      "keywords": [
+        "transformation",
+        "8-week",
+        "career",
+        "program",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-week1",
+        "./skills/eric-week2",
+        "./skills/eric-week3",
+        "./skills/eric-week4",
+        "./skills/eric-week5",
+        "./skills/eric-week6",
+        "./skills/eric-week7",
+        "./skills/eric-week8"
+      ]
     }
   ]
 }
