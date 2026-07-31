@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { readMemoryNotes, normalizeTitle } from "@/lib/sucai";
 
-// POST /api/scrape — trigger scraping for a platform
+// POST /api/scrape — trigger scraping / import for a platform
 // Body: { platform: "weixin", accountId: "..." }
+//   or: { platform: "xiaohongshu" }  ← 从素材库 记忆库.csv 增量入库
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -10,6 +12,10 @@ export async function POST(req: NextRequest) {
 
     if (platform === "weixin") {
       return await scrapeWeixin(accountId);
+    }
+
+    if (platform === "xiaohongshu") {
+      return await importXiaohongshu();
     }
 
     return NextResponse.json(
@@ -92,4 +98,76 @@ function parseRssItems(xml: string): RssItem[] {
 function extractTag(xml: string, tag: string): string | null {
   const m = xml.match(new RegExp(`<${tag}[^>]*>(?:<!\\[CDATA\\[)?(.*?)(?:\\]\\]>)?<\\/${tag}>`, "s"));
   return m ? m[1].trim() : null;
+}
+
+/**
+ * 小红书入库：读取素材库 职场面试_记忆库.csv，把定时采集任务的产物增量写进 HotTopic。
+ * - platform = "xiaohongshu"
+ * - engagementScore = 热度数值化（37万 → 370000）
+ * - rawData = 原始行 JSON（关键词/来源/链接/热度原始值/归一化标题，便于后续去重与复看）
+ * 去重：已存在的 xiaohongshu 热点按 url 优先、归一化标题兜底，跳过不重复入库。
+ */
+async function importXiaohongshu() {
+  let notes;
+  try {
+    notes = readMemoryNotes();
+  } catch (err) {
+    return NextResponse.json(
+      { error: true, message: `读取素材库失败: ${err instanceof Error ? err.message : String(err)}` },
+      { status: 502 }
+    );
+  }
+
+  if (notes.length === 0) {
+    return NextResponse.json({ message: "素材库 记忆库.csv 为空或不存在，未导入", count: 0, skipped: 0 });
+  }
+
+  // 已有 xiaohongshu 热点，建立去重索引（url + 归一化标题）
+  const existing = await prisma.hotTopic.findMany({
+    where: { platform: "xiaohongshu" },
+    select: { url: true, title: true, rawData: true },
+  });
+  const seenUrl = new Set<string>();
+  const seenTitle = new Set<string>();
+  for (const e of existing) {
+    if (e.url) seenUrl.add(e.url);
+    seenTitle.add(normalizeTitle(e.title));
+  }
+
+  const toCreate = notes.filter((n) => {
+    const nt = normalizeTitle(n.title);
+    if (n.url && seenUrl.has(n.url)) return false;
+    if (seenTitle.has(nt)) return false;
+    // 同批内部也去重
+    if (n.url) seenUrl.add(n.url);
+    seenTitle.add(nt);
+    return n.title.trim() !== "";
+  });
+
+  let created = 0;
+  for (const n of toCreate) {
+    await prisma.hotTopic.create({
+      data: {
+        platform: "xiaohongshu",
+        title: n.title,
+        url: n.url,
+        engagementScore: n.heatNum,
+        rawData: JSON.stringify({
+          keyword: n.keyword,
+          source: n.source,
+          firstSeen: n.firstSeen,
+          heatRaw: n.heatRaw,
+          normalizedTitle: normalizeTitle(n.title),
+        }),
+      },
+    });
+    created++;
+  }
+
+  return NextResponse.json({
+    message: `小红书素材入库完成，新增 ${created} 条，跳过重复 ${notes.length - created} 条`,
+    count: created,
+    skipped: notes.length - created,
+    total: notes.length,
+  });
 }

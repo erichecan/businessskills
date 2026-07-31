@@ -2,6 +2,14 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "autoPort": true,
+      "cwd": "app"
+    },
+    {
       "name": "workflow",
       "runtimeExecutable": "node",
       "runtimeArgs": ["server.js"],
@@ -16,6 +24,14 @@
       "port": 8810,
       "autoPort": false,
       "cwd": "xhs"
+    },
+    {
+      "name": "preview-static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8830"],
+      "port": 8830,
+      "autoPort": false,
+      "cwd": "preview"
     }
   ]
 }
