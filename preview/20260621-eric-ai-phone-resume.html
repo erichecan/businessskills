@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>何文彬 Eric · 高级产品总监 × AI 全栈开发者</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef1f6;
+    --slide:#ffffff;
+    --ink:#161a2e;
+    --ink-soft:#3a3f57;
+    --muted:#6b7189;
+    --line:#e4e7f0;
+    --line-soft:#eef0f6;
+    --accent:#3b46e0;
+    --accent-2:#0ea5a4;
+    --accent-soft:#eef0ff;
+    --teal-soft:#e6f7f5;
+    --ok:#0f9d6b;
+    --shadow:0 24px 60px -28px rgba(22,26,46,.35);
+    --r:20px;
+    --fs-display:clamp(40px,6.2vw,84px);
+    --fs-h1:clamp(28px,3.4vw,46px);
+    --fs-h2:clamp(20px,2.1vw,28px);
+    --fs-body:clamp(15px,1.18vw,18px);
+    --maxw:1120px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'Sora','PingFang SC','Microsoft YaHei',system-ui,-apple-system,sans-serif;
+    background:var(--bg);color:var(--ink);
+    -webkit-font-smoothing:antialiased;line-height:1.6;
+  }
+  .deck{height:100vh;overflow-y:scroll;scroll-snap-type:y mandatory;scroll-behavior:smooth}
+  .deck::-webkit-scrollbar{width:0}
+  .slide{
+    min-height:100vh;scroll-snap-align:start;scroll-snap-stop:always;
+    display:flex;align-items:center;justify-content:center;
+    padding:6vh 7vw;position:relative;
+  }
+  .panel{
+    width:100%;max-width:var(--maxw);background:var(--slide);
+    border:1px solid var(--line);border-radius:28px;
+    box-shadow:var(--shadow);padding:clamp(30px,4.4vw,64px);
+    position:relative;overflow:hidden;
+  }
+  .kicker{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);background:var(--accent-soft);padding:7px 14px;border-radius:999px;margin-bottom:22px;
+  }
+  .kicker.teal{color:var(--accent-2);background:var(--teal-soft)}
+  h1.display{font-size:var(--fs-display);font-weight:800;line-height:1.04;letter-spacing:-.02em}
+  h2.title{font-size:var(--fs-h1);font-weight:700;line-height:1.14;letter-spacing:-.01em}
+  h3{font-size:var(--fs-h2);font-weight:700}
+  p,li{font-size:var(--fs-body);color:var(--ink-soft)}
+  .muted{color:var(--muted)}
+  .accent{color:var(--accent)}
+  .ink{color:var(--ink)}
+  .lead{font-size:clamp(17px,1.5vw,22px);color:var(--ink-soft);font-weight:500}
+
+  /* cover */
+  .cover .en{font-size:clamp(16px,1.5vw,21px);color:var(--muted);font-weight:500;margin-top:8px}
+  .cover .role{font-size:clamp(17px,1.6vw,23px);font-weight:600;color:var(--ink);margin-top:22px}
+  .cover .tagline{font-size:clamp(18px,1.7vw,25px);font-weight:600;color:var(--ink-soft);margin-top:10px;line-height:1.4}
+  .cover .tagline b{color:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+  .chip{font-size:14px;font-weight:500;color:var(--ink-soft);background:#f4f5fa;border:1px solid var(--line);padding:8px 14px;border-radius:999px}
+  .chip.hot{background:var(--accent-soft);border-color:#d8dcff;color:var(--accent);font-weight:600}
+  .meta-row{display:flex;flex-wrap:wrap;gap:16px 26px;margin-top:34px;padding-top:24px;border-top:1px solid var(--line-soft);align-items:center}
+  .meta-row .item{font-size:14.5px;color:var(--muted)}
+  .meta-row .item b{color:var(--ink);font-weight:600}
+
+  /* grids / cards */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:30px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:28px}
+  .card{background:#fbfcfe;border:1px solid var(--line);border-radius:var(--r);padding:24px}
+  .card .num{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.1em}
+  .card h3{margin:12px 0 8px;font-size:clamp(18px,1.5vw,22px)}
+  .card p{font-size:15px}
+  .card.spot{border-color:#cfd4ff;background:linear-gradient(180deg,#f6f7ff,#fbfcfe)}
+  .card.teal{border-color:#cfe9e7;background:linear-gradient(180deg,#effaf9,#fbfcfe)}
+  .card.teal .num{color:var(--accent-2)}
+
+  /* pipeline */
+  .pipe{display:flex;align-items:stretch;gap:0;margin-top:30px;flex-wrap:nowrap;overflow:hidden}
+  .node{flex:1;background:#fbfcfe;border:1px solid var(--line);border-radius:16px;padding:18px 14px;text-align:center;position:relative;z-index:1}
+  .node .ico{font-size:22px}
+  .node .lbl{font-size:15px;font-weight:700;color:var(--ink);margin-top:6px}
+  .node .sub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4}
+  .node.k{border-color:#cfe9e7;background:var(--teal-soft)}
+  .arrow{flex:none;width:34px;display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:20px;font-weight:700}
+  .loopnote{text-align:center;font-size:13.5px;color:var(--muted);margin-top:16px}
+
+  /* workflow steps */
+  .flow{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:28px}
+  .step{background:#fbfcfe;border:1px solid var(--line);border-radius:16px;padding:22px}
+  .step .n{width:32px;height:32px;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .step.t .n{background:var(--accent-2)}
+  .step h4{font-size:16.5px;margin:13px 0 6px;color:var(--ink);font-weight:700}
+  .step p{font-size:14px}
+
+  /* skills modules */
+  .mod{margin-top:22px}
+  .mod h4{font-size:15px;font-weight:700;color:var(--accent);margin-bottom:10px}
+  .mod .tags{display:flex;flex-wrap:wrap;gap:8px}
+  .tag{font-size:13.5px;color:var(--ink-soft);background:#f4f5fa;border:1px solid var(--line);padding:6px 12px;border-radius:8px;font-weight:500}
+  .tag.key{background:var(--accent-soft);border-color:#d8dcff;color:var(--accent);font-weight:600}
+
+  /* timeline */
+  .tl{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:40px}
+  .tl::before{content:'';position:absolute;top:9px;left:5%;right:5%;height:2px;background:var(--line)}
+  .stage2{position:relative}
+  .stage2 .pin{width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--accent);position:relative;z-index:1}
+  .stage2 .when{font-size:13px;font-weight:700;color:var(--accent);margin-top:16px}
+  .stage2 h4{font-size:16.5px;margin:6px 0 6px;color:var(--ink);font-weight:700}
+  .stage2 p{font-size:13.5px}
+
+  /* closing */
+  .closing .panel{background:linear-gradient(160deg,#1c2150,#2a2f78);border-color:#2a2f78}
+  .closing .kicker{background:rgba(255,255,255,.12);color:#cfd4ff}
+  .closing h1,.closing h2,.closing .role{color:#fff}
+  .closing .lead{color:#d4d8f5}
+  .closing .chip{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.18);color:#eef0ff}
+  .closing .meta-row{border-top-color:rgba(255,255,255,.18)}
+  .closing .meta-row .item{color:#aeb6e8}
+  .closing .meta-row .item b{color:#fff}
+
+  /* nav */
+  .dots{position:fixed;right:26px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:13px;z-index:50}
+  .dots a{width:10px;height:10px;border-radius:50%;background:#c4c9dc;display:block;transition:.25s;position:relative}
+  .dots a.active{background:var(--accent);transform:scale(1.35)}
+  .dots a span{position:absolute;right:20px;top:50%;transform:translateY(-50%);white-space:nowrap;font-size:12px;color:var(--ink);background:#fff;border:1px solid var(--line);padding:3px 9px;border-radius:6px;opacity:0;pointer-events:none;transition:.2s;box-shadow:0 6px 16px -8px rgba(0,0,0,.3)}
+  .dots a:hover span{opacity:1}
+  .progress{position:fixed;top:0;left:0;height:3px;background:var(--accent);width:0;z-index:60;transition:width .2s}
+  .counter{position:fixed;left:26px;bottom:22px;font-size:13px;color:var(--muted);font-weight:600;z-index:50}
+  .counter b{color:var(--accent)}
+  .hint{position:fixed;right:26px;bottom:22px;font-size:12px;color:var(--muted);z-index:50;display:flex;align-items:center;gap:6px}
+  .hint kbd{background:#fff;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:inherit;font-size:11px}
+
+  @media(max-width:760px){
+    .grid3,.grid2,.flow,.tl{grid-template-columns:1fr}
+    .tl::before{display:none}
+    .pipe{flex-wrap:wrap;gap:10px}
+    .arrow{width:100%;transform:rotate(90deg);height:18px}
+    .node{flex:1 1 100%}
+    .dots,.hint{display:none}
+    .slide{padding:5vh 5vw}
+  }
+  @media print{
+    .deck{height:auto;overflow:visible}
+    .slide{min-height:auto;page-break-after:always;padding:14mm}
+    .panel{box-shadow:none;border:1px solid #ddd}
+    .dots,.progress,.counter,.hint{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<div class="deck" id="deck">
+
+  <!-- 0 封面 -->
+  <section class="slide cover" id="s0" data-label="封面">
+    <div class="panel">
+      <div class="kicker">高级产品总监 · AI 全栈开发者</div>
+      <h1 class="display">何文彬</h1>
+      <div class="en">Eric Wenbin He</div>
+      <div class="role">12 年高级产品总监（腾讯）｜现 AI 全栈开发者</div>
+      <div class="tagline"><b>产品体系规划</b> × <b>大规模 AI 全栈交付</b></div>
+      <div class="chips">
+        <span class="chip">腾讯 12 年高级产品总监</span>
+        <span class="chip">TMS · WMS · 多套电商系统</span>
+        <span class="chip hot">自研 AI 电话产品</span>
+        <span class="chip hot">Twilio · Telnyx 实战</span>
+      </div>
+      <div class="meta-row">
+        <span class="item">📍 <b>大多伦多 · Markham</b></span>
+        <span class="item">🌐 <b>远程长期可</b></span>
+        <span class="item">✉️ <b>erichecan@gmail.com</b></span>
+        <span class="item">📞 <b>437 299 9468</b></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1 最近核心项目：三个特点 -->
+  <section class="slide" id="s1" data-label="AI 电话 · 三个特点">
+    <div class="panel">
+      <div class="kicker">最近核心项目</div>
+      <h2 class="title">自研 AI 电话产品 · <span class="accent">三个核心特点</span></h2>
+      <div class="grid3">
+        <div class="card spot">
+          <div class="num">特点 01</div>
+          <h3>真外呼 + 真接听</h3>
+          <p>跑在真实运营商线路上，对接 Twilio 与 Telnyx，既能批量自动外呼回访，也能 7×24 接听来电，不是模拟环境。</p>
+        </div>
+        <div class="card spot">
+          <div class="num">特点 02</div>
+          <h3>知识库驱动，答得准</h3>
+          <p>把产品手册、政策、常见问答做成可检索的知识库，AI 回答有据可依、准确可控，不会凭空乱编。</p>
+        </div>
+        <div class="card spot">
+          <div class="num">特点 03</div>
+          <h3>能办事，不止能聊</h3>
+          <p>通话不止对话：识别意图后能查订单、改信息、转人工，并自动生成带上下文的工单，形成完整闭环。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 AI 电话产品机制 -->
+  <section class="slide" id="s2" data-label="AI 电话 · 机制">
+    <div class="panel">
+      <div class="kicker teal">产品机制 · 一通电话怎么跑通</div>
+      <h2 class="title">一通电话，从<span style="color:var(--accent-2)">接通到办成事</span></h2>
+      <p class="lead" style="margin-top:14px">完整体验闭环：<b class="ink">接得通 → 听得懂 → 答得准 → 办得成</b>，多轮对话直到问题闭环。</p>
+      <div class="pipe">
+        <div class="node">
+          <div class="ico">📞</div>
+          <div class="lbl">接得通</div>
+          <div class="sub">Twilio · Telnyx<br>真实通话线路</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="node k">
+          <div class="ico">👂</div>
+          <div class="lbl">听得懂</div>
+          <div class="sub">实时语音转文字</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="node k">
+          <div class="ico">🧠</div>
+          <div class="lbl">答得准</div>
+          <div class="sub">理解意图 · 检索知识库</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="node k">
+          <div class="ico">🗣️</div>
+          <div class="lbl">说得出</div>
+          <div class="sub">自然人声实时合成</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="node">
+          <div class="ico">✅</div>
+          <div class="lbl">办得成</div>
+          <div class="sub">转人工 · 建工单<br>改订单</div>
+        </div>
+      </div>
+      <p class="loopnote">↺ 多轮对话循环；复杂场景一键转人工坐席，并带上完整上下文</p>
+    </div>
+  </section>
+
+  <!-- 3 外包客户电话如何创建 -->
+  <section class="slide" id="s3" data-label="一通电话怎么建">
+    <div class="panel">
+      <div class="kicker">业务流程 · 从配置到回流</div>
+      <h2 class="title">一个外包客户的电话，<span class="accent">是怎么创建起来的</span></h2>
+      <p class="lead" style="margin-top:14px">从客户接入到数据回流，整条产品流程由我设计并落地。</p>
+      <div class="flow">
+        <div class="step">
+          <div class="n">1</div>
+          <h4>客户接入 · 绑定线路</h4>
+          <p>为外包客户开通账号，分配专属号码，对接 Twilio / Telnyx 通话线路。</p>
+        </div>
+        <div class="step">
+          <div class="n">2</div>
+          <h4>搭建知识库</h4>
+          <p>导入客户的产品手册、服务政策与常见问答，构建可检索的知识库。</p>
+        </div>
+        <div class="step">
+          <div class="n">3</div>
+          <h4>配置对话 Agent</h4>
+          <p>设定外呼话术、对话目标、应答策略，以及「什么情况转人工」的规则。</p>
+        </div>
+        <div class="step t">
+          <div class="n">4</div>
+          <h4>创建外呼任务</h4>
+          <p>导入客户名单，设定呼叫时段、并发路数与重拨策略，进入排队调度。</p>
+        </div>
+        <div class="step t">
+          <div class="n">5</div>
+          <h4>实时通话执行</h4>
+          <p>系统逐通拨出，实时「听 → 想 → 说」多轮对话，按知识库与策略推进到目标。</p>
+        </div>
+        <div class="step t">
+          <div class="n">6</div>
+          <h4>通话后处理</h4>
+          <p>自动录音质检，生成带上下文的工单，结果回流 CRM 与运营报表。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 大规模交付 -->
+  <section class="slide" id="s4" data-label="企业级系统交付">
+    <div class="panel">
+      <div class="kicker">大规模交付能力</div>
+      <h2 class="title">多套企业级系统，<span class="accent">从 0 到 1 独立交付</span></h2>
+      <p class="lead" style="margin-top:14px">不只是会调 AI 接口——这些都是端到端独立设计、开发、上线的完整系统。</p>
+      <div class="grid3">
+        <div class="card">
+          <h3>🚚 TMS 运输管理系统</h3>
+          <p>覆盖运输订单、调度、路线规划与运费结算全流程，支撑企业级运输业务运转。</p>
+        </div>
+        <div class="card">
+          <h3>📦 WMS 仓储管理系统</h3>
+          <p>打通入库、拣货、库存、出库全链路，处理高并发、多角色、强一致性的复杂业务。</p>
+        </div>
+        <div class="card">
+          <h3>🛒 多套完整电商系统</h3>
+          <p>从商城前台到订单、库存、支付、营销与运营后台，独立交付多套完整闭环的电商系统。</p>
+        </div>
+      </div>
+      <p style="margin-top:24px;font-size:clamp(16px,1.4vw,20px);color:var(--ink);font-weight:600">产品、后端、AI、电话语音全链路，一个人就能闭环交付。</p>
+    </div>
+  </section>
+
+  <!-- 5 产品体系规划 -->
+  <section class="slide" id="s5" data-label="产品体系规划">
+    <div class="panel">
+      <div class="kicker">产品体系规划</div>
+      <h2 class="title">12 年高级产品总监：<br>从单点功能到<span class="accent">完整产品体系</span></h2>
+      <div class="grid3">
+        <div class="card">
+          <div class="num">规划方法</div>
+          <h3>从需求到产品矩阵</h3>
+          <p>把分散的业务诉求收敛成结构化的产品矩阵，定义边界、优先级与演进路线，而不是被需求推着走。</p>
+        </div>
+        <div class="card">
+          <div class="num">设计单位</div>
+          <h3>以体验闭环为单位</h3>
+          <p>从用户旅程倒推，把功能组织成「用户能完成一件事」的完整闭环，再向下拆解到模块与迭代。</p>
+        </div>
+        <div class="card">
+          <div class="num">跨线治理</div>
+          <h3>跨业务线架构治理</h3>
+          <p>统筹多条业务线的产品规划与能力复用，把公共能力下沉，避免重复造轮子、避免体系割裂。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 职业轨迹 -->
+  <section class="slide" id="s7" data-label="职业轨迹">
+    <div class="panel">
+      <div class="kicker">职业轨迹</div>
+      <h2 class="title">从产品总监，到<span class="accent">能独立交付的 AI 开发者</span></h2>
+      <div class="tl">
+        <div class="stage2">
+          <div class="pin"></div>
+          <div class="when">腾讯 · 12 年</div>
+          <h4>高级产品总监</h4>
+          <p>主导多条业务线的产品体系规划与从 0 到 1 落地。</p>
+        </div>
+        <div class="stage2">
+          <div class="pin"></div>
+          <div class="when">转型期</div>
+          <h4>AI 全栈开发者</h4>
+          <p>从产品转为亲手写代码，独立交付 TMS / WMS 与多套电商系统。</p>
+        </div>
+        <div class="stage2">
+          <div class="pin"></div>
+          <div class="when">当前</div>
+          <h4>自研 AI 电话产品</h4>
+          <p>打通 Twilio / Telnyx 真实通话链路，做出能外呼、能接听、能办事的 Voice Agent。</p>
+        </div>
+        <div class="stage2">
+          <div class="pin"></div>
+          <div class="when">持续</div>
+          <h4>Data Science 进修</h4>
+          <p>系统补强数据与 AI 工程能力，让产品判断与技术落地继续合一。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 收尾名片 -->
+  <section class="slide closing" id="s8" data-label="联系">
+    <div class="panel">
+      <div class="kicker">联系</div>
+      <h1 class="display">何文彬</h1>
+      <div class="role" style="margin-top:8px">高级产品总监 × AI 全栈开发者</div>
+      <p class="lead" style="margin-top:18px;max-width:780px">自研 AI 电话产品 · Twilio / Telnyx 实战 · 企业级系统独立交付 · 可远程长期。</p>
+      <div class="chips" style="margin-top:26px">
+        <span class="chip">自研 AI 电话产品</span>
+        <span class="chip">Twilio · Telnyx 实战</span>
+        <span class="chip">企业级系统交付</span>
+        <span class="chip">产品体系规划</span>
+        <span class="chip">可远程长期</span>
+      </div>
+      <div class="meta-row">
+        <span class="item">✉️ <b>erichecan@gmail.com</b></span>
+        <span class="item">📞 <b>437 299 9468</b></span>
+        <span class="item">📍 <b>大多伦多 · Markham</b></span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<nav class="dots" id="dots"></nav>
+<div class="counter"><b id="cur">01</b> / <span id="total">09</span></div>
+<div class="hint"><kbd>↑</kbd><kbd>↓</kbd> 翻页 · <kbd>空格</kbd>下一页</div>
+
+<script>
+  const deck=document.getElementById('deck');
+  const slides=[...document.querySelectorAll('.slide')];
+  const dots=document.getElementById('dots');
+  const cur=document.getElementById('cur');
+  const prog=document.getElementById('progress');
+  document.getElementById('total').textContent=String(slides.length).padStart(2,'0');
+
+  slides.forEach((s)=>{
+    const a=document.createElement('a');
+    a.href='#'+s.id;
+    a.innerHTML='<span>'+s.dataset.label+'</span>';
+    a.addEventListener('click',e=>{e.preventDefault();s.scrollIntoView({behavior:'smooth'});});
+    dots.appendChild(a);
+  });
+  const dotEls=[...dots.children];
+
+  const io=new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(en.isIntersecting){
+        const i=slides.indexOf(en.target);
+        dotEls.forEach((d,j)=>d.classList.toggle('active',j===i));
+        cur.textContent=String(i+1).padStart(2,'0');
+      }
+    });
+  },{threshold:.55});
+  slides.forEach(s=>io.observe(s));
+
+  deck.addEventListener('scroll',()=>{
+    prog.style.width=(deck.scrollTop/(deck.scrollHeight-deck.clientHeight)*100)+'%';
+  },{passive:true});
+
+  function currentIndex(){
+    const c=deck.scrollTop+deck.clientHeight/2;let best=0,bd=Infinity;
+    slides.forEach((s,i)=>{const d=Math.abs(s.offsetTop+s.offsetHeight/2-c);if(d<bd){bd=d;best=i;}});
+    return best;
+  }
+  function go(i){i=Math.max(0,Math.min(slides.length-1,i));slides[i].scrollIntoView({behavior:'smooth'});}
+  window.addEventListener('keydown',e=>{
+    if(['ArrowDown','PageDown',' '].includes(e.key)){e.preventDefault();go(currentIndex()+1);}
+    if(['ArrowUp','PageUp'].includes(e.key)){e.preventDefault();go(currentIndex()-1);}
+    if(e.key==='Home'){e.preventDefault();go(0);}
+    if(e.key==='End'){e.preventDefault();go(slides.length-1);}
+  });
+</script>
+</body>
+</html>
