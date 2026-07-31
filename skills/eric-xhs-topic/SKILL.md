@@ -23,6 +23,7 @@ description: |
 知识库/原子库/atoms.jsonl         — dontbesilent 的 4176 个知识原子
 知识库/Eric原子库/atoms.jsonl     — Eric 的个人原子库
 知识库/Eric原子库/atoms_2026Q2.jsonl  — Eric 的 2026 Q2 原子（如文件存在）
+知识库/小红书库/notes.jsonl       — 采集到的赛道高热笔记（热度≥1万），评判选题时按关键词匹配同话题真实爆款做参照
 知识库/高频概念词典.md             — 术语定义
 ```
 
