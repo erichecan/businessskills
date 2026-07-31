@@ -68,3 +68,4 @@ xhs/素材库/备份归档_*.tar.gz
 app/prisma/dev.db
 app/prisma/dev.db-journal
 xhs/素材库/健康告警.md
+xhs/素材库/审核报告/
