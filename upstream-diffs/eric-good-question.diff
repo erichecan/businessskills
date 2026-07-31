@@ -1,0 +1,44 @@
+--- /private/tmp/claude-501/-Volumes-datacenter-04-eric-AIcoding-businessskills/a2657c9c-cfcc-4e53-b4f9-6fdf17fce3d2/scratchpad/sync-worktree/skills/eric-good-question/SKILL.md	2026-07-30 22:16:47
++++ /var/folders/b_/rvnfgp8159q1x74n0x5675r00000gn/T/tmp.H8Git57sXn	2026-07-30 22:17:01
+@@ -436,24 +436,6 @@
+ 
+ ---
+ 
+-## 和其他 skill 的关系
+-
+-先用本 skill 把问题断点、未知项、反馈入口写清楚。只有当用户要进入具体解决方案时，才转其他 skill。
+-
+-| 情况 | 推荐 |
+-|---|---|
+-| 问题本身涉及商业模式成立与否 | 转 `/eric-diagnosis` |
+-| 问题里有核心词没有定义 | 转 `/eric-deconstruct` |
+-| 问题其实是模糊目标 | 转 `/eric-goal` |
+-| 问题指向内容表现，且已经形成清楚断点 | 转 `/eric-content` 或 `/eric-hook` |
+-| 问题指向对标选择 | 转 `/eric-benchmark` |
+-| 问题已经写清楚，接下来要长期跟踪选择、结果和修正 | 转 `/eric-decision` |
+-| 问题清楚但用户做不动 | 转 `/eric-action` |
+-| 用户想系统学习某个理论 | 转 `/eric-learning` |
+-| 用户想多角色发散后收敛 | 转 `/eric-chatroom` |
+-
+----
+-
+ ## 说话风格
+ 
+ 1. **先钉现象，再谈解释。**
+@@ -469,3 +451,16 @@
+ 
+ - 用户用中文就用中文，用英文就用英文。
+ - 中文回复遵循《中文文案排版指北》。
++
++
++---
++
++## 不知道下一步用哪个 Skill？
++
++输入 `/dbs`。
++
++这是商业工具箱的导航入口。它会读取刚才的具体结论和你的最新目标，选择当前最值得处理的一个方向，并直接路由到对应 Skill。
++
++你也可以直接说你想做什么。`/dbs` 会尊重你的明确选择。
++
++不熟悉所有 Skill 没关系，下一步不确定时就回 `/dbs`。
