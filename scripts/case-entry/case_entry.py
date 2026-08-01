@@ -17,7 +17,10 @@ PORT = 8787
 PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>案例库 · 原话采集</title>
 <style>
  body{margin:0;font-family:-apple-system,"PingFang SC",sans-serif;background:#f6f6f2;color:#222;display:flex;min-height:100vh}
- .main{flex:1;max-width:680px;padding:40px 48px}
+ .main{flex:1;max-width:1080px;padding:40px 56px;margin:0 auto}
+ .tabs{display:flex;gap:10px;margin:20px 0 8px}
+ .tab{padding:8px 22px;border:1px solid #ccc;border-radius:20px;cursor:pointer;font-size:14px;background:#fff;user-select:none}
+ .tab.active{background:#1c1c1c;color:#fff;border-color:#1c1c1c}
  .side{width:330px;background:#efeee7;padding:40px 32px;font-size:13.5px;line-height:1.8;color:#555}
  h1{font-size:20px} h3{margin:20px 0 6px;font-size:14px;color:#8a6d2f}
  label{display:block;margin:18px 0 6px;font-weight:600;font-size:14px}
@@ -33,7 +36,12 @@ PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>�
  .row{cursor:pointer} .row:hover td{background:#efeee7}
 </style></head><body>
 <div class="main">
- <h1>案例库 · 原话采集</h1>
+ <h1>案例库</h1>
+ <div class="tabs">
+  <div class="tab active" id="t-entry" onclick="showTab('entry')">原话采集</div>
+  <div class="tab" id="t-view" onclick="showTab('view')">案例查看</div>
+ </div>
+ <div id="pane-entry">
  <label>案例<select id="cid"></select></label>
  <label>场景</label><input id="f1">
  <label>对方原话 <small>只有这一句需要精确。短的、糙的、不完整的才是真的；记不全就加「大意是」「后面还说了一串记不清了」</small></label>
@@ -45,7 +53,9 @@ PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>�
  <label>可迁移的那一句 <small>读者明天就能用的句式</small></label>
  <textarea id="f5" rows="2"></textarea>
  <button onclick="save()">保存到案例库.csv</button><span id="msg"></span>
- <div style="margin-top:36px;display:flex;gap:10px;align-items:center">
+ </div>
+ <div id="pane-view" style="display:none">
+ <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
   <input id="q" placeholder="搜索案例：场景 / 原话 / 可迁移句 关键字…" style="flex:1" oninput="renderList()">
   <select id="flt" style="width:130px" onchange="renderList()">
    <option value="all">全部</option><option value="filled">已填</option><option value="pending">待补充</option>
@@ -53,8 +63,9 @@ PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>�
   <span id="cnt" style="font-size:13px;color:#888;white-space:nowrap"></span>
  </div>
  <table id="list"></table>
+ </div>
 </div>
-<div class="side">
+<div class="side" id="side">
  <h3>提取不出来？从情绪进：</h3>
  1. 哪一句话让你当场<b>胃里一沉</b>？<br>
  2. 哪一句你事后在车里、地铁上<b>又想了一遍</b>？<br>
@@ -89,11 +100,21 @@ function renderList(){
  const filled=rows.filter(r=>r["对方原话"]!=='待补充').length;
  document.getElementById('cnt').textContent=`显示 ${hits.length}/${rows.length} · 已填 ${filled}`;
  document.getElementById('list').innerHTML='<tr><th>ID</th><th>场景</th><th>对方原话</th><th>可迁移的那一句</th></tr>'+
-  hits.map(({r,i})=>`<tr class="row" onclick="view(${i})" title="点击查看/编辑完整内容"><td>${r["案例ID"]}</td><td>${r["场景"]}</td><td class="${r["对方原话"]==='待补充'?'pending':''}">${r["对方原话"].slice(0,30)}</td><td class="${r["可迁移的那一句"]==='待补充'?'pending':''}">${(r["可迁移的那一句"]||'').slice(0,20)}</td></tr>`).join('');
+  hits.map(({r,i})=>`<tr class="row" onclick="view(${i})" title="点击查看/编辑完整内容"><td>${r["案例ID"]}</td><td>${r["场景"]}</td><td class="${r["对方原话"]==='待补充'?'pending':''}">${r["对方原话"].slice(0,55)}</td><td class="${r["可迁移的那一句"]==='待补充'?'pending':''}">${(r["可迁移的那一句"]||'').slice(0,35)}</td></tr>`).join('');
+}
+function showTab(name){
+ const entry=name==='entry';
+ document.getElementById('pane-entry').style.display=entry?'':'none';
+ document.getElementById('pane-view').style.display=entry?'none':'';
+ document.getElementById('t-entry').className='tab'+(entry?' active':'');
+ document.getElementById('t-view').className='tab'+(entry?'':' active');
+ document.getElementById('side').style.display=entry?'':'none';
+ if(!entry) renderList();
 }
 function view(i){
  document.getElementById('cid').value=String(i);
  fill();
+ showTab('entry');
  window.scrollTo({top:0,behavior:'smooth'});
 }
 function fill(){
@@ -116,6 +137,7 @@ async function save(){
   msg.style.color='#c0392b';
  }
 }
+if(location.hash==='#view') showTab('view');
 load().catch(()=>{const m=document.getElementById('msg');m.textContent='❌ 服务未运行，请先启动';m.style.color='#c0392b';});
 </script></body></html>"""
 
