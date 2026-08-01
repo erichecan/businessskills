@@ -69,3 +69,5 @@ app/prisma/dev.db
 app/prisma/dev.db-journal
 xhs/素材库/健康告警.md
 xhs/素材库/审核报告/
+# IP 形象资产例外（全局 *.png 忽略之上）
+!xhs/素材库/图文模板/*.png
