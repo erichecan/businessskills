@@ -26,6 +26,21 @@
   /* 卡型微调 */
   .cover h1 { font-size:118px; }
   .cover .sub { font-size:56px; font-weight:600; color:var(--ink); }
+  /* 封面变体 A：大形象居中 */
+  .coverbig h1 { font-size:118px; }
+  .coverbig .poseimg { max-height:720px; max-width:80%; margin-bottom:140px; }
+  /* 封面变体 B：形象+对话气泡（角色说出结论） */
+  .covertalk h1 { font-size:104px; }
+  .covertalk .poseimg { position:absolute; left:64px; bottom:150px; max-height:560px; max-width:44%; margin:0; }
+  .covertalk .quote { position:absolute; right:88px; bottom:480px; left:560px;
+    border:7px solid var(--ink); border-radius:56px; padding:44px 52px;
+    font-size:58px; line-height:1.5; font-weight:700; background:#fff; }
+  .covertalk .quote:after { content:""; position:absolute; left:-40px; bottom:60px;
+    border:22px solid transparent; border-right-color:var(--ink); }
+  /* 封面变体 C：上文下图分栏 */
+  .coversplit h1 { font-size:108px; }
+  .coversplit .poseimg { max-height:560px; max-width:74%; margin-bottom:110px;
+    border-top:3px solid #ddd6c4; padding-top:60px; }
   .contrast .bad { color:#8d876f; text-decoration:line-through; }
 </style>
 </head>

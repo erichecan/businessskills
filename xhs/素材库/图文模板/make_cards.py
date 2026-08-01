@@ -28,9 +28,10 @@ def render(cards, outdir: Path):
         qb = f'<div class="quote">「{html.escape(quote)}」</div>' if quote else ""
         ip = (f'<img class="ipimg" src="file://{IP_IMG}">'
               if c.get("type") == "cover" and IP_IMG.exists() else "")
-        pose_file = Path(__file__).parent / f"{POSE_MAP.get(c.get('type', ''), '')}.png"
+        pose_name = c.get("pose") or POSE_MAP.get(c.get("type", ""), "")
+        pose_file = Path(__file__).parent / f"{pose_name}.png"
         pose = (f'<img class="poseimg" src="file://{pose_file}">'
-                if c.get("type") in POSE_MAP and pose_file.exists() else "")
+                if pose_name and pose_file.exists() else "")
         page = (TPL.replace("{{POSE_BLOCK}}", pose)
                    .replace("{{IP_BLOCK}}", ip)
                    .replace("{{TYPE}}", c.get("type", ""))
