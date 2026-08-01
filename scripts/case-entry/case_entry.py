@@ -78,11 +78,18 @@ function fill(){
 async function save(){
  const v=document.getElementById('cid').value;
  const body={idx:v, 场景:f1.value, 对方原话:f2.value, 我的原话:f3.value, 结果:f4.value, 可迁移的那一句:f5.value};
- const res=await fetch('/save',{method:'POST',body:JSON.stringify(body)});
- document.getElementById('msg').textContent=res.ok?'✅ 已写入':'❌ 失败';
- document.getElementById('msg').className='ok'; load();
+ const msg=document.getElementById('msg');
+ try{
+  const res=await fetch('/save',{method:'POST',body:JSON.stringify(body)});
+  msg.textContent=res.ok?'✅ 已写入':'❌ 保存失败（HTTP '+res.status+'）';
+  msg.style.color=res.ok?'#2f7d4f':'#c0392b';
+  if(res.ok) load();
+ }catch(e){
+  msg.textContent='❌ 服务未运行——在终端执行 python3 scripts/case-entry/case_entry.py 后，回到本页再点一次保存（已填内容不会丢）';
+  msg.style.color='#c0392b';
+ }
 }
-load();
+load().catch(()=>{const m=document.getElementById('msg');m.textContent='❌ 服务未运行，请先启动';m.style.color='#c0392b';});
 </script></body></html>"""
 
 
