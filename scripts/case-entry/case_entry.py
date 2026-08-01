@@ -134,11 +134,30 @@ async function loadDrafts(){
     <span style="color:${d.score===null?'#bbb':d.score>=85?'#2f7d4f':d.score>=70?'#b06c00':'#c0392b'}">${d.score===null?'未审核':d.score+' 分 · '+(d.grade||'')}</span>
    </div>`).join('');
 }
+let curDraft=null;
 async function showDraft(name,arch){
  const d=await (await fetch('/draft?name='+encodeURIComponent(name)+'&arch='+(arch?1:0))).json();
- document.getElementById('dbody').textContent=d.content;
- document.getElementById('daudit').textContent=d.audit?`独立/自评审核：${d.audit}`:'尚无审核记录';
- document.getElementById('dimgs').innerHTML=(d.images||[]).map(u=>`<img src="${u}" style="height:220px;border-radius:6px;border:1px solid #ddd">`).join('')||'';
+ curDraft={name,arch};
+ document.getElementById('daudit').textContent=d.audit?`审核：${d.audit}`:'尚无审核记录';
+ document.getElementById('dimgs').innerHTML=(d.images||[]).map(u=>
+  `<div style="text-align:center"><img src="${u}" style="height:240px;border-radius:6px;border:1px solid #ddd;display:block"><a href="${u}" download style="font-size:12px">下载</a></div>`).join('')
+  ||'<span style="color:#999;font-size:13px">封面生成中，稍后重新点击本篇即可看到</span>';
+ const cp=(id,txt)=>`<button style="margin:0;padding:5px 14px;font-size:12px" onclick="navigator.clipboard.writeText(document.getElementById('${id}').textContent).then(()=>this.textContent='已拷贝 ✓')">拷贝</button>`;
+ document.getElementById('dbody').innerHTML=
+  `<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px"><h2 id="dtitle" style="margin:0;font-size:22px">${d.title||'（未解析出标题）'}</h2>${cp('dtitle')}</div>
+   <div style="display:flex;gap:12px;align-items:flex-start;margin:14px 0 4px"><b style="flex-shrink:0">正文</b>${cp('dtext')}
+    <button style="margin:0;padding:5px 14px;font-size:12px;background:#c0392b" onclick="prefill(this)">预填到小红书发布页</button></div>
+   <div id="dtext" style="white-space:pre-wrap;background:#fafaf7;border:1px solid #eee;border-radius:6px;padding:14px">${(d.body||d.content).replace(/</g,'&lt;')}</div>
+   <div style="display:flex;gap:12px;align-items:center;margin-top:12px"><b>标签</b><span id="dtags">${d.tags||''}</span>${d.tags?cp('dtags'):''}</div>
+   <div id="dlog" style="font-size:12.5px;color:#666;white-space:pre-wrap;margin-top:10px"></div>
+   <details style="margin-top:16px;border:none"><summary style="font-size:13px;color:#999;cursor:pointer">查看原始 md 全文</summary><pre style="white-space:pre-wrap;font-size:13px">${d.content.replace(/</g,'&lt;')}</pre></details>`;
+}
+async function prefill(btn){
+ if(!curDraft) return;
+ btn.textContent='预填中…';
+ const r=await (await fetch('/prefill?name='+encodeURIComponent(curDraft.name)+'&arch='+(curDraft.arch?1:0))).json();
+ document.getElementById('dlog').textContent=r.log;
+ btn.textContent=r.ok?'已预填，去 Chrome 检查后发布':'预填失败，见下方日志';
 }
 function view(i){
  document.getElementById('cid').value=String(i);
@@ -206,20 +225,120 @@ def list_drafts():
     return out
 
 
+def parse_draft(text):
+    """从成稿 md 中启发式提取 发布标题/正文/话题标签。解析失败各字段回退为空。"""
+    import re
+    title = ""
+    m = re.search(r"^#{1,3}\s*发布标题[^\n]*\n(.*?)(?=\n#{1,3}\s|\Z)", text, re.M | re.S)
+    if m:
+        for line in m.group(1).splitlines():
+            line = line.strip()
+            if not line or line == "---":
+                continue
+            line = re.sub(r"——?触发器[^\n]*", "", line)          # 去触发器注释
+            line = re.sub(r"（[^）]*触发器[^）]*）", "", line)
+            line = line.strip(" *-①②③").lstrip("0123456789.．、 ")
+            line = line.strip("*《》「」 ").strip()
+            if line:
+                title = line
+                break
+    if not title:
+        m = re.search(r"^#\s*(?:成稿[：:]\s*)?(.+?)(?:\s*20\d{2}-\d{2}-\d{2})?\s*$", text, re.M)
+        title = (m.group(1).strip() if m else "")
+    body = ""
+    m = re.search(r"^#{1,3}\s*\*{0,2}正文[^\n]*\n(.*?)(?=\n#{1,3}\s|\n\*\*(?:60秒|话题|合规|封面)|\Z)", text, re.M | re.S)
+    if m:
+        body = m.group(1).strip().strip("-").strip()
+    tag_src = text
+    m = re.search(r"^#{1,3}\s*\*{0,2}话题标签[^\n]*\n(.*?)(?=\n#{1,3}\s|\Z)", text, re.M | re.S)
+    if m:
+        tag_src = m.group(1)
+    tags = [t for t in re.findall(r"#[\w一-鿿]+", tag_src)
+            if not re.fullmatch(r"#[0-9A-Fa-f]{3,8}", t)]
+    return {"title": title, "body": body, "tags": " ".join(dict.fromkeys(tags))[:300]}
+
+
+def ensure_cover(name, title):
+    """为成稿即时渲染封面卡（缓存到 成品图/<stem>/00_cover.png）。"""
+    import subprocess as sp
+    import tempfile
+    stem = name.removeprefix("成稿_").removesuffix(".md")
+    out_dir = SUCAI / "成品图" / stem
+    cover = out_dir / "01_cover.png"
+    if cover.exists() or not title:
+        return
+    cards = [{"type": "cover", "tag": "职场表达", "title": title, "body": ""}]
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
+        json.dump(cards, f, ensure_ascii=False)
+        tmp = f.name
+    try:
+        sp.run(["python3", str(SUCAI / "图文模板" / "make_cards.py"), tmp, str(out_dir)],
+               capture_output=True, timeout=90)
+    except Exception:
+        pass
+
+
 def draft_detail(name, archived):
     if "/" in name or ".." in name:
         return None
     f = (SUCAI / "归档稿" / name) if archived else (SUCAI / name)
     if not f.exists():
         return None
+    text = f.read_text(encoding="utf-8")
     a = audit_map().get(name)
     audit = f"{a['总分']} 分 · {a.get('评级','')} · 处置:{a.get('处置','')} · {a.get('备注','')[:80]}" if a else None
+    parsed = parse_draft(text)
+    ensure_cover(name, parsed["title"])
     imgs = []
     stem = name.removeprefix("成稿_").removesuffix(".md")
     img_dir = SUCAI / "成品图" / stem
     if img_dir.is_dir():
         imgs = [f"/img?f=成品图/{stem}/{p.name}" for p in sorted(img_dir.glob("*.png"))]
-    return {"content": f.read_text(encoding="utf-8"), "audit": audit, "images": imgs}
+    return {"content": text, "audit": audit, "images": imgs, **parsed}
+
+
+def prefill_xhs(name, archived):
+    """通过 web-access CDP 代理，在用户 Chrome 中打开小红书创作平台并预填图/题/文。
+    不点发布——最后一步留给人。返回操作日志。"""
+    import urllib.request as rq
+    import urllib.parse as up
+    import time
+    log = []
+
+    def api(path, data=None):
+        url = f"http://localhost:3456{path}"
+        req = rq.Request(url, data=data.encode() if data else None, method="POST" if data else "GET")
+        return json.loads(rq.urlopen(req, timeout=30).read())
+
+    d = draft_detail(name, archived)
+    if not d:
+        return {"ok": False, "log": "成稿不存在"}
+    stem = name.removeprefix("成稿_").removesuffix(".md")
+    img_dir = SUCAI / "成品图" / stem
+    files = [str(p) for p in sorted(img_dir.glob("*.png"))] if img_dir.is_dir() else []
+    if not files:
+        return {"ok": False, "log": "没有已渲染的卡片图，先等封面生成或本机渲染图文 JSON"}
+    try:
+        t = api("/new?url=" + up.quote("https://creator.xiaohongshu.com/publish/publish?source=official", safe=""))
+        tid = t.get("targetId")
+        log.append(f"已打开创作平台（tab {tid[:8]}…）")
+        time.sleep(4)
+        r = api(f"/setFiles?target={tid}", json.dumps({"selector": "input[type=file]", "files": files}))
+        log.append(f"图片上传：{r}")
+        time.sleep(3)
+        fill = (
+            "(()=>{const t=document.querySelector('input[placeholder*=标题]')||document.querySelector('input[type=text]');"
+            f"if(t){{t.value={json.dumps(d['title'])};t.dispatchEvent(new Event('input',{{bubbles:true}}));}}"
+            "const c=document.querySelector('[contenteditable=true]');"
+            f"if(c){{c.innerText={json.dumps((d['body'] + chr(10) + d['tags']).strip())};c.dispatchEvent(new Event('input',{{bubbles:true}}));}}"
+            "return (t?'标题✓':'标题✗')+' '+(c?'正文✓':'正文✗');})()"
+        )
+        r = api(f"/eval?target={tid}", fill)
+        log.append(f"预填结果：{r.get('value')}")
+        log.append("请到 Chrome 该标签页检查内容与图片顺序，确认后手动点「发布」。")
+        return {"ok": True, "log": "\n".join(log)}
+    except Exception as e:
+        return {"ok": False, "log": "\n".join(log + [f"CDP 代理不可用或操作失败：{e}", "请先在仓库运行 web-access 前置检查启动代理后重试"])}
 
 
 class H(BaseHTTPRequestHandler):
@@ -246,6 +365,9 @@ class H(BaseHTTPRequestHandler):
                 self._send('{"error":"not found"}', "application/json", 404)
             else:
                 self._send(json.dumps(d, ensure_ascii=False), "application/json")
+        elif u.path == "/prefill":
+            r = prefill_xhs(q.get("name", [""])[0], q.get("arch", ["0"])[0] == "1")
+            self._send(json.dumps(r, ensure_ascii=False), "application/json")
         elif u.path == "/img":
             rel = q.get("f", [""])[0]
             fp = (SUCAI / rel).resolve()
