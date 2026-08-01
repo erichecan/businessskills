@@ -152,12 +152,28 @@ async function showDraft(name,arch){
    <div id="dlog" style="font-size:12.5px;color:#666;white-space:pre-wrap;margin-top:10px"></div>
    <details style="margin-top:16px;border:none"><summary style="font-size:13px;color:#999;cursor:pointer">查看原始 md 全文</summary><pre style="white-space:pre-wrap;font-size:13px">${d.content.replace(/</g,'&lt;')}</pre></details>`;
 }
+let curTid=null;
 async function prefill(btn){
  if(!curDraft) return;
  btn.textContent='预填中…';
  const r=await (await fetch('/prefill?name='+encodeURIComponent(curDraft.name)+'&arch='+(curDraft.arch?1:0))).json();
+ curTid=r.tid||null;
  document.getElementById('dlog').textContent=r.log;
- btn.textContent=r.ok?'已预填，去 Chrome 检查后发布':'预填失败，见下方日志';
+ btn.textContent=r.ok?'已预填 ✓':'预填失败，见下方日志';
+ if(r.ok){
+  const d=new Date(Date.now()+86400000);
+  const t=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} 09:00`;
+  btn.insertAdjacentHTML('afterend',
+   ` <button style="margin:0 0 0 8px;padding:5px 14px;font-size:12px;background:#8a6d2f" onclick="doclick(this,'sched','${t}')">定时明早9点发布</button>`+
+   ` <button style="margin:0 0 0 8px;padding:5px 14px;font-size:12px" onclick="doclick(this,'now','')">立即点击发布</button>`);
+ }
+}
+async function doclick(btn,mode,t){
+ if(!curTid) return;
+ btn.textContent='执行中…';
+ const r=await (await fetch('/doclick?tid='+curTid+'&mode='+mode+'&time='+encodeURIComponent(t))).json();
+ document.getElementById('dlog').textContent=r.log;
+ btn.textContent=r.ok?'完成 ✓ 去 Chrome 确认':'未完全成功，见日志';
 }
 function view(i){
  document.getElementById('cid').value=String(i);
@@ -278,6 +294,46 @@ def ensure_cover(name, title):
         pass
 
 
+def do_publish_click(tid, mode, sched_time):
+    """在已预填的发布页上执行最终动作：mode=now 直接点发布；mode=sched 先开定时并设时间再点。"""
+    import urllib.request as rq
+    import time
+    log = []
+
+    def ev(js):
+        req = rq.Request(f"http://localhost:3456/eval?target={tid}", data=js.encode(), method="POST")
+        return json.loads(rq.urlopen(req, timeout=30).read()).get("value")
+
+    try:
+        if mode == "sched":
+            r = ev('(()=>{const leaf=[...document.querySelectorAll("*")].find(e=>e.children.length===0&&e.textContent.trim()==="定时发布");'
+                   'let n=leaf,sw=null;for(let i=0;i<6&&n;i++){sw=[...(n.parentElement?.querySelectorAll("[class*=switch]")||[])]'
+                   '.find(e=>/switch-switch/.test(e.className));if(sw)break;n=n.parentElement;}'
+                   'if(!sw)return "sw✗";const on=/checked|active|open/.test(sw.className)||sw.querySelector("input")?.checked;'
+                   'if(!on)sw.click();return "sw✓";})()')
+            log.append(f"定时开关：{r}")
+            time.sleep(1.5)
+            if sched_time:
+                r = ev('(()=>{const i=[...document.querySelectorAll("input")].find(x=>/\\d{4}-\\d{2}-\\d{2}/.test(x.value)||/时间|日期/.test(x.placeholder||""));'
+                       'if(!i)return "time✗";'
+                       'const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value").set;'
+                       f's.call(i,{json.dumps(sched_time)});'
+                       'i.dispatchEvent(new Event("input",{bubbles:true}));i.dispatchEvent(new Event("change",{bubbles:true}));'
+                       'return "time✓ "+i.value;})()')
+                log.append(f"定时时间：{r}")
+                time.sleep(1)
+        r = ev('(()=>{const b=[...document.querySelectorAll("button,[class*=btn],[class*=Btn]")]'
+               '.find(e=>{const t=e.textContent.trim();return (t==="发布"||t==="定时发布")&&e.offsetWidth>40&&e.offsetWidth<300;});'
+               'if(!b)return "btn✗";b.click();return "已点击「"+b.textContent.trim()+"」";})()')
+        log.append(f"发布按钮：{r}")
+        time.sleep(3)
+        r = ev('document.body.innerText.slice(0,120)')
+        log.append(f"页面状态：{(r or '')[:80]}")
+        return {"ok": "✗" not in "".join(log), "log": "\n".join(log)}
+    except Exception as e:
+        return {"ok": False, "log": "\n".join(log + [f"失败：{e}"])}
+
+
 def draft_detail(name, archived):
     if "/" in name or ".." in name:
         return None
@@ -362,8 +418,8 @@ def prefill_xhs(name, archived):
                 'JSON.stringify({t:[...document.querySelectorAll("input")].find(i=>(i.placeholder||"").includes("标题"))?.value,'
                 'b:(document.querySelector("[contenteditable=true]")?.innerText||"").length})')
         log.append(f"回读校验：{r.get('value')}")
-        log.append("✅ 请到 Chrome 该标签页检查图片顺序与内容，确认后手动点「发布」。")
-        return {"ok": True, "log": "\n".join(log)}
+        log.append("✅ 预填完成。可在工作台点「立即发布」/「定时发布」，或到 Chrome 手动点发布。")
+        return {"ok": True, "log": "\n".join(log), "tid": tid}
     except Exception as e:
         return {"ok": False, "log": "\n".join(log + [f"CDP 代理不可用或操作失败：{e}", "先运行 node ~/.claude/skills/web-access/scripts/check-deps.mjs 启动代理后重试"])}
 
@@ -392,6 +448,9 @@ class H(BaseHTTPRequestHandler):
                 self._send('{"error":"not found"}', "application/json", 404)
             else:
                 self._send(json.dumps(d, ensure_ascii=False), "application/json")
+        elif u.path == "/doclick":
+            r = do_publish_click(q.get("tid", [""])[0], q.get("mode", ["now"])[0], q.get("time", [""])[0])
+            self._send(json.dumps(r, ensure_ascii=False), "application/json")
         elif u.path == "/prefill":
             r = prefill_xhs(q.get("name", [""])[0], q.get("arch", ["0"])[0] == "1")
             self._send(json.dumps(r, ensure_ascii=False), "application/json")
