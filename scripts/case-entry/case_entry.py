@@ -146,7 +146,8 @@ async function showDraft(name,arch){
  document.getElementById('dbody').innerHTML=
   `<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px"><h2 id="dtitle" style="margin:0;font-size:22px">${d.title||'（未解析出标题）'}</h2>${cp('dtitle')}</div>
    <div style="display:flex;gap:12px;align-items:flex-start;margin:14px 0 4px"><b style="flex-shrink:0">正文</b>${cp('dtext')}
-    <button style="margin:0;padding:5px 14px;font-size:12px;background:#c0392b" onclick="prefill(this)">预填到小红书发布页</button></div>
+    <button style="margin:0;padding:5px 14px;font-size:12px;background:#c0392b" onclick="prefill(this)">预填到小红书发布页</button>
+    <button style="margin:0;padding:5px 14px;font-size:12px;background:#566270" onclick="rerender(this)">重新生成图片</button></div>
    <div id="dtext" style="white-space:pre-wrap;background:#fafaf7;border:1px solid #eee;border-radius:6px;padding:14px">${(d.body||d.content).replace(/</g,'&lt;')}</div>
    <div style="display:flex;gap:12px;align-items:center;margin-top:12px"><b>标签</b><span id="dtags">${d.tags||''}</span>${d.tags?cp('dtags'):''}</div>
    <div id="dlog" style="font-size:12.5px;color:#666;white-space:pre-wrap;margin-top:10px"></div>
@@ -167,6 +168,13 @@ async function prefill(btn){
    ` <button style="margin:0 0 0 8px;padding:5px 14px;font-size:12px;background:#8a6d2f" onclick="doclick(this,'sched','${t}')">定时明早9点发布</button>`+
    ` <button style="margin:0 0 0 8px;padding:5px 14px;font-size:12px" onclick="doclick(this,'now','')">立即点击发布</button>`);
  }
+}
+async function rerender(btn){
+ if(!curDraft) return;
+ btn.textContent='重渲染中…';
+ const r=await (await fetch('/rerender?name='+encodeURIComponent(curDraft.name)+'&arch='+(curDraft.arch?1:0))).json();
+ btn.textContent=r.ok?'已重新生成 ✓':'失败';
+ if(r.ok) showDraft(curDraft.name,curDraft.arch);
 }
 async function doclick(btn,mode,t){
  if(!curTid) return;
@@ -268,6 +276,7 @@ def parse_draft(text):
     m = re.search(r"^#{1,3}\s*\*{0,2}正文[^\n]*\n(.*?)(?=\n#{1,3}\s|\n\*\*(?:60秒|话题|合规|封面)|\Z)", text, re.M | re.S)
     if m:
         body = m.group(1).strip().strip("-").strip()
+        body = re.sub(r"^（正文总字数[^）]*）\s*$", "", body, flags=re.M).strip()
     tag_src = text
     m = re.search(r"^#{1,3}\s*\*{0,2}话题标签[^\n]*\n(.*?)(?=\n#{1,3}\s|\Z)", text, re.M | re.S)
     if m:
@@ -472,6 +481,17 @@ class H(BaseHTTPRequestHandler):
                 self._send('{"error":"not found"}', "application/json", 404)
             else:
                 self._send(json.dumps(d, ensure_ascii=False), "application/json")
+        elif u.path == "/rerender":
+            name = q.get("name", [""])[0]
+            if "/" not in name and ".." not in name:
+                import shutil
+                stem = name.removeprefix("成稿_").removesuffix(".md")
+                shutil.rmtree(SUCAI / "成品图" / stem, ignore_errors=True)
+                d = draft_detail(name, q.get("arch", ["0"])[0] == "1")
+                self._send(json.dumps({"ok": d is not None, "images": (d or {}).get("images", [])},
+                                      ensure_ascii=False), "application/json")
+            else:
+                self._send('{"ok":false}', "application/json", 400)
         elif u.path == "/doclick":
             r = do_publish_click(q.get("tid", [""])[0], q.get("mode", ["now"])[0], q.get("time", [""])[0])
             self._send(json.dumps(r, ensure_ascii=False), "application/json")

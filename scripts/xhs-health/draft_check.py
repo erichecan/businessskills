@@ -69,9 +69,19 @@ def main() -> int:
         if tlen > 20:
             issues.append(f"标题 {tlen} 字（>20）：「{title[:30]}」")
 
-        clen = len(re.sub(r"\s", "", body))
-        if not 600 <= clen <= 2000:
-            issues.append(f"全文 {clen} 字（正文应 800-1200，全文含结构约 600-2000）")
+        bm = re.search(r"^#{1,3}\s*\*{0,2}正文[^\n]*\n(.*?)(?=\n#{1,3}\s|\Z)", text, re.M | re.S)
+        if bm:
+            blen = len(re.sub(r"\s|（正文总字数[^）]*）", "", bm.group(1)))
+            if not 280 <= blen <= 560:
+                issues.append(f"正文节 {blen} 字（搜索流规格 300-500）")
+        else:
+            clen = len(re.sub(r"\s", "", body))
+            if not 300 <= clen <= 2000:
+                issues.append(f"全文 {clen} 字且未找到正文节")
+        if "五问启动检查" in text:
+            issues.append("成稿文件包含「五问启动检查」章节（应只打印不落盘）")
+        if "正文总字数" in text:
+            issues.append("成稿文件包含「正文总字数」标注行（应只打印不落盘）")
 
         if not any(h in text for h in CTA_HINTS):
             issues.append("未检出 CTA/互动段（无问句结尾、无评论区引导）")
