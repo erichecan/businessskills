@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --ink:#1c1c1c; --accent:#c0392b; --gold:#8a6d2f; --paper:#fafaf7; }
+  * { margin:0; box-sizing:border-box; }
+  body { width:1242px; height:1660px; background:var(--paper); color:var(--ink);
+         font-family:"PingFang SC","Hiragino Sans GB",sans-serif; display:flex; }
+  .card { display:flex; flex-direction:column; padding:96px 88px; width:100%; }
+  .tag { font-size:34px; letter-spacing:.2em; color:var(--gold); margin-bottom:48px; }
+  .idx { position:absolute; top:96px; right:88px; font-size:36px; color:#b9b3a6; }
+  h1 { font-size:104px; line-height:1.35; font-weight:800; }
+  h1 .hl { color:var(--accent); }
+  .sub { font-size:52px; line-height:1.6; margin-top:64px; color:#444; }
+  .quote { font-size:72px; line-height:1.5; font-weight:700; margin:auto 0;
+           border-left:14px solid var(--accent); padding-left:48px; }
+  .body { font-size:54px; line-height:1.75; margin-top:56px; white-space:pre-line; }
+  .foot { margin-top:auto; font-size:36px; color:#8d876f; border-top:2px solid #ddd6c4; padding-top:32px; }
+  /* 卡型微调 */
+  .cover h1 { font-size:118px; }
+  .cover .sub { font-size:56px; font-weight:600; color:var(--ink); }
+  .contrast .bad { color:#8d876f; text-decoration:line-through; }
+</style>
+</head>
+<body>
+  <div class="card {{TYPE}}">
+    <div class="tag">{{TAG}}</div>
+    <div class="idx">{{IDX}}/7</div>
+    <h1>{{TITLE}}</h1>
+    {{QUOTE_BLOCK}}
+    <div class="body">{{BODY}}</div>
+    <div class="foot">前腾讯资深中层 · 只讲上过场的原话</div>
+  </div>
+</body>
+</html>
