@@ -400,7 +400,11 @@ def prefill_xhs(name, archived):
         time.sleep(5)
 
         # 3. 标题走原生 setter + input 事件；正文是 ProseMirror，必须用 execCommand insertText
-        full_body = (d["body"] + "\n\n" + d["tags"]).strip()
+        import re as _re
+        clean = _re.sub(r"\*\*(.+?)\*\*", r"\1", d["body"])       # 去 markdown 粗体
+        clean = _re.sub(r"^#{1,6}\s+", "", clean, flags=_re.M)     # 去残留标题标记
+        clean = _re.sub(r"^---+\s*$", "", clean, flags=_re.M).strip()
+        full_body = clean  # 标签单独走话题联想，见第 3.5 步
         fill = (
             "(()=>{"
             "const t=[...document.querySelectorAll('input')].find(i=>(i.placeholder||'').includes('标题'));"
@@ -412,6 +416,23 @@ def prefill_xhs(name, archived):
         )
         r = api(f"/eval?target={tid}", fill)
         log.append(f"预填结果：{r.get('value')}")
+
+        # 3.5 标签逐个走话题联想（点选后才是真话题），失败则保留纯文本
+        tag_ok = 0
+        for tag in d["tags"].split()[:10]:
+            api(f"/eval?target={tid}",
+                '(()=>{const ed=document.querySelector("[contenteditable=true]");ed.focus();'
+                'const sel=window.getSelection();sel.selectAllChildren(ed);sel.collapseToEnd();'
+                f'document.execCommand("insertText",false,{json.dumps(" #" + tag.lstrip("#"))});return 1;}})()')
+            time.sleep(1.3)
+            r = api(f"/eval?target={tid}",
+                    '(()=>{const rows=[...document.querySelectorAll("*")].filter(e=>e.textContent.includes("浏览")&&e.childElementCount>=1&&e.offsetHeight>20&&e.offsetHeight<80);'
+                    'if(rows.length){rows[0].click();return "picked"}'
+                    'const ed=document.querySelector("[contenteditable=true]");ed.focus();document.execCommand("insertText",false," ");return "plain";})()')
+            if r.get("value") == "picked":
+                tag_ok += 1
+            time.sleep(0.6)
+        log.append(f"话题标签：{tag_ok}/{min(len(d['tags'].split()),10)} 个转为真话题，其余保留文本")
 
         # 4. 回读校验
         r = api(f"/eval?target={tid}",

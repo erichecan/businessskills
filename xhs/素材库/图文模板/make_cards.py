@@ -14,6 +14,7 @@ from pathlib import Path
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 TPL = (Path(__file__).parent / "card.html").read_text(encoding="utf-8")
+IP_IMG = Path(__file__).parent / "ip.png"  # IP 形象（存在则自动上封面）
 
 
 def render(cards, outdir: Path):
@@ -21,7 +22,10 @@ def render(cards, outdir: Path):
     for i, c in enumerate(cards, 1):
         quote = c.get("quote", "")
         qb = f'<div class="quote">「{html.escape(quote)}」</div>' if quote else ""
-        page = (TPL.replace("{{TYPE}}", c.get("type", ""))
+        ip = (f'<img class="ipimg" src="file://{IP_IMG}">'
+              if c.get("type") == "cover" and IP_IMG.exists() else "")
+        page = (TPL.replace("{{IP_BLOCK}}", ip)
+                   .replace("{{TYPE}}", c.get("type", ""))
                    .replace("{{TAG}}", html.escape(c.get("tag", "")))
                    .replace("{{IDX}}", str(i))
                    .replace("{{TITLE}}", c.get("title", ""))
