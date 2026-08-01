@@ -30,6 +30,7 @@ PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>�
  table{border-collapse:collapse;width:100%;margin-top:28px;font-size:13px}
  td,th{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}
  .pending{color:#b06c00}
+ .row{cursor:pointer} .row:hover td{background:#efeee7}
 </style></head><body>
 <div class="main">
  <h1>案例库 · 原话采集</h1>
@@ -66,8 +67,13 @@ async function load(){
  const sel=document.getElementById('cid');
  sel.innerHTML=rows.map((r,i)=>`<option value="${i}">${r["案例ID"]} · ${r["场景"]}</option>`).join('')+'<option value="new">＋ 新建案例</option>';
  sel.onchange=fill; fill();
- document.getElementById('list').innerHTML='<tr><th>ID</th><th>场景</th><th>对方原话</th></tr>'+
-  rows.map(r=>`<tr><td>${r["案例ID"]}</td><td>${r["场景"]}</td><td class="${r["对方原话"]==='待补充'?'pending':''}">${r["对方原话"].slice(0,40)}</td></tr>`).join('');
+ document.getElementById('list').innerHTML='<tr><th>ID</th><th>场景</th><th>对方原话</th><th>可迁移的那一句</th></tr>'+
+  rows.map((r,i)=>`<tr class="row" onclick="view(${i})" title="点击查看/编辑完整内容"><td>${r["案例ID"]}</td><td>${r["场景"]}</td><td class="${r["对方原话"]==='待补充'?'pending':''}">${r["对方原话"].slice(0,30)}</td><td class="${r["可迁移的那一句"]==='待补充'?'pending':''}">${(r["可迁移的那一句"]||'').slice(0,20)}</td></tr>`).join('');
+}
+function view(i){
+ document.getElementById('cid').value=String(i);
+ fill();
+ window.scrollTo({top:0,behavior:'smooth'});
 }
 function fill(){
  const v=document.getElementById('cid').value;
