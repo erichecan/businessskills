@@ -71,3 +71,11 @@ xhs/素材库/健康告警.md
 xhs/素材库/审核报告/
 # IP 形象资产例外（全局 *.png 忽略之上）
 !xhs/素材库/图文模板/*.png
+
+# Python 缓存与任务临时产物
+__pycache__/
+xhs/素材库/tmp_build/
+xhs/素材库/candidate_keywords_raw.json
+xhs/素材库/collected_items.json
+xhs/素材库/excel_rows.json
+xhs/素材库/dedupe_check.py
