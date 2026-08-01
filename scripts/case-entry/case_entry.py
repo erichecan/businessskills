@@ -323,22 +323,49 @@ def prefill_xhs(name, archived):
         tid = t.get("targetId")
         log.append(f"已打开创作平台（tab {tid[:8]}…）")
         time.sleep(4)
+
+        # 1. 页面默认停在「上传视频」，必须先切到「上传图文」tab
+        r = api(f"/eval?target={tid}",
+                '(()=>{const el=[...document.querySelectorAll("[class*=tab]")]'
+                '.find(e=>e.textContent.trim()==="上传图文");'
+                'if(el){el.click();return "ok"} return "notfound"})()')
+        if r.get("value") != "ok":
+            return {"ok": False, "log": "\n".join(log + ["找不到「上传图文」tab，页面结构可能已变"])}
+        log.append("已切换到「上传图文」")
+        time.sleep(2)
+
+        # 2. 确认文件输入框收图片格式后上传
+        r = api(f"/eval?target={tid}",
+                'document.querySelector("input[type=file]")?.accept||""')
+        if "png" not in (r.get("value") or ""):
+            return {"ok": False, "log": "\n".join(log + [f"文件输入框格式异常：{r.get('value')}"])}
         r = api(f"/setFiles?target={tid}", json.dumps({"selector": "input[type=file]", "files": files}))
-        log.append(f"图片上传：{r}")
-        time.sleep(3)
+        log.append(f"图片上传：{len(files)} 张 → {r}")
+        time.sleep(5)
+
+        # 3. 标题走原生 setter + input 事件；正文是 ProseMirror，必须用 execCommand insertText
+        full_body = (d["body"] + "\n\n" + d["tags"]).strip()
         fill = (
-            "(()=>{const t=document.querySelector('input[placeholder*=标题]')||document.querySelector('input[type=text]');"
-            f"if(t){{t.value={json.dumps(d['title'])};t.dispatchEvent(new Event('input',{{bubbles:true}}));}}"
-            "const c=document.querySelector('[contenteditable=true]');"
-            f"if(c){{c.innerText={json.dumps((d['body'] + chr(10) + d['tags']).strip())};c.dispatchEvent(new Event('input',{{bubbles:true}}));}}"
-            "return (t?'标题✓':'标题✗')+' '+(c?'正文✓':'正文✗');})()"
+            "(()=>{"
+            "const t=[...document.querySelectorAll('input')].find(i=>(i.placeholder||'').includes('标题'));"
+            "if(t){const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;"
+            f"s.call(t,{json.dumps(d['title'][:20])});t.dispatchEvent(new Event('input',{{bubbles:true}}));}}"
+            "const ed=document.querySelector('[contenteditable=true]');let r2='正文✗';"
+            f"if(ed){{ed.focus();r2='正文'+(document.execCommand('insertText',false,{json.dumps(full_body)})?'✓':'✗');}}"
+            "return (t?'标题✓':'标题✗')+' '+r2;})()"
         )
         r = api(f"/eval?target={tid}", fill)
         log.append(f"预填结果：{r.get('value')}")
-        log.append("请到 Chrome 该标签页检查内容与图片顺序，确认后手动点「发布」。")
+
+        # 4. 回读校验
+        r = api(f"/eval?target={tid}",
+                'JSON.stringify({t:[...document.querySelectorAll("input")].find(i=>(i.placeholder||"").includes("标题"))?.value,'
+                'b:(document.querySelector("[contenteditable=true]")?.innerText||"").length})')
+        log.append(f"回读校验：{r.get('value')}")
+        log.append("✅ 请到 Chrome 该标签页检查图片顺序与内容，确认后手动点「发布」。")
         return {"ok": True, "log": "\n".join(log)}
     except Exception as e:
-        return {"ok": False, "log": "\n".join(log + [f"CDP 代理不可用或操作失败：{e}", "请先在仓库运行 web-access 前置检查启动代理后重试"])}
+        return {"ok": False, "log": "\n".join(log + [f"CDP 代理不可用或操作失败：{e}", "先运行 node ~/.claude/skills/web-access/scripts/check-deps.mjs 启动代理后重试"])}
 
 
 class H(BaseHTTPRequestHandler):
