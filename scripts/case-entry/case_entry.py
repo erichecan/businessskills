@@ -40,6 +40,7 @@ PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>�
  <div class="tabs">
   <div class="tab active" id="t-entry" onclick="showTab('entry')">原话采集</div>
   <div class="tab" id="t-view" onclick="showTab('view')">案例查看</div>
+  <div class="tab" id="t-drafts" onclick="showTab('drafts')">成稿预览</div>
  </div>
  <div id="pane-entry">
  <label>案例<select id="cid"></select></label>
@@ -63,6 +64,19 @@ PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>�
   <span id="cnt" style="font-size:13px;color:#888;white-space:nowrap"></span>
  </div>
  <table id="list"></table>
+ </div>
+ <div id="pane-drafts" style="display:none">
+  <div style="display:flex;gap:24px;margin-top:16px">
+   <div style="width:320px;flex-shrink:0">
+    <div id="dcnt" style="font-size:13px;color:#888;margin-bottom:8px"></div>
+    <div id="dlist"></div>
+   </div>
+   <div style="flex:1;min-width:0">
+    <div id="dimgs" style="display:flex;gap:8px;overflow-x:auto;margin-bottom:14px"></div>
+    <div id="daudit" style="font-size:13px;color:#8a6d2f;margin-bottom:10px"></div>
+    <div id="dbody" style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:24px 28px;font-size:15px;line-height:1.9;white-space:pre-wrap;word-break:break-word">← 从左侧选择一篇成稿</div>
+   </div>
+  </div>
  </div>
 </div>
 <div class="side" id="side">
@@ -103,13 +117,28 @@ function renderList(){
   hits.map(({r,i})=>`<tr class="row" onclick="view(${i})" title="点击查看/编辑完整内容"><td>${r["案例ID"]}</td><td>${r["场景"]}</td><td class="${r["对方原话"]==='待补充'?'pending':''}">${r["对方原话"].slice(0,55)}</td><td class="${r["可迁移的那一句"]==='待补充'?'pending':''}">${(r["可迁移的那一句"]||'').slice(0,35)}</td></tr>`).join('');
 }
 function showTab(name){
- const entry=name==='entry';
- document.getElementById('pane-entry').style.display=entry?'':'none';
- document.getElementById('pane-view').style.display=entry?'none':'';
- document.getElementById('t-entry').className='tab'+(entry?' active':'');
- document.getElementById('t-view').className='tab'+(entry?'':' active');
- document.getElementById('side').style.display=entry?'':'none';
- if(!entry) renderList();
+ for(const t of ['entry','view','drafts']){
+  document.getElementById('pane-'+t).style.display=t===name?'':'none';
+  document.getElementById('t-'+t).className='tab'+(t===name?' active':'');
+ }
+ document.getElementById('side').style.display=name==='entry'?'':'none';
+ if(name==='view') renderList();
+ if(name==='drafts') loadDrafts();
+}
+async function loadDrafts(){
+ const ds=await (await fetch('/drafts')).json();
+ document.getElementById('dcnt').textContent=`共 ${ds.length} 篇（含归档）`;
+ document.getElementById('dlist').innerHTML=ds.map(d=>
+  `<div class="ditem" onclick="showDraft('${d.name}',${d.archived})" style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;margin-bottom:6px;cursor:pointer;background:#fff;font-size:13px">
+    <b>${d.name.replace(/^成稿_/,'').replace(/\\.md$/,'')}</b>${d.archived?' <span style="color:#999">[归档]</span>':''}<br>
+    <span style="color:${d.score===null?'#bbb':d.score>=85?'#2f7d4f':d.score>=70?'#b06c00':'#c0392b'}">${d.score===null?'未审核':d.score+' 分 · '+(d.grade||'')}</span>
+   </div>`).join('');
+}
+async function showDraft(name,arch){
+ const d=await (await fetch('/draft?name='+encodeURIComponent(name)+'&arch='+(arch?1:0))).json();
+ document.getElementById('dbody').textContent=d.content;
+ document.getElementById('daudit').textContent=d.audit?`独立/自评审核：${d.audit}`:'尚无审核记录';
+ document.getElementById('dimgs').innerHTML=(d.images||[]).map(u=>`<img src="${u}" style="height:220px;border-radius:6px;border:1px solid #ddd">`).join('')||'';
 }
 function view(i){
  document.getElementById('cid').value=String(i);
@@ -137,14 +166,60 @@ async function save(){
   msg.style.color='#c0392b';
  }
 }
-if(location.hash==='#view') showTab('view');
+const h=location.hash.slice(1);
+if(['view','drafts'].includes(h)) showTab(h);
 load().catch(()=>{const m=document.getElementById('msg');m.textContent='❌ 服务未运行，请先启动';m.style.color='#c0392b';});
 </script></body></html>"""
+
+
+SUCAI = CSV_PATH.parent
 
 
 def read_rows():
     with CSV_PATH.open(encoding="utf-8") as f:
         return list(csv.DictReader(f))
+
+
+def audit_map():
+    p = SUCAI / "审核记录.csv"
+    m = {}
+    if p.exists():
+        for r in csv.DictReader(p.open(encoding="utf-8")):
+            m[(r.get("成稿文件") or "").strip()] = r
+    return m
+
+
+def list_drafts():
+    am = audit_map()
+    out = []
+    for base, archived in [(SUCAI, False), (SUCAI / "归档稿", True)]:
+        if not base.is_dir():
+            continue
+        for f in base.glob("成稿_*.md"):
+            a = am.get(f.name)
+            out.append({
+                "name": f.name, "archived": archived,
+                "score": int(a["总分"]) if a and (a.get("总分") or "").isdigit() else None,
+                "grade": (a.get("评级") if a else None),
+            })
+    out.sort(key=lambda d: d["name"], reverse=True)
+    return out
+
+
+def draft_detail(name, archived):
+    if "/" in name or ".." in name:
+        return None
+    f = (SUCAI / "归档稿" / name) if archived else (SUCAI / name)
+    if not f.exists():
+        return None
+    a = audit_map().get(name)
+    audit = f"{a['总分']} 分 · {a.get('评级','')} · 处置:{a.get('处置','')} · {a.get('备注','')[:80]}" if a else None
+    imgs = []
+    stem = name.removeprefix("成稿_").removesuffix(".md")
+    img_dir = SUCAI / "成品图" / stem
+    if img_dir.is_dir():
+        imgs = [f"/img?f=成品图/{stem}/{p.name}" for p in sorted(img_dir.glob("*.png"))]
+    return {"content": f.read_text(encoding="utf-8"), "audit": audit, "images": imgs}
 
 
 class H(BaseHTTPRequestHandler):
@@ -158,8 +233,29 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(body.encode("utf-8"))
 
     def do_GET(self):
-        if self.path == "/data":
+        from urllib.parse import urlparse, parse_qs
+        u = urlparse(self.path)
+        q = parse_qs(u.query)
+        if u.path == "/data":
             self._send(json.dumps(read_rows(), ensure_ascii=False), "application/json")
+        elif u.path == "/drafts":
+            self._send(json.dumps(list_drafts(), ensure_ascii=False), "application/json")
+        elif u.path == "/draft":
+            d = draft_detail(q.get("name", [""])[0], q.get("arch", ["0"])[0] == "1")
+            if d is None:
+                self._send('{"error":"not found"}', "application/json", 404)
+            else:
+                self._send(json.dumps(d, ensure_ascii=False), "application/json")
+        elif u.path == "/img":
+            rel = q.get("f", [""])[0]
+            fp = (SUCAI / rel).resolve()
+            if fp.is_file() and fp.suffix == ".png" and str(fp).startswith(str(SUCAI.resolve())):
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.end_headers()
+                self.wfile.write(fp.read_bytes())
+            else:
+                self._send("not found", code=404)
         else:
             self._send(PAGE)
 
