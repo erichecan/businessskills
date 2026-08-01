@@ -11,6 +11,9 @@
   .ipimg { position:absolute; right:88px; bottom:200px; width:300px; height:300px;
            border-radius:50%; object-fit:cover; border:8px solid #fff;
            box-shadow:0 12px 40px rgba(0,0,0,.18); }
+  .poseimg { align-self:center; margin-top:auto; margin-bottom:40px;
+             max-height:460px; max-width:66%; object-fit:contain;
+             mix-blend-mode:multiply; }
   .tag { font-size:34px; letter-spacing:.2em; color:var(--gold); margin-bottom:48px; }
   .idx { position:absolute; top:96px; right:88px; font-size:36px; color:#b9b3a6; }
   h1 { font-size:104px; line-height:1.35; font-weight:800; }
@@ -33,6 +36,7 @@
     <h1>{{TITLE}}</h1>
     {{QUOTE_BLOCK}}
     <div class="body">{{BODY}}</div>
+    {{POSE_BLOCK}}
     {{IP_BLOCK}}
     <div class="foot">前腾讯资深中层 · 只讲上过场的原话</div>
   </div>

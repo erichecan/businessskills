@@ -15,6 +15,10 @@ from pathlib import Path
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 TPL = (Path(__file__).parent / "card.html").read_text(encoding="utf-8")
 IP_IMG = Path(__file__).parent / "ip.png"  # IP 形象（存在则自动上封面）
+POSE_MAP = {  # 卡型 → 姿势插画（角色参与内容，不是装饰）
+    "scene": "pose1_站立", "contrast": "pose3_摊手", "why": "pose4_沉思",
+    "formula": "pose5_白板", "boundary": "pose6_叹气", "quote": "pose6_叹气",
+}
 
 
 def render(cards, outdir: Path):
@@ -24,7 +28,11 @@ def render(cards, outdir: Path):
         qb = f'<div class="quote">「{html.escape(quote)}」</div>' if quote else ""
         ip = (f'<img class="ipimg" src="file://{IP_IMG}">'
               if c.get("type") == "cover" and IP_IMG.exists() else "")
-        page = (TPL.replace("{{IP_BLOCK}}", ip)
+        pose_file = Path(__file__).parent / f"{POSE_MAP.get(c.get('type', ''), '')}.png"
+        pose = (f'<img class="poseimg" src="file://{pose_file}">'
+                if c.get("type") in POSE_MAP and pose_file.exists() else "")
+        page = (TPL.replace("{{POSE_BLOCK}}", pose)
+                   .replace("{{IP_BLOCK}}", ip)
                    .replace("{{TYPE}}", c.get("type", ""))
                    .replace("{{TAG}}", html.escape(c.get("tag", "")))
                    .replace("{{IDX}}", str(i))
