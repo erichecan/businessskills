@@ -253,6 +253,9 @@ def parse_draft(text):
                 continue
             line = re.sub(r"——?触发器[^\n]*", "", line)          # 去触发器注释
             line = re.sub(r"（[^）]*触发器[^）]*）", "", line)
+            line = re.sub(r"[（(]\s*\d+\s*字\s*[）)]", "", line)   # 去（12字）字数标注
+            line = re.sub(r"【(首选|备选|推荐)】", "", line)        # 去【首选】等标记
+            line = line.replace("*", "")                          # 去残留粗体星号
             line = line.strip(" *-①②③").lstrip("0123456789.．、 ")
             line = line.strip("*《》「」 ").strip()
             if line:
