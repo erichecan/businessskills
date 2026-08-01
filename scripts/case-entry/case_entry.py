@@ -45,6 +45,13 @@ PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>�
  <label>可迁移的那一句 <small>读者明天就能用的句式</small></label>
  <textarea id="f5" rows="2"></textarea>
  <button onclick="save()">保存到案例库.csv</button><span id="msg"></span>
+ <div style="margin-top:36px;display:flex;gap:10px;align-items:center">
+  <input id="q" placeholder="搜索案例：场景 / 原话 / 可迁移句 关键字…" style="flex:1" oninput="renderList()">
+  <select id="flt" style="width:130px" onchange="renderList()">
+   <option value="all">全部</option><option value="filled">已填</option><option value="pending">待补充</option>
+  </select>
+  <span id="cnt" style="font-size:13px;color:#888;white-space:nowrap"></span>
+ </div>
  <table id="list"></table>
 </div>
 <div class="side">
@@ -67,8 +74,22 @@ async function load(){
  const sel=document.getElementById('cid');
  sel.innerHTML=rows.map((r,i)=>`<option value="${i}">${r["案例ID"]} · ${r["场景"]}</option>`).join('')+'<option value="new">＋ 新建案例</option>';
  sel.onchange=fill; fill();
+ renderList();
+}
+function renderList(){
+ const q=(document.getElementById('q').value||'').trim().toLowerCase();
+ const flt=document.getElementById('flt').value;
+ const hits=rows.map((r,i)=>({r,i})).filter(({r})=>{
+  const filled=r["对方原话"]!=='待补充';
+  if(flt==='filled'&&!filled) return false;
+  if(flt==='pending'&&filled) return false;
+  if(!q) return true;
+  return ["案例ID","场景","对方原话","我的原话","结果","可迁移的那一句","已用于哪些笔记"].some(k=>(r[k]||'').toLowerCase().includes(q));
+ });
+ const filled=rows.filter(r=>r["对方原话"]!=='待补充').length;
+ document.getElementById('cnt').textContent=`显示 ${hits.length}/${rows.length} · 已填 ${filled}`;
  document.getElementById('list').innerHTML='<tr><th>ID</th><th>场景</th><th>对方原话</th><th>可迁移的那一句</th></tr>'+
-  rows.map((r,i)=>`<tr class="row" onclick="view(${i})" title="点击查看/编辑完整内容"><td>${r["案例ID"]}</td><td>${r["场景"]}</td><td class="${r["对方原话"]==='待补充'?'pending':''}">${r["对方原话"].slice(0,30)}</td><td class="${r["可迁移的那一句"]==='待补充'?'pending':''}">${(r["可迁移的那一句"]||'').slice(0,20)}</td></tr>`).join('');
+  hits.map(({r,i})=>`<tr class="row" onclick="view(${i})" title="点击查看/编辑完整内容"><td>${r["案例ID"]}</td><td>${r["场景"]}</td><td class="${r["对方原话"]==='待补充'?'pending':''}">${r["对方原话"].slice(0,30)}</td><td class="${r["可迁移的那一句"]==='待补充'?'pending':''}">${(r["可迁移的那一句"]||'').slice(0,20)}</td></tr>`).join('');
 }
 function view(i){
  document.getElementById('cid').value=String(i);
