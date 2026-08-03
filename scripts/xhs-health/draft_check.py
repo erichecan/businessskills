@@ -3,10 +3,12 @@
 
 对最近 N 篇 成稿_*.md 逐篇检查：
 1. 标题 ≤20 字（逐字数，emoji 不计）
-2. 正文 800-1200 字
+2. 正文 300-500 字（搜索流规格，依据 20260731 决策 3）
 3. CTA/互动段存在（问句结尾或含"评论区/你呢/你遇到过"）
 4. AI 味硬指标：「不是X是Y」句式 ≤2 处
 5. 跨篇查重：签名句（我面过300人/上周一个候选人 等）近 5 篇内重复即违规
+6. 文风守门线（L1，2026-08-02 加）：平均句长 ≤30 / 引语密度 ≥0.8 /
+   具体名词密度 ≥2.0 / 排比 ≤1。指标实现见 style_metrics.py。
 
 用法：python3 draft_check.py [--days 2]（被 health_check.py 每日调用）
 违规 → 打印明细，退出码 1。
@@ -16,6 +18,8 @@ import re
 import sys
 from datetime import date, timedelta
 from pathlib import Path
+
+from style_metrics import measure
 
 SUCAI = Path(__file__).resolve().parents[2] / "xhs" / "素材库"
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
@@ -37,6 +41,29 @@ def extract(text):
     return title
 
 
+# 文风守门线 v1 — 2026-08-02 由 4 篇有独立审核分的稿标定（详见 docs/20260802-...实施方案.md）。
+# 定位是异常检测，不是质量评分：过线不代表稿子好，只代表没有明显跑偏。
+# 标定依据：83分天花板稿 句长24.5/引语2.18/具体名词2.52；被判红橙的稿 句长34.2、引语0.58、具体名词1.63。
+MAX_AVG_SENT_LEN = 30
+MIN_QUOTE_PER_100 = 0.8
+MIN_CONCRETE_PER_100 = 2.0
+MAX_PARALLEL = 1
+
+
+def style_issues(text):
+    m = measure(text)
+    out = []
+    if m["平均句长"] > MAX_AVG_SENT_LEN:
+        out.append(f"平均句长 {m['平均句长']} 字（>{MAX_AVG_SENT_LEN}，句子过长读不动）")
+    if m["引语/百字"] < MIN_QUOTE_PER_100:
+        out.append(f"引语密度 {m['引语/百字']}/百字（<{MIN_QUOTE_PER_100}，缺对方原话）")
+    if m["具体名词/百字"] < MIN_CONCRETE_PER_100:
+        out.append(f"具体名词密度 {m['具体名词/百字']}/百字（<{MIN_CONCRETE_PER_100}，太抽象）")
+    if m["排比处数"] > MAX_PARALLEL:
+        out.append(f"排比 {m['排比处数']} 处（>{MAX_PARALLEL}，活人感杀手）：{m['_排比实例'][0][:50]}")
+    return out
+
+
 def drafts_sorted():
     files = []
     for f in SUCAI.glob("成稿_*.md"):
@@ -46,55 +73,74 @@ def drafts_sorted():
     return sorted(files)
 
 
+def check_one(d, f, all_drafts):
+    """单篇机械检查，返回违规条目列表（空 = 通过）。
+
+    all_drafts 是全量成稿（按日期排序），只为跨篇查重用——签名句要跟「这篇之前的 5 篇」比，
+    那 5 篇可能落在本次检查窗口之外，所以不能只传窗口内的。
+    """
+    text = f.read_text(encoding="utf-8")
+    body = re.sub(r"```.*?```", "", text, flags=re.S)
+    issues = []
+
+    title = extract(text)
+    tlen = len(_EMOJI.sub("", title))
+    if tlen > 20:
+        issues.append(f"标题 {tlen} 字（>20）：「{title[:30]}」")
+
+    bm = re.search(r"^#{1,3}\s*\*{0,2}正文[^\n]*\n(.*?)(?=\n#{1,3}\s|\Z)", text, re.M | re.S)
+    if bm:
+        blen = len(re.sub(r"\s|（正文总字数[^）]*）", "", bm.group(1)))
+        if not 280 <= blen <= 560:
+            issues.append(f"正文节 {blen} 字（搜索流规格 300-500）")
+    else:
+        clen = len(re.sub(r"\s", "", body))
+        if not 300 <= clen <= 2000:
+            issues.append(f"全文 {clen} 字且未找到正文节")
+    if "五问启动检查" in text:
+        issues.append("成稿文件包含「五问启动检查」章节（应只打印不落盘）")
+    if "正文总字数" in text:
+        issues.append("成稿文件包含「正文总字数」标注行（应只打印不落盘）")
+
+    if not any(h in text for h in CTA_HINTS):
+        issues.append("未检出 CTA/互动段（无问句结尾、无评论区引导）")
+
+    nb = len(NOT_BUT.findall(body))
+    if nb > 2:
+        issues.append(f"「不是X是Y」句式 {nb} 处（>2，AI 味硬指标）")
+
+    issues.extend(style_issues(text))
+
+    prev5 = [pf.read_text(encoding="utf-8") for pd, pf in all_drafts if pd < d][-5:]
+    for sig in SIGNATURES:
+        if sig in text and any(sig in p for p in prev5):
+            issues.append(f"签名句「{sig}」近 5 篇内重复使用（模板自我复制）")
+    return issues
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=2)
+    ap.add_argument("--file", metavar="FILENAME",
+                    help="只检查指定成稿（refine_loop 单篇复检用）；退出码 2 = 文件不存在")
     args = ap.parse_args()
 
     all_drafts = drafts_sorted()
-    cutoff = date.today() - timedelta(days=args.days)
-    recent = [(d, f) for d, f in all_drafts if d >= cutoff]
-    if not recent:
-        print("近期无成稿，跳过机械检查")
-        return 0
+    if args.file:
+        recent = [(d, f) for d, f in all_drafts if f.name == args.file]
+        if not recent:
+            print(f"找不到 {args.file}（需在 素材库/ 下且文件名含 YYYY-MM-DD）", file=sys.stderr)
+            return 2
+    else:
+        cutoff = date.today() - timedelta(days=args.days)
+        recent = [(d, f) for d, f in all_drafts if d >= cutoff]
+        if not recent:
+            print("近期无成稿，跳过机械检查")
+            return 0
 
     problems = []
     for d, f in recent:
-        text = f.read_text(encoding="utf-8")
-        body = re.sub(r"```.*?```", "", text, flags=re.S)
-        issues = []
-
-        title = extract(text)
-        tlen = len(_EMOJI.sub("", title))
-        if tlen > 20:
-            issues.append(f"标题 {tlen} 字（>20）：「{title[:30]}」")
-
-        bm = re.search(r"^#{1,3}\s*\*{0,2}正文[^\n]*\n(.*?)(?=\n#{1,3}\s|\Z)", text, re.M | re.S)
-        if bm:
-            blen = len(re.sub(r"\s|（正文总字数[^）]*）", "", bm.group(1)))
-            if not 280 <= blen <= 560:
-                issues.append(f"正文节 {blen} 字（搜索流规格 300-500）")
-        else:
-            clen = len(re.sub(r"\s", "", body))
-            if not 300 <= clen <= 2000:
-                issues.append(f"全文 {clen} 字且未找到正文节")
-        if "五问启动检查" in text:
-            issues.append("成稿文件包含「五问启动检查」章节（应只打印不落盘）")
-        if "正文总字数" in text:
-            issues.append("成稿文件包含「正文总字数」标注行（应只打印不落盘）")
-
-        if not any(h in text for h in CTA_HINTS):
-            issues.append("未检出 CTA/互动段（无问句结尾、无评论区引导）")
-
-        nb = len(NOT_BUT.findall(body))
-        if nb > 2:
-            issues.append(f"「不是X是Y」句式 {nb} 处（>2，AI 味硬指标）")
-
-        prev5 = [pf.read_text(encoding="utf-8") for pd, pf in all_drafts if pd < d][-5:]
-        for sig in SIGNATURES:
-            if sig in text and any(sig in p for p in prev5):
-                issues.append(f"签名句「{sig}」近 5 篇内重复使用（模板自我复制）")
-
+        issues = check_one(d, f, all_drafts)
         if issues:
             problems.append((f.name, issues))
 
