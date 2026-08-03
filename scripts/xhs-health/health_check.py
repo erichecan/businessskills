@@ -25,6 +25,10 @@ ALERT_FILE = SUCAI / "健康告警.md"
 LOG_COLUMNS = 10
 NUMERIC_COLS = [2, 3, 4, 5, 7]  # 跑的关键词数/总抓取条数/本轮新增/记忆库累计/连续0新增轮数
 
+EXPECTED_RUNS = 4            # 采集任务每 6 小时一轮
+MIN_QUOTES_PER_RUN = 2       # 每轮至少收 2 条评论区原话（成稿可信度维度的唯一合法来源）
+MAX_CANDIDATE_BACKLOG = 200  # 候选词积压上限
+
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 
@@ -46,7 +50,7 @@ def check_log_freshness(alerts):
         alerts.append("运行日志.csv 不存在")
         return
     log_dates = []
-    for row in csv.reader(RUN_LOG.open(encoding="utf-8")):
+    for row in csv.reader(RUN_LOG.open(encoding="utf-8-sig")):
         if row and DATE_RE.fullmatch(row[0].strip()):
             log_dates.append(date.fromisoformat(row[0].strip()))
     if not log_dates:
@@ -63,7 +67,7 @@ def check_log_freshness(alerts):
 def check_log_schema(alerts):
     if not RUN_LOG.exists():
         return
-    rows = [r for r in csv.reader(RUN_LOG.open(encoding="utf-8")) if r]
+    rows = [r for r in csv.reader(RUN_LOG.open(encoding="utf-8-sig")) if r]
     bad = []
     for i, row in enumerate(rows[-10:], start=len(rows) - min(10, len(rows) - 1)):
         if not DATE_RE.fullmatch(row[0].strip()):
@@ -88,15 +92,145 @@ def check_audit_gate(alerts):
             recent.append(f.name)
     if not recent:
         return
-    audited = set()
+    # 闸门只认独立审核。自评行不算过闸——自评与独立审核实测差 19 分且处置相反
+    # （08-01 稿：自评 87 绿「发布」，独立审核 68 红「返工」）。
+    audited, self_only = set(), set()
     if AUDIT_LOG.exists():
-        for row in csv.DictReader(AUDIT_LOG.open(encoding="utf-8")):
-            audited.add((row.get("成稿文件") or "").strip())
+        for row in csv.DictReader(AUDIT_LOG.open(encoding="utf-8-sig")):
+            name = (row.get("成稿文件") or "").strip()
+            if (row.get("审核方") or "").strip() == "独立审核":
+                audited.add(name)
+            else:
+                self_only.add(name)
     missing = [f for f in recent if f not in audited]
     if missing:
+        detail = []
+        for f in missing:
+            mark = "（仅有自评，不算过闸）" if f in self_only else "（无任何审核记录）"
+            detail.append(f + mark)
         alerts.append(
-            "成稿未过审核闸门（审核记录.csv 无对应行）：\n  - " + "\n  - ".join(missing)
+            "成稿未过审核闸门（需独立审核行）：\n  - " + "\n  - ".join(detail)
         )
+
+
+def check_publish_backfill(alerts):
+    """词库的发布回流是否断了。
+
+    L3 只盯一个指标：搜索进入占比（20260731 决策 4）。它必须发布后从笔记后台回填，
+    没有任何自动化能凭空造出来。这里管两件事：
+    1. 标了已发布却没有笔记链接 → 记录不实（2026-08-02 就出过：标着「已使用/发布日08-01」
+       实际一篇没发，是成稿被当成了发布）
+    2. 发布满 7 天还没回填占比 → 该去后台取数了
+    """
+    ciku = SUCAI / "词库.csv"
+    if not ciku.exists():
+        return
+    rows = list(csv.DictReader(ciku.open(encoding="utf-8-sig")))
+    if not rows or "笔记链接" not in rows[0]:
+        return
+    unlinked, due = [], []
+    today = date.today()
+    for r in rows:
+        kw = (r.get("关键词") or "").strip()
+        status = (r.get("状态") or "").strip()
+        pub = (r.get("发布日") or "").strip()
+        link = (r.get("笔记链接") or "").strip()
+        ratio = (r.get("搜索来源占比") or "").strip()
+        if status == "已发布" and not link:
+            unlinked.append(kw)
+        if pub and not ratio:
+            try:
+                if (today - date.fromisoformat(pub)).days >= 7:
+                    due.append(f"{kw}（发布于 {pub}）")
+            except ValueError:
+                unlinked.append(f"{kw}：发布日「{pub}」格式非法")
+    if unlinked:
+        alerts.append("词库记录不实（标已发布但无笔记链接）：\n  - " + "\n  - ".join(unlinked))
+    if due:
+        alerts.append("发布满 7 天未回填搜索来源占比：\n  - " + "\n  - ".join(due))
+
+
+def check_verdict_conflict(alerts):
+    """同一篇稿的自评处置与独立审核处置打架 → 暴露出来。
+
+    处置以独立审核为准。留着两行矛盾记录不告警的话，看错行就会把该返工的稿发出去。
+    """
+    if not AUDIT_LOG.exists():
+        return
+    by_draft = {}
+    for row in csv.DictReader(AUDIT_LOG.open(encoding="utf-8-sig")):
+        name = (row.get("成稿文件") or "").strip()
+        by_draft.setdefault(name, {})[(row.get("审核方") or "").strip()] = (
+            (row.get("处置") or "").strip(), (row.get("总分") or "").strip())
+    conflicts = []
+    for name, sides in by_draft.items():
+        indep, own = sides.get("独立审核"), sides.get("自评")
+        if indep and own and indep[0] != own[0]:
+            conflicts.append(f"{name}：自评 {own[1]}分→{own[0]}，独立审核 {indep[1]}分→{indep[0]}（以独立审核为准）")
+    if conflicts:
+        alerts.append("处置冲突（自评与独立审核不一致）：\n  - " + "\n  - ".join(conflicts))
+
+
+def check_run_completeness(alerts):
+    """昨天的采集轮次齐不齐。
+
+    采集任务每 6 小时一轮（0/6/12/18 点）＝ 一天四轮。只查昨天不查今天——
+    健康检查 09:30 跑的时候，今天才轮到第二轮，查了必然误报。
+    这一条补的是 check_log_freshness 的盲区：那条只看「有没有断流」，
+    一天只跑一轮也算新鲜，但实际漏了 3/4 的采集量（08-01 就只有 run1–run3）。
+    """
+    if not RUN_LOG.exists():
+        return
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    runs = {r[1].strip() for r in csv.reader(RUN_LOG.open(encoding="utf-8-sig"))
+            if len(r) > 1 and r[0].strip() == yesterday}
+    if not runs:
+        alerts.append(f"采集轮次缺失：{yesterday} 运行日志一轮都没有")
+        return
+    missing = [f"run{i}" for i in range(1, EXPECTED_RUNS + 1) if f"run{i}" not in runs]
+    if missing:
+        alerts.append(f"采集轮次不全：{yesterday} 只跑了 {len(runs)}/{EXPECTED_RUNS} 轮，缺 {'/'.join(missing)}")
+
+
+def check_quote_harvest(alerts):
+    """评论区原话收割配额。
+
+    原话是成稿可信度维度（15 分）的唯一合法来源，也是案例库的供给源
+    （harvest_cases.py 从这里提候选）。收割断供，成稿就只能靠脚本化改写，
+    审核必然扣「引语只有一条真人原话」。
+    ⚠️ 用 评论区原话.csv 的实际行数核对，不读运行日志备注里模型自报的「收割 N 条」。
+    """
+    quotes = SUCAI / "评论区原话.csv"
+    if not quotes.exists() or not RUN_LOG.exists():
+        return
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    runs = sum(1 for r in csv.reader(RUN_LOG.open(encoding="utf-8-sig"))
+               if len(r) > 1 and r[0].strip() == yesterday)
+    if not runs:
+        return  # 一轮没跑，由 check_run_completeness 报，这里不重复告警
+    got = sum(1 for r in csv.DictReader(quotes.open(encoding="utf-8-sig"))
+              if (r.get("日期") or "").strip() == yesterday)
+    quota = runs * MIN_QUOTES_PER_RUN
+    if got < quota:
+        alerts.append(f"评论区原话欠收：{yesterday} 跑了 {runs} 轮只收 {got} 条"
+                      f"（配额 {MIN_QUOTES_PER_RUN} 条/轮 = {quota} 条）")
+
+
+def check_candidate_backlog(alerts):
+    """候选词积压。
+
+    候选词只进不出的话，探测和选题都会被稀释——真正值得做的词淹在几百个里选不出来。
+    运行日志自己也在提醒（08-02 run4：「候选积压达674个，远超30阈值」），
+    但提醒写在备注里没人处理，改成机械告警。
+    """
+    pool = SUCAI / "关键词池.csv"
+    if not pool.exists():
+        return
+    n = sum(1 for r in csv.DictReader(pool.open(encoding="utf-8-sig"))
+            if (r.get("类型") or "").strip() == "候选")
+    if n > MAX_CANDIDATE_BACKLOG:
+        alerts.append(f"候选词积压 {n} 个（阈值 {MAX_CANDIDATE_BACKLOG}）：该做一次退休清点，"
+                      f"否则值得做的词会淹在里面选不出来")
 
 
 def notify(title, text):
@@ -125,8 +259,13 @@ def check_draft_quality(alerts):
 def main() -> int:
     alerts = []
     check_log_freshness(alerts)
+    check_run_completeness(alerts)
+    check_quote_harvest(alerts)
+    check_candidate_backlog(alerts)
     check_log_schema(alerts)
     check_audit_gate(alerts)
+    check_verdict_conflict(alerts)
+    check_publish_backfill(alerts)
     check_draft_quality(alerts)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
