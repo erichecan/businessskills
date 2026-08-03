@@ -63,7 +63,8 @@ def used_keywords() -> set:
     不另建索引表——成稿 md 的头部会写「关键词来源：词库.csv「XXX」」，
     直接全文匹配即可，少一张要维护的表就少一处会对不上的地方。
     """
-    blob = "\n".join(f.read_text(encoding="utf-8") for f in SUCAI.glob("成稿_*.md"))
+    files = list(SUCAI.glob("成稿_*.md")) + list((SUCAI / "归档稿").glob("成稿_*.md"))
+    blob = "\n".join(f.read_text(encoding="utf-8") for f in files)
     return {kw for kw in _all_keywords() if kw and kw in blob}
 
 
