@@ -5,13 +5,17 @@
 """
 import csv
 import json
+import re
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 CSV_PATH = REPO / "xhs" / "素材库" / "案例库.csv"
-FIELDS = ["案例ID", "场景", "对方原话", "我的原话", "结果", "可迁移的那一句", "已用于哪些笔记"]
+# 来源/来源链接/状态 三列由 harvest_cases.py 引入：案例库同时收 Eric 自己的经历（来源=自有）
+# 和采集来的真实原话（来源=采集）。⛔ 这里少写一列，界面保存时 DictWriter 会把整列抹掉。
+FIELDS = ["案例ID", "场景", "对方原话", "我的原话", "结果", "可迁移的那一句", "已用于哪些笔记",
+          "来源", "来源链接", "状态"]
 PORT = 8787
 
 PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>案例库 · 原话采集</title>
@@ -219,7 +223,8 @@ SUCAI = CSV_PATH.parent
 
 
 def read_rows():
-    with CSV_PATH.open(encoding="utf-8") as f:
+    # utf-8-sig 而非 utf-8：带 BOM 时首列名会变成 "\ufeff案例ID"，页面上整列取不到值（全 undefined）
+    with CSV_PATH.open(encoding="utf-8-sig") as f:
         return list(csv.DictReader(f))
 
 
@@ -227,7 +232,7 @@ def audit_map():
     p = SUCAI / "审核记录.csv"
     m = {}
     if p.exists():
-        for r in csv.DictReader(p.open(encoding="utf-8")):
+        for r in csv.DictReader(p.open(encoding="utf-8-sig")):
             m[(r.get("成稿文件") or "").strip()] = r
     return m
 
@@ -261,7 +266,7 @@ def parse_draft(text):
                 continue
             line = re.sub(r"——?触发器[^\n]*", "", line)          # 去触发器注释
             line = re.sub(r"（[^）]*触发器[^）]*）", "", line)
-            line = re.sub(r"[（(]\s*\d+\s*字\s*[）)]", "", line)   # 去（12字）字数标注
+            line = re.sub(r"[（(][^）)]*\d+\s*字[^）)]*[）)]", "", line)  # 去（12字）/（13字，搜索原句，关键词最左）等整段注释
             line = re.sub(r"【(首选|备选|推荐)】", "", line)        # 去【首选】等标记
             line = line.replace("*", "")                          # 去残留粗体星号
             line = line.strip(" *-①②③").lstrip("0123456789.．、 ")
@@ -318,11 +323,23 @@ def do_publish_click(tid, mode, sched_time):
 
     try:
         if mode == "sched":
-            r = ev('(()=>{const leaf=[...document.querySelectorAll("*")].find(e=>e.children.length===0&&e.textContent.trim()==="定时发布");'
-                   'let n=leaf,sw=null;for(let i=0;i<6&&n;i++){sw=[...(n.parentElement?.querySelectorAll("[class*=switch]")||[])]'
-                   '.find(e=>/switch-switch/.test(e.className));if(sw)break;n=n.parentElement;}'
-                   'if(!sw)return "sw✗";const on=/checked|active|open/.test(sw.className)||sw.querySelector("input")?.checked;'
-                   'if(!on)sw.click();return "sw✓";})()')
+            # 定时开关 = .post-time-wrapper .d-switch.d-clickable
+            # 实测（2026-08-02）：
+            #   · el.click() 无效——原生 click 事件缺 clientX/clientY/view，Vue 不认
+            #   · pointerdown→…→click 五连发会触发两次 toggle，净效果为零（曾误报 sw✓）
+            #   · 正解：只发一个带坐标的合成 click
+            # 滚动与取坐标必须分两次 eval，同一次里 rect 还是滚动前的值。
+            ev('(()=>{const s=document.querySelector(".post-time-wrapper .d-switch.d-clickable");'
+               'if(s)s.scrollIntoView({block:"center",behavior:"instant"});return 1})()')
+            time.sleep(2)
+            r = ev('(()=>{const w=document.querySelector(".post-time-wrapper");'
+                   'if(!w)return "sw✗ 无定时区（图片可能未上传完）";'
+                   'const on=()=>/(^|\\s)checked(\\s|$)/.test(w.querySelector(".d-switch-simulator")?.className||"");'
+                   'if(on())return "sw✓ 已开";'
+                   'const s=w.querySelector(".d-switch.d-clickable"),r=s.getBoundingClientRect();'
+                   's.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,'
+                   'clientX:r.left+r.width/2,clientY:r.top+r.height/2,view:window}));'
+                   'return on()?"sw✓":"sw✗ 点击未生效";})()')
             log.append(f"定时开关：{r}")
             time.sleep(1.5)
             if sched_time:
@@ -334,9 +351,16 @@ def do_publish_click(tid, mode, sched_time):
                        'return "time✓ "+i.value;})()')
                 log.append(f"定时时间：{r}")
                 time.sleep(1)
-        r = ev('(()=>{const b=[...document.querySelectorAll("button,[class*=btn],[class*=Btn]")]'
-               '.find(e=>{const t=e.textContent.trim();return (t==="发布"||t==="定时发布")&&e.offsetWidth>40&&e.offsetWidth<300;});'
-               'if(!b)return "btn✗";b.click();return "已点击「"+b.textContent.trim()+"」";})()')
+        # 发布按钮是 div.btn-inner / span.btn-text，文本为「发布笔记」，不是 <button>
+        r = ev('(()=>{const b=[...document.querySelectorAll("[class*=btn-inner],[class*=btn-text],button,[class*=btn]")]'
+               '.find(e=>{const t=(e.innerText||"").trim();'
+               'return /^(发布笔记|定时发布笔记|发布|定时发布)$/.test(t)&&e.offsetWidth>40&&e.offsetWidth<320;});'
+               'if(!b)return "btn✗ 找不到发布按钮";'
+               'b.scrollIntoView({block:"center",behavior:"instant"});'
+               'const r=b.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;'
+               '["pointerdown","mousedown","pointerup","mouseup","click"].forEach(t=>'
+               'b.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,clientX:x,clientY:y,view:window})));'
+               'return "已点击「"+(b.innerText||"").trim()+"」";})()')
         log.append(f"发布按钮：{r}")
         time.sleep(3)
         r = ev('document.body.innerText.slice(0,120)')
@@ -392,22 +416,38 @@ def prefill_xhs(name, archived):
         log.append(f"已打开创作平台（tab {tid[:8]}…）")
         time.sleep(4)
 
-        # 1. 页面默认停在「上传视频」，必须先切到「上传图文」tab
-        r = api(f"/eval?target={tid}",
-                '(()=>{const el=[...document.querySelectorAll("[class*=tab]")]'
-                '.find(e=>e.textContent.trim()==="上传图文");'
-                'if(el){el.click();return "ok"} return "notfound"})()')
-        if r.get("value") != "ok":
-            return {"ok": False, "log": "\n".join(log + ["找不到「上传图文」tab，页面结构可能已变"])}
+        # 1. 页面默认停在「上传视频」，必须先切到「上传图文」tab。
+        # 轮询而非固定 sleep：创作平台首屏渲染慢，固定等 4 秒时 tab 常常还没挂上 DOM。
+        switched = False
+        for _ in range(20):
+            r = api(f"/eval?target={tid}",
+                    '(()=>{const el=[...document.querySelectorAll("[class*=tab]")]'
+                    '.find(e=>e.textContent.trim()==="上传图文"&&(e.offsetWidth||e.offsetHeight));'
+                    'if(el){el.click();return "ok"} return "notfound"})()')
+            if r.get("value") == "ok":
+                switched = True
+                break
+            time.sleep(1)
+        if not switched:
+            return {"ok": False, "log": "\n".join(log + ["等待 20 秒仍找不到「上传图文」tab，页面结构可能已变"])}
         log.append("已切换到「上传图文」")
         time.sleep(2)
 
         # 2. 确认文件输入框收图片格式后上传
-        r = api(f"/eval?target={tid}",
-                'document.querySelector("input[type=file]")?.accept||""')
-        if "png" not in (r.get("value") or ""):
-            return {"ok": False, "log": "\n".join(log + [f"文件输入框格式异常：{r.get('value')}"])}
-        r = api(f"/setFiles?target={tid}", json.dumps({"selector": "input[type=file]", "files": files}))
+        # 切 tab 后图片 input 才会挂载，同样轮询等它出现
+        accept = ""
+        for _ in range(15):
+            r = api(f"/eval?target={tid}",
+                    '(()=>{const i=[...document.querySelectorAll("input[type=file]")]'
+                    '.find(x=>/png|jpg|jpeg/i.test(x.accept||""));return i?i.accept:""})()')
+            accept = r.get("value") or ""
+            if "png" in accept.lower():
+                break
+            time.sleep(1)
+        if "png" not in accept.lower():
+            return {"ok": False, "log": "\n".join(log + [f"等待图片上传框超时，当前 accept：{accept}"])}
+        r = api(f"/setFiles?target={tid}",
+                json.dumps({"selector": 'input[type=file][accept*="png"]', "files": files}))
         log.append(f"图片上传：{len(files)} 张 → {r}")
         time.sleep(5)
 
@@ -516,14 +556,20 @@ class H(BaseHTTPRequestHandler):
         rows = read_rows()
         if d["idx"] == "new":
             row = {k: "" for k in FIELDS}
-            row["案例ID"] = f"C{len(rows)+1:03d}"
+            # 只数 C 开头的：表里混有 H 开头的采集条目，用 len(rows) 会一路跳号
+            cnums = [int(m.group(1)) for r in rows
+                     if (m := re.match(r"C(\d+)", r.get("案例ID", "")))]
+            row["案例ID"] = f"C{max(cnums, default=0)+1:03d}"
+            row["来源"], row["状态"] = "自有", "已确认"  # 手工新建的一律是 Eric 自己的
             rows.append(row)
         else:
             row = rows[int(d["idx"])]
+            if row.get("状态") == "待确认":
+                row["状态"] = "已确认"  # 人工编辑过即视为确认
         for k in ["场景", "对方原话", "我的原话", "结果", "可迁移的那一句"]:
             row[k] = d[k].strip() or "待补充"
         with CSV_PATH.open("w", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=FIELDS)
+            w = csv.DictWriter(f, fieldnames=FIELDS, extrasaction="ignore")
             w.writeheader()
             w.writerows(rows)
         self._send('{"ok":true}', "application/json")
