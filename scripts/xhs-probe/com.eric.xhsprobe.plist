@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.eric.xhsprobe</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/xhs-probe/probe.py</string>
+        <string>--from-cikuku</string>
+        <string>--limit</string>
+        <string>5</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>30</integer></dict>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/tmp/xhsprobe.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/xhsprobe.log</string>
+</dict>
+</plist>
