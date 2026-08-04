@@ -369,7 +369,7 @@ def audit(fname: str, lane="搜索流"):
         if attempt == 1:
             time.sleep(RETRY_WAIT)
     else:
-        return None, "审核未产生新记录", ""
+        return None, "审核未产生新记录", "", ""
 
     last = rows[-1]
     try:
@@ -377,7 +377,7 @@ def audit(fname: str, lane="搜索流"):
     except ValueError:
         score = 0
     report = _read_or(SUCAI / "审核报告" / f"{Path(fname).stem}_独立审核.md", last.get("备注", ""))
-    return score, (last.get("红线") or "").strip(), report
+    return score, (last.get("红线") or "").strip(), report, (last.get("处置") or "").strip()
 
 
 def park(draft: Path, score, note):
@@ -440,20 +440,24 @@ def run_one(row, args, lane) -> str:
             continue
         print("机械检查通过 → 送独立审核")
 
-        score, redline, report = audit(draft.name, lane)
+        score, redline, report, disposition = audit(draft.name, lane)
         if score is None:
             print("⛔ 独立审核连续两次未写出记录，本轮无法判定，停手（不拿上一轮旧分充数）")
             break
-        print(f"独立审核：{score} 分 · 红线：{redline or '无'}")
+        print(f"独立审核：{score} 分 · 红线：{redline or '无'} · 处置：{disposition or '?'}")
         if score > best["score"]:
             best = {"score": score, "md": md, "cards": cards}
-        if score >= args.threshold and redline in ("", "无"):
+        # 必须同时满足处置=发布。D7 定的是「处置以独立审核为准」，只看分数会和闸门打架：
+        # 实测一篇 86 分绿、红线无、但审核员处置写「待人工」的稿，loop 判过线收工，
+        # auto_publish 却拦下 —— loop 以为成了，稿子其实卡在闸门外，而且不会再返工。
+        if score >= args.threshold and redline in ("", "无") and disposition == "发布":
             print(f"\n✅ 过线（≥{args.threshold} 且无红线）")
             render_cards(slug)
             predict_one(draft.name, lane)
             print("   → 交给 auto_publish 闸门（次日 10:00 定时任务会取）")
             return "过线"
-        feedback = (f"【独立审核 {score} 分，未过线（需 ≥{args.threshold} 且红线为无）】\n"
+        feedback = (f"【独立审核 {score} 分 · 处置「{disposition}」，未过线"
+                    f"（需 ≥{args.threshold}、红线为无、且处置=发布）】\n"
                     f"{report[:4000]}\n{KEEP_PASSED}")
 
     if not draft:
