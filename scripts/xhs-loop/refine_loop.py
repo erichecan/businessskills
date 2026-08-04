@@ -134,6 +134,15 @@ def probe_evidence(keyword: str) -> str:
     return "\n\n".join(hits) or "（该词无 probe_*.json，需在备注说明为什么值得赌）"
 
 
+def pose_library() -> str:
+    """姿势库清单，读目录不写死 —— make_cards.py 的注释就因为写死而停在「共 18 个」，
+    实际已经 30 个了。文件名自带语义（pose19_谈薪拉扯），模型据此选图。"""
+    d = SUCAI / "图文模板"
+    names = sorted((p.stem for p in d.glob("pose*.png")),
+                   key=lambda s: int(re.match(r"pose(\d+)", s).group(1)))
+    return "、".join(names)
+
+
 def recent_drafts(n=5) -> str:
     """近 n 篇成稿全文——给模型看「别再用这些开头和签名句」。
 
@@ -197,9 +206,20 @@ draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，�
 {SEP_MD}
 <成稿 markdown 全文，章节顺序照范例：标题 / 发布标题 / 正文 / 图文卡片 / 话题标签 / 处置>
 {SEP_JSON}
-<7 个卡片对象的 JSON 数组，字段 type/tag/title/quote/body，
+<7 个卡片对象的 JSON 数组，字段 type/tag/title/quote/body/pose，
  type 依次为 cover,scene,contrast,quote,why,formula,boundary，body 内换行用 <br>>
-{SEP_END}"""
+{SEP_END}
+
+【pose 字段 —— 每张卡必须给，按这张卡讲的内容选人物姿势】
+可选姿势（文件名自带语义，照抄名字，不要加 .png）：
+{pose_library()}
+
+选图规则：
+- 按**这张卡的内容**选，不是按卡型选。讲谈薪拉扯就用 pose19_谈薪拉扯，
+  讲被追问答不上来就用 pose8_被追问冒汗，讲复盘记录就用 pose30_记三行笔记。
+- ⛔ 7 张卡不许出现重复姿势 —— 每篇笔记的图现在长得都一样，就是因为以前按卡型
+  固定映射（scene 永远是面试对坐、contrast 永远是摊手），30 个姿势只用到 9 个。
+- 实在没有贴切的，选情绪对得上的（叹气/沉思/如释重负），别硬凑动作。"""
 
 
 def parse_output(out: str):

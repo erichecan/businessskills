@@ -7,13 +7,31 @@
   * { margin:0; box-sizing:border-box; }
   body { width:1242px; height:1660px; background:var(--paper); color:var(--ink);
          font-family:"PingFang SC","Hiragino Sans GB",sans-serif; display:flex; }
-  .card { display:flex; flex-direction:column; padding:96px 88px; width:100%; position:relative; }
+  /* height:100% + border-box 是让 flex 收缩生效的前提：原来 .card 不设高度，
+     高度由内容撑开，flex 容器永远没有负 free space，flex-shrink 从不触发 ——
+     图片始终按 height 渲染，超出 body 1660px 的部分被截图直接切掉（人物下半身没了）。
+     调 flex-shrink / min-height 都治不了，因为那是参数，这是结构。 */
+  .card { display:flex; flex-direction:column; padding:96px 88px; width:100%;
+          height:100%; box-sizing:border-box; position:relative; }
   .ipimg { position:absolute; right:88px; bottom:200px; width:300px; height:300px;
            border-radius:50%; object-fit:cover; border:8px solid #fff;
            box-shadow:0 12px 40px rgba(0,0,0,.18); }
+  /* height 而非 max-height：姿势图裁掉透明边距后只有 208-384px 高，
+     max-height 是上限不是目标，图会按自身尺寸渲染，人物在 1660px 画布上只占一小块。
+     设定 height 让所有姿势统一放大到同一视觉高度（原图 246×410 级别，放大约 1.5-2.2 倍；
+     手绘线稿对放大的容忍度比照片高）。 */
+  /* 自适应：height 给目标值、flex-shrink 允许被压、min-height 兜底。
+     ① 原来写 max-height:460px 是上限不是目标 —— 姿势图裁掉透明边距后只有 208-384px 高，
+        够不着上限，就按自身尺寸渲染，人物在 1660px 画布上只占一小块。
+     ② 但 flex-shrink:0 + 固定 520px 会让文字多的卡直接溢出画布（人物下半身被切）。
+     ③ 必须显式 min-height:0。flex item 的 min-height 默认是 auto，对 <img> 会解析成
+        图片固有高度（裁剪后 246×304），照样挡住收缩 —— 删掉这行不等于设 0，
+        quote 卡型（.quote 用了 margin:auto 0 抢空间）会被顶出画布下沿。
+     结论：height 给目标值 + 允许自由压缩。文案短的卡图能撑到 500px，
+     文案长的卡自动压到可用空间。要图更大就得让卡片文案更短 —— 版面守恒，不是参数问题。 */
   .poseimg { align-self:center; margin-top:auto; margin-bottom:40px;
-             max-height:460px; max-width:66%; object-fit:contain;
-             mix-blend-mode:multiply; }
+             height:500px; min-height:0; width:auto; max-width:78%;
+             object-fit:contain; mix-blend-mode:multiply; }
   .tag { font-size:34px; letter-spacing:.2em; color:var(--gold); margin-bottom:48px; }
   .idx { position:absolute; top:96px; right:88px; font-size:36px; color:#b9b3a6; }
   h1 { font-size:104px; line-height:1.35; font-weight:800; }
@@ -53,7 +71,7 @@
     <div class="body">{{BODY}}</div>
     {{POSE_BLOCK}}
     {{IP_BLOCK}}
-    <div class="foot">前腾讯资深专家，只讲你最需要的</div>
+    <div class="foot">只说你需要的，帮你看清楚职场</div>
   </div>
 </body>
 </html>

@@ -15,7 +15,9 @@ from pathlib import Path
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 TPL = (Path(__file__).parent / "card.html").read_text(encoding="utf-8")
 IP_IMG = Path(__file__).parent / "ip.png"  # IP 形象（存在则自动上封面）
-POSE_MAP = {  # 卡型 → 默认姿势（卡片 JSON 可用 "pose" 字段覆盖；姿势库共 18 个）
+POSE_MAP = {  # 卡型 → **兜底**姿势。正常情况下卡片 JSON 的 "pose" 字段会覆盖它 —— 
+# 只靠这张表的话，每篇笔记 7 张图的姿势完全相同（卡型顺序是固定的），
+# 30 个姿势里只用得到下面这 9 个。2026-08-03 起由成稿按内容逐卡指定。
     "scene": "pose7_面试对坐", "contrast": "pose3_摊手", "why": "pose4_沉思",
     "formula": "pose5_白板", "boundary": "pose11_打勾打叉", "quote": "pose8_被追问冒汗",
     "coverbig": "pose1_站立", "covertalk": "pose9_推眼镜反击", "coversplit": "pose5_白板",
