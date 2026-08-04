@@ -134,15 +134,18 @@ async function loadDrafts(){
  document.getElementById('dcnt').textContent=`共 ${ds.length} 篇（含归档）`;
  document.getElementById('dlist').innerHTML=ds.map(d=>
   `<div class="ditem" onclick="showDraft('${d.name}',${d.archived})" style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;margin-bottom:6px;cursor:pointer;background:#fff;font-size:13px">
-    <b>${d.name.replace(/^成稿_/,'').replace(/\\.md$/,'')}</b>${d.archived?' <span style="color:#999">[归档]</span>':''}<br>
-    <span style="color:${d.score===null?'#bbb':d.score>=85?'#2f7d4f':d.score>=70?'#b06c00':'#c0392b'}">${d.score===null?'未审核':d.score+' 分 · '+(d.grade||'')}</span>
+    <b>${d.name.replace(/^成稿_/,'').replace(/\\.md$/,'')}</b>${d.archived?' <span style="color:#999">[归档]</span>':''}
+    <span style="font-size:11px;padding:1px 6px;border-radius:8px;background:${d.lane==='推荐流'?'#e8e0f5':'#e0eef5'};color:#555">${d.lane}</span><br>
+    <span style="color:${d.score===null?'#bbb':!d.independent?'#999':d.score>=85?'#2f7d4f':d.score>=70?'#b06c00':'#c0392b'}">${
+      d.score===null?'未审核':d.score+' 分 · '+(d.grade||'')+(d.independent?'':' ⚠️ 仅自评')}</span>
    </div>`).join('');
 }
 let curDraft=null;
 async function showDraft(name,arch){
  const d=await (await fetch('/draft?name='+encodeURIComponent(name)+'&arch='+(arch?1:0))).json();
  curDraft={name,arch};
- document.getElementById('daudit').textContent=d.audit?`审核：${d.audit}`:'尚无审核记录';
+ document.getElementById('daudit').innerHTML=(d.audit?`审核：${d.audit}`:'尚无审核记录')
+   +(d.predict?`<br><span style="color:#666">📊 ${d.predict}</span>`:'');
  document.getElementById('dimgs').innerHTML=(d.images||[]).map(u=>
   `<div style="text-align:center"><img src="${u}" style="height:240px;border-radius:6px;border:1px solid #ddd;display:block"><a href="${u}" download style="font-size:12px">下载</a></div>`).join('')
   ||'<span style="color:#999;font-size:13px">封面生成中，稍后重新点击本篇即可看到</span>';
@@ -229,7 +232,32 @@ def read_rows():
 
 
 def audit_map():
+    """只认「独立审核」行。
+
+    ⛔ 原来不分审核方，谁写的行都当审核分显示 —— 8:30 任务自评 86 分绿的那篇，
+    界面上看着跟独立审核 86 分一模一样，而它根本没过审。D7 定的是「自评无处置权」，
+    界面上让自评冒充审核分，等于把那条决策在人眼这一侧又漏掉一次。
+    自评行单独返回，标成「自评」显示。
+    """
     p = SUCAI / "审核记录.csv"
+    indep, own = {}, {}
+    if p.exists():
+        for r in csv.DictReader(p.open(encoding="utf-8-sig")):
+            name = (r.get("成稿文件") or "").strip()
+            if (r.get("审核方") or "").strip() == "独立审核":
+                indep[name] = r
+            else:
+                own[name] = r
+    return indep, own
+
+
+def lane_of_draft(text):
+    m = re.search(r"口径[:：]\s*\**\s*(搜索流|推荐流)", text)
+    return m.group(1) if m else "搜索流"
+
+
+def prediction_map():
+    p = SUCAI / "预测记录.csv"
     m = {}
     if p.exists():
         for r in csv.DictReader(p.open(encoding="utf-8-sig")):
@@ -238,17 +266,24 @@ def audit_map():
 
 
 def list_drafts():
-    am = audit_map()
+    indep, own = audit_map()
     out = []
     for base, archived in [(SUCAI, False), (SUCAI / "归档稿", True)]:
         if not base.is_dir():
             continue
         for f in base.glob("成稿_*.md"):
-            a = am.get(f.name)
+            a, o = indep.get(f.name), own.get(f.name)
+            src = a or o
+            try:
+                head = f.read_text(encoding="utf-8")[:800]
+            except OSError:
+                head = ""
             out.append({
                 "name": f.name, "archived": archived,
-                "score": int(a["总分"]) if a and (a.get("总分") or "").isdigit() else None,
-                "grade": (a.get("评级") if a else None),
+                "score": int(src["总分"]) if src and (src.get("总分") or "").isdigit() else None,
+                "grade": (src.get("评级") if src else None),
+                "independent": a is not None,          # False = 只有自评，不算过审
+                "lane": lane_of_draft(head),
             })
     out.sort(key=lambda d: d["name"], reverse=True)
     return out
@@ -377,8 +412,22 @@ def draft_detail(name, archived):
     if not f.exists():
         return None
     text = f.read_text(encoding="utf-8")
-    a = audit_map().get(name)
-    audit = f"{a['总分']} 分 · {a.get('评级','')} · 处置:{a.get('处置','')} · {a.get('备注','')[:80]}" if a else None
+    indep, own = audit_map()
+    a, o = indep.get(name), own.get(name)
+    src = a or o
+    audit = None
+    if src:
+        who = "独立审核" if a else "⚠️ 仅自评（未过审，不算数）"
+        audit = (f"{src['总分']} 分 · {src.get('评级','')} · {who} · "
+                 f"处置:{src.get('处置','')} · {src.get('备注','')[:80]}")
+    pred = prediction_map().get(name)
+    predict = None
+    if pred:
+        # 押的数要看得见，不然 7 天后复盘时没人记得当初预测了什么
+        predict = (f"{pred.get('口径','')} 预测 7 天：观看 {pred.get('观看_低')}-{pred.get('观看_高')} · "
+                   f"赞 {pred.get('点赞_低')}-{pred.get('点赞_高')} · 藏 {pred.get('收藏_低')}-{pred.get('收藏_高')} · "
+                   f"评 {pred.get('评论_低')}-{pred.get('评论_高')} · 转 {pred.get('转发_低')}-{pred.get('转发_高')} · "
+                   f"CES {pred.get('CES_低')}-{pred.get('CES_高')}")
     parsed = parse_draft(text)
     ensure_cover(name, parsed["title"])
     imgs = []
@@ -386,7 +435,8 @@ def draft_detail(name, archived):
     img_dir = SUCAI / "成品图" / stem
     if img_dir.is_dir():
         imgs = [f"/img?f=成品图/{stem}/{p.name}" for p in sorted(img_dir.glob("*.png"))]
-    return {"content": text, "audit": audit, "images": imgs, **parsed}
+    return {"content": text, "audit": audit, "predict": predict,
+            "lane": lane_of_draft(text), "images": imgs, **parsed}
 
 
 def prefill_xhs(name, archived):

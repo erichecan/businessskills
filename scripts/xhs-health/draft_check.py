@@ -73,11 +73,13 @@ def drafts_sorted():
     return sorted(files)
 
 
-# 两条流的正文规格不同：搜索流 300-500（图承载内容、正文承载关键词），
-# 推荐流 800-1200（实测旧稿 874/1041 字）。口径写在成稿头部「> 口径：推荐流」，
-# 由这里自动识别——health_check 批量跑时没法逐篇传参，只能让稿子自己说明。
+# 两条流**共用同一个正文规格 300-500**（2026-08-03 Eric 定：推荐流也改 300-500）。
+# 之前推荐流是 800-1200（照旧稿 874/1041 字），现在统一 —— 图承载内容、正文承载关键词
+# 这套结构对两条流都成立，字数不同只会让流程分叉。
+# 口径仍要识别：标题/首图/开头的判据两条流是反的（搜索原句直给 vs 留悬念），
+# 那部分差异由 audit skill 的附录口径管，不在机械检查里。
 LANE_RE = re.compile(r"口径[:：]\s*\**\s*(搜索流|推荐流)")
-BODY_RANGE = {"搜索流": (280, 560), "推荐流": (750, 1300)}
+BODY_RANGE = {"搜索流": (280, 560), "推荐流": (280, 560)}
 
 
 def lane_of(text, override=None):
@@ -108,8 +110,7 @@ def check_one(d, f, all_drafts, lane_override=None):
     if bm:
         blen = len(re.sub(r"\s|（正文总字数[^）]*）", "", bm.group(1)))
         if not lo <= blen <= hi:
-            spec = "300-500" if lane == "搜索流" else "800-1200"
-            issues.append(f"正文节 {blen} 字（{lane}规格 {spec}）")
+            issues.append(f"正文节 {blen} 字（{lane}规格 300-500）")
     else:
         clen = len(re.sub(r"\s", "", body))
         if not 300 <= clen <= 2000:

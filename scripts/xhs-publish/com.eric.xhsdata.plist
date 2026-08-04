@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.eric.xhsdata</string>
+    <!-- 数据回流：抓后台数据 → 预测对账 → 案例库补货。
+         补 fetch_stats / review_prediction / harvest_cases 三个「写完没人调度」的断点。
+         21:15 跑：采集任务 0/6/12/18 点四轮当天已跑完，数据齐了才有得抓。 -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/xhs-publish/daily_data.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>15</integer></dict>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/tmp/xhsdata.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/xhsdata.log</string>
+</dict>
+</plist>
