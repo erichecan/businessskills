@@ -310,6 +310,8 @@ def main():
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--now", action="store_true", help="立即发布，不走时段轮换")
     ap.add_argument("--slots", action="store_true", help="只看下一个发布时段")
+    ap.add_argument("--only", action="append", metavar="FILENAME",
+                    help="只处理指定成稿（可重复）。手动发布用：绕过每日配额，但**不绕闸门**")
     ap.add_argument("--confirm", metavar="FILENAME", help="人工点完定时发布后回填")
     ap.add_argument("--at", metavar="TIME", default="", help="配合 --confirm，实际定时时间")
     args = ap.parse_args()
@@ -344,18 +346,43 @@ def main():
         return 0
 
     done_today = published_today()
-    quota = DAILY_QUOTA - done_today
-    if quota <= 0 and not args.dry_run:
-        print(f"[{datetime.now():%Y-%m-%d %H:%M}] 今日已发 {done_today} 篇，达到每日配额 {DAILY_QUOTA}，不再发布。")
-        return 0
-
-    batch = passed[:max(quota, 1) if not args.dry_run else 1]
-    print(f"[{datetime.now():%Y-%m-%d %H:%M}] 闸门通过 {len(passed)} 篇，"
-          f"今日已发 {done_today}/{DAILY_QUOTA}，本次处理 {len(batch)} 篇\n")
-    rc = 0
-    for name, why in batch:
-        print(f"--- {name}\n    {why}")
-        rc |= publish_one(name, args.dry_run, args.now)
+    if args.only:
+        # 手动指定：绕过每日配额（是人在决定发几篇），但闸门照走 ——
+        # passed 已经是过闸门的列表，指定了没过闸门的篇目会在这里被剔掉并明确报出来。
+        want = list(dict.fromkeys(args.only))
+        by_name = {n: w for n, w in passed}
+        batch = [(n, by_name[n]) for n in want if n in by_name]
+        for n in want:
+            if n not in by_name:
+                why = next((w for nm, ok, w in cands if nm == n), "不在成稿列表里")
+                print(f"⛔ 跳过 {n}：{why}")
+        if not batch:
+            print("指定的稿都没过闸门，不发布。")
+            return 1
+        print(f"[{datetime.now():%Y-%m-%d %H:%M}] 手动指定 {len(batch)} 篇"
+              f"（今日已发 {done_today}，本次不受配额 {DAILY_QUOTA} 限制）\n")
+    else:
+        quota = DAILY_QUOTA - done_today
+        if quota <= 0 and not args.dry_run:
+            print(f"[{datetime.now():%Y-%m-%d %H:%M}] 今日已发 {done_today} 篇，达到每日配额 {DAILY_QUOTA}，不再发布。")
+            return 0
+        batch = passed[:max(quota, 1) if not args.dry_run else 1]
+        print(f"[{datetime.now():%Y-%m-%d %H:%M}] 闸门通过 {len(passed)} 篇，"
+              f"今日已发 {done_today}/{DAILY_QUOTA}，本次处理 {len(batch)} 篇\n")
+    # ⛔ 一次只预填一篇。创作平台的发布页一次只承载一篇稿，连续预填第二篇会把第一篇
+    # 直接覆盖掉 —— 而预填后最后一步（选时段、点发布）要人来点，人还没点，稿就没了。
+    # 2026-08-03 实测：连预填 3 篇，页面上只剩最后一篇，前两篇白填。
+    # DAILY_QUOTA=2 的含义是「一天发 2 篇」，靠一天跑两次实现，不是一次填两篇。
+    rest = batch[1:]
+    name, why = batch[0]
+    print(f"--- {name}\n    {why}")
+    rc = publish_one(name, args.dry_run, args.now)
+    if rest:
+        print(f"\n还有 {len(rest)} 篇在队列里，**发完这篇再跑一次**才会预填下一篇"
+              f"（创作平台一次只放得下一篇）：")
+        for n, _ in rest:
+            print(f"  · {n}")
+        print(f"  发完后先回填：python3 auto_publish.py --confirm {name} --at \"YYYY-MM-DD HH:MM\"")
     return rc
 
 
