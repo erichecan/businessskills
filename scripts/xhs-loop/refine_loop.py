@@ -49,8 +49,34 @@ SEP_SLUG, SEP_MD, SEP_JSON, SEP_END = "===SLUG===", "===MARKDOWN===", "===CARDS_
 # 返工时不提醒的话，模型会为了修一条意见把已经达标的机械项改坏（实测：第 3 轮为了改
 # 审核意见，具体名词密度从 2.0+ 掉到 1.51，连机械检查都没过，比上一轮还差）。
 KEEP_PASSED = """⚠️ 改的是被指出的问题，别把已经达标的地方改坏。尤其守住这几条：
-正文 300-500 字 · 平均句长≤30 · 引语密度≥0.8/百字 · 具体名词（数字/时间/金额/职位）≥2.0/百字 ·
-排比≤1 处 · 「不是X是Y」≤2 处 · 结尾保留具体问句。改完自己数一遍再输出。"""
+正文字数守住本篇口径的规格 · 平均句长≤30 · 引语密度≥0.8/百字 ·
+具体名词（数字/时间/金额/职位）≥2.0/百字 · 排比≤1 处 · 「不是X是Y」≤2 处 ·
+结尾保留具体问句。改完自己数一遍再输出。"""
+
+# 两条流的规格差异源自 eric-xhs-audit SKILL.md 文末「附录 · 推荐流口径」。
+# Eric 2026-08-03：推荐流不做视频，但按原成稿路线做图文，账号内容丰富度才起得来。
+LANE_SPEC = {
+    "搜索流": {
+        "words": "300-500",
+        "brief": "搜索流图文笔记（7 张图承载内容 + 300-500 字正文承载关键词）",
+        "rules": """- 标题：直接给搜索原句，关键词放最左，**不要留悬念**，≤20 字
+- 首图：搜索原句大字 + 结论前置（信息型），让搜索的人一眼确认「答的就是我搜的」
+- 开头：10 分档，让搜索者确认答的就是他搜的，不要铺垫
+- 可信度是最重项（15 分）：原话颗粒度决定他信不信你
+- ⛔ 红线：首图不是搜索原句 / 出现「表达力」三字 / 编造原话""",
+    },
+    "推荐流": {
+        "words": "800-1200",
+        "brief": "推荐流图文笔记（7 张图 + 800-1200 字正文）",
+        "rules": """- 标题：**留悬念不把答案说完**，张力 6 项（对比/数字/悬念/冲突/时间承诺/结果承诺）命中 ≥2，≤20 字
+- 首图：0.3 秒制造认知冲突/好奇/焦虑（气质型），**不要**搜索原句大字
+- 开头：15 分档，前 3 秒抓手 + 留悬念
+- 主指标是 CES（赞×1+藏×1+评×4+转×4）和互动率 ≥5%，所以评论钩子权重更高
+- ⛔ 红线：标题把答案说完 = 必死（这条与搜索流正好相反）
+- ⚠️ 推荐流暂无高分范例可参照（历史推荐流稿最高 69 分），下面给的范例是搜索流的，
+  只学它的结构组织和原话使用方式，标题/首图/开头一律按上面推荐流口径重做""",
+    },
+}
 
 
 def _read_or(path: Path, fallback: str) -> str:
@@ -115,8 +141,9 @@ def recent_drafts(n=5) -> str:
     return "\n\n".join(f"【{f.name}】\n{f.read_text(encoding='utf-8')[:1500]}" for f in files)
 
 
-def build_prompt(row: dict, feedback: str, round_no: int) -> str:
+def build_prompt(row: dict, feedback: str, round_no: int, lane: str = "搜索流") -> str:
     kw = row["关键词"]
+    spec = LANE_SPEC[lane]
     benchmark = _read_or(SUCAI / "成稿_2026-08-02_空降前30天.md", "（无范例）")
     rework = ""
     if feedback:
@@ -126,8 +153,12 @@ def build_prompt(row: dict, feedback: str, round_no: int) -> str:
 
 {feedback}
 """
-    return f"""你是 Eric 的小红书成稿写手。写一篇搜索流图文笔记（7 张图 + 300-500 字正文）。
+    return f"""你是 Eric 的小红书成稿写手。写一篇{spec['brief']}。
 {rework}
+【本篇口径：{lane}】必须在成稿头部的引言区写一行 `> 口径：{lane}` ——
+draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，漏了会按搜索流误判。
+{spec['rules']}
+
 【今天是 {date.today().isoformat()}】成稿将命名为 成稿_{date.today().isoformat()}_<你给的短名>.md，
 文中提到日期或引用卡片文件名时按这个日期写。
 
@@ -213,8 +244,8 @@ def run_claude(prompt: str, tag: str) -> str:
     return ""
 
 
-def write_draft(row, feedback, round_no, dry_run=False):
-    prompt = build_prompt(row, feedback, round_no)
+def write_draft(row, feedback, round_no, dry_run=False, lane="搜索流"):
+    prompt = build_prompt(row, feedback, round_no, lane)
     if dry_run:
         print(f"--- [dry-run] 第 {round_no} 轮 prompt 共 {len(prompt)} 字，前 600 字：\n{prompt[:600]}\n---")
         return None, None, None
@@ -257,9 +288,9 @@ def render_cards(slug: str) -> bool:
     return True
 
 
-def mech_check(fname: str):
-    r = subprocess.run([sys.executable, str(HEALTH / "draft_check.py"), "--file", fname],
-                       capture_output=True, text=True)
+def mech_check(fname: str, lane="搜索流"):
+    r = subprocess.run([sys.executable, str(HEALTH / "draft_check.py"), "--file", fname,
+                        "--lane", lane], capture_output=True, text=True)
     return r.returncode == 0, (r.stdout or "").strip()
 
 
@@ -271,7 +302,7 @@ def _audit_rows(fname: str) -> list:
             and (r.get("审核方") or "").strip() == "独立审核"]
 
 
-def audit(fname: str):
+def audit(fname: str, lane="搜索流"):
     """跑独立审核并取本轮新增的那一行。分数为 None = 审核失败（不是低分）。
 
     ⛔ 这里曾经只取「该文件最后一行独立审核记录」，不管这轮审核有没有真的写出新行。
@@ -282,8 +313,8 @@ def audit(fname: str):
     """
     before = len(_audit_rows(fname))
     for attempt in (1, 2):
-        r = subprocess.run([sys.executable, str(HEALTH / "independent_audit.py"), "--force", fname],
-                           capture_output=True, text=True, timeout=WRITE_TIMEOUT)
+        r = subprocess.run([sys.executable, str(HEALTH / "independent_audit.py"), "--force", fname,
+                            "--lane", lane], capture_output=True, text=True, timeout=WRITE_TIMEOUT)
         rows = _audit_rows(fname)
         if len(rows) > before:
             break
@@ -328,40 +359,28 @@ def park(draft: Path, score, note):
     print(f"   已移入 归档稿/{draft.name}")
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--topic", help="指定关键词（默认从词库自动选）")
-    ap.add_argument("--rounds", type=int, default=MAX_ROUNDS)
-    ap.add_argument("--threshold", type=int, default=PASS_SCORE)
-    ap.add_argument("--dry-run", action="store_true")
-    args = ap.parse_args()
+def predict_one(draft_name: str, lane: str):
+    """过线后押个数，7 天后由 review_prediction.py 对账。
 
-    if args.topic:
-        rows = [r for r in csv.DictReader(CIKU.open(encoding="utf-8-sig"))
-                if (r.get("关键词") or "").strip() == args.topic]
-        row = rows[0] if rows else {"关键词": args.topic}
-    else:
-        row = pick_topic()
-    if not row:
-        # 燃料耗尽不是「今天没事干」，是上游断供了：采集→探词→人工验证搜索位空缺
-        # 这条链停在哪一环，loop 就从哪一天起空转。说清楚该去补哪一环。
-        print("⛔ 无题可做：词库里没有「状态=已验证 且 未写过」的词。")
-        print("   燃料在上游：跑 eric-xhs-probe 探候选词 → 人工把搜索位有空缺的标成「已验证」")
-        return 1
+    不押数就没法复盘：「这篇效果不好」是感觉，「预测观看 400 实际 120」才是能改进的结论。
+    """
+    r = subprocess.run([sys.executable, str(Path(__file__).parent / "predict.py"),
+                        draft_name, "--lane", lane], capture_output=True, text=True, timeout=120)
+    print((r.stdout or "").strip() or f"   ⚠️ 预测失败：{(r.stderr or '')[:200]}")
 
+
+def run_one(row, args, lane) -> str:
+    """跑完一篇的完整闭环。返回 过线 / 归档 / 失败。"""
     kw = row["关键词"]
-    print(f"选题：{kw}（密度 {row.get('竞争密度','?')} · 意图 {row.get('意图强度','?')}）")
-    if args.dry_run:
-        write_draft(row, "", 1, dry_run=True)
-        return 0
+    print(f"\n{'='*54}\n选题：{kw}（{lane} · 密度 {row.get('竞争密度','?')} · 意图 {row.get('意图强度','?')}）")
 
     # 越改越差是真会发生的：复跑实测第 2 轮 84 分，第 3 轮为了修审核意见把具体名词密度
     # 从 2.0+ 改到 1.51，连机械检查都没过。只留最后一版等于把最好的那版扔了，所以择优。
     best = {"score": -1, "md": None, "cards": None}
-    feedback, draft, score, slug = "", None, 0, None
+    feedback, draft, score, slug, md = "", None, 0, None, None
     for rnd in range(1, args.rounds + 1):
-        print(f"\n=== 第 {rnd}/{args.rounds} 轮 ===")
-        new_slug, md, cards = write_draft(row, feedback, rnd)
+        print(f"\n--- 第 {rnd}/{args.rounds} 轮 ---")
+        new_slug, md, cards = write_draft(row, feedback, rnd, lane=lane)
         if not new_slug or not md:
             print("⛔ 成稿输出解析失败（原始输出见 loop日志/）")
             break
@@ -371,15 +390,14 @@ def main() -> int:
         draft = save(slug, md, cards)
         print(f"成稿 → {draft.name}" + ("" if cards else "（⚠️ 卡片 JSON 解析失败，首图无法核验）"))
 
-        ok, mech = mech_check(draft.name)
+        ok, mech = mech_check(draft.name, lane)
         if not ok:
             print(f"机械检查未过：\n{mech}")
-            feedback = (f"【机械检查（代码硬核对，必须全部修掉）】\n{mech}\n"
-                        f"{KEEP_PASSED}")
+            feedback = f"【机械检查（代码硬核对，必须全部修掉）】\n{mech}\n{KEEP_PASSED}"
             continue
         print("机械检查通过 → 送独立审核")
 
-        score, redline, report = audit(draft.name)
+        score, redline, report = audit(draft.name, lane)
         if score is None:
             print("⛔ 独立审核连续两次未写出记录，本轮无法判定，停手（不拿上一轮旧分充数）")
             break
@@ -389,21 +407,60 @@ def main() -> int:
         if score >= args.threshold and redline in ("", "无"):
             print(f"\n✅ 过线（≥{args.threshold} 且无红线）")
             render_cards(slug)
+            predict_one(draft.name, lane)
             print("   → 交给 auto_publish 闸门（次日 10:00 定时任务会取）")
-            return 0
+            return "过线"
         feedback = (f"【独立审核 {score} 分，未过线（需 ≥{args.threshold} 且红线为无）】\n"
                     f"{report[:4000]}\n{KEEP_PASSED}")
 
     if not draft:
-        print("\n⛔ 一轮成稿都没产出，无产物可归档")
-        return 1
+        print("⛔ 一轮成稿都没产出，无产物可归档")
+        return "失败"
     # 比内容不比分数：机械检查未过的轮次根本没拿到分，score 还留着上一轮的值，
     # 拿它比较会得出「最后一版就是最佳」的错误结论，回滚静默失效。
     if best["md"] and best["md"] != md:
         draft = save(slug, best["md"], best["cards"])
-        print(f"\n回滚到最佳版本（{best['score']} 分，最后一版更差）")
+        print(f"回滚到最佳版本（{best['score']} 分，最后一版更差）")
     print("⏸ 未过线／中途停手，存入待激活素材库")
     park(draft, max(best["score"], 0), feedback or "loop 中断，未取得有效审核分")
+    return "归档"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--topic", help="指定关键词（默认从词库自动选；--count>1 时只作用于第一篇）")
+    ap.add_argument("--rounds", type=int, default=MAX_ROUNDS)
+    ap.add_argument("--threshold", type=int, default=PASS_SCORE)
+    ap.add_argument("--count", type=int, default=1, help="连跑几篇（消化候选积压用）")
+    ap.add_argument("--lane", default="搜索流", choices=["搜索流", "推荐流"])
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+
+    tally = {"过线": 0, "归档": 0, "失败": 0}
+    for i in range(args.count):
+        if args.topic and i == 0:
+            rows = [r for r in csv.DictReader(CIKU.open(encoding="utf-8-sig"))
+                    if (r.get("关键词") or "").strip() == args.topic]
+            row = rows[0] if rows else {"关键词": args.topic}
+        else:
+            row = pick_topic()
+        if not row:
+            # 燃料耗尽不是「今天没事干」，是上游断供了：采集 → probe → auto_analyze。
+            # 这条链停在哪一环，loop 就从哪一天起空转，说清楚该去补哪一环。
+            print("⛔ 无题可做：词库里没有「状态=已验证 且 未写过」的词。")
+            print("   燃料在上游：python3 scripts/xhs-probe/probe.py --from-cikuku --limit 5")
+            print("             → auto_analyze.py → backfill.py（做→已验证，全自动）")
+            return 1 if i == 0 else 0
+
+        if args.dry_run:
+            print(f"选题：{row['关键词']}（{args.lane}）")
+            write_draft(row, "", 1, dry_run=True, lane=args.lane)
+            return 0
+        tally[run_one(row, args, args.lane)] += 1
+
+    if args.count > 1:
+        print(f"\n{'='*54}\n本轮 {args.count} 篇："
+              f"过线 {tally['过线']} · 归档 {tally['归档']} · 失败 {tally['失败']}")
     return 0
 
 

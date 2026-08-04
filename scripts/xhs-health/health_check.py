@@ -216,6 +216,27 @@ def check_quote_harvest(alerts):
                       f"（配额 {MIN_QUOTES_PER_RUN} 条/轮 = {quota} 条）")
 
 
+def check_prediction_review(alerts):
+    """有够 7 天数据但没复盘的预测 → 告警。
+
+    预测本身没价值，预测-实际的差值才有价值。发了不复盘等于白押数，
+    模型系数永远停在先验值上（docs/20260803-小红书数据预测调研.md 第五节）。
+    """
+    script = REPO / "scripts" / "xhs-loop" / "review_prediction.py"
+    if not script.exists() or not (SUCAI / "预测记录.csv").exists():
+        return
+    try:
+        r = subprocess.run([sys.executable, str(script), "--list"],
+                           capture_output=True, text=True, timeout=60)
+    except Exception as e:
+        alerts.append(f"预测复盘检查无法执行：{e}")
+        return
+    m = re.search(r"可复盘 (\d+) 篇", r.stdout or "")
+    if m and int(m.group(1)) > 0:
+        alerts.append(f"有 {m.group(1)} 篇预测够 7 天数据但未复盘："
+                      f"跑 python3 scripts/xhs-loop/review_prediction.py")
+
+
 def check_candidate_backlog(alerts):
     """候选词积压。
 
@@ -262,6 +283,7 @@ def main() -> int:
     check_run_completeness(alerts)
     check_quote_harvest(alerts)
     check_candidate_backlog(alerts)
+    check_prediction_review(alerts)
     check_log_schema(alerts)
     check_audit_gate(alerts)
     check_verdict_conflict(alerts)

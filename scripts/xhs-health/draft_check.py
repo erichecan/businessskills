@@ -73,7 +73,21 @@ def drafts_sorted():
     return sorted(files)
 
 
-def check_one(d, f, all_drafts):
+# 两条流的正文规格不同：搜索流 300-500（图承载内容、正文承载关键词），
+# 推荐流 800-1200（实测旧稿 874/1041 字）。口径写在成稿头部「> 口径：推荐流」，
+# 由这里自动识别——health_check 批量跑时没法逐篇传参，只能让稿子自己说明。
+LANE_RE = re.compile(r"口径[:：]\s*\**\s*(搜索流|推荐流)")
+BODY_RANGE = {"搜索流": (280, 560), "推荐流": (750, 1300)}
+
+
+def lane_of(text, override=None):
+    if override:
+        return override
+    m = LANE_RE.search(text)
+    return m.group(1) if m else "搜索流"
+
+
+def check_one(d, f, all_drafts, lane_override=None):
     """单篇机械检查，返回违规条目列表（空 = 通过）。
 
     all_drafts 是全量成稿（按日期排序），只为跨篇查重用——签名句要跟「这篇之前的 5 篇」比，
@@ -88,11 +102,14 @@ def check_one(d, f, all_drafts):
     if tlen > 20:
         issues.append(f"标题 {tlen} 字（>20）：「{title[:30]}」")
 
+    lane = lane_of(text, lane_override)
+    lo, hi = BODY_RANGE[lane]
     bm = re.search(r"^#{1,3}\s*\*{0,2}正文[^\n]*\n(.*?)(?=\n#{1,3}\s|\Z)", text, re.M | re.S)
     if bm:
         blen = len(re.sub(r"\s|（正文总字数[^）]*）", "", bm.group(1)))
-        if not 280 <= blen <= 560:
-            issues.append(f"正文节 {blen} 字（搜索流规格 300-500）")
+        if not lo <= blen <= hi:
+            spec = "300-500" if lane == "搜索流" else "800-1200"
+            issues.append(f"正文节 {blen} 字（{lane}规格 {spec}）")
     else:
         clen = len(re.sub(r"\s", "", body))
         if not 300 <= clen <= 2000:
@@ -123,6 +140,8 @@ def main() -> int:
     ap.add_argument("--days", type=int, default=2)
     ap.add_argument("--file", metavar="FILENAME",
                     help="只检查指定成稿（refine_loop 单篇复检用）；退出码 2 = 文件不存在")
+    ap.add_argument("--lane", choices=["搜索流", "推荐流"],
+                    help="覆盖稿内口径标记（默认读成稿头部的「口径：X」，读不到按搜索流）")
     args = ap.parse_args()
 
     all_drafts = drafts_sorted()
@@ -140,7 +159,7 @@ def main() -> int:
 
     problems = []
     for d, f in recent:
-        issues = check_one(d, f, all_drafts)
+        issues = check_one(d, f, all_drafts, args.lane)
         if issues:
             problems.append((f.name, issues))
 

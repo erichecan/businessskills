@@ -4,13 +4,13 @@
 <dict>
     <key>Label</key>
     <string>com.eric.xhsprobe</string>
+    <!-- 2026-08-03：从只跑 probe.py 改成跑整条链（probe → auto_analyze → backfill）。
+         原来第 2 层要在对话里手动跑 skill，探测数据攒着没人分析，词库的「已验证」
+         全靠人工标。limit 也从 5 提到 10 —— 探测队列有 267 个词待探。 -->
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
-        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/xhs-probe/probe.py</string>
-        <string>--from-cikuku</string>
-        <string>--limit</string>
-        <string>5</string>
+        <string>/bin/bash</string>
+        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/xhs-probe/daily_probe.sh</string>
     </array>
     <key>StartCalendarInterval</key>
     <array>
