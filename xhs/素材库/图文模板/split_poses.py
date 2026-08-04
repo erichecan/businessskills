@@ -14,6 +14,7 @@
   python3 split_poses.py --group 3 --src a.png     # 只处理某一组
 """
 import argparse
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -26,6 +27,9 @@ except ImportError:
 HERE = Path(__file__).parent
 BACKUP = HERE / "_原图备份"
 DOWNLOADS = Path.home() / "Downloads"
+# 已切过的源图清单。不记的话，切完的图还留在下载目录里，下次仍算「最新一批」，
+# 会被当成新组重切一遍并张冠李戴（实测：组 1-8 切完后再跑，它们被认成了组 9-16）。
+STATE = HERE / ".split_state.json"
 
 ALPHA_MIN = 12       # alpha 高于此值算「有内容」，滤掉 ChatGPT 生成的极淡光晕
 MIN_BLOCK_W = 120    # 窄于此的内容块视为噪点（飘出来的问号、纸飞机等），并入相邻块
@@ -145,15 +149,66 @@ def split_one(src: Path, names, dry: bool):
     return ok
 
 
+def load_done() -> set:
+    try:
+        return set(json.loads(STATE.read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError):
+        return set()
+
+
+def mark_done(paths):
+    STATE.write_text(json.dumps(sorted(load_done() | {p.name for p in paths}),
+                                ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def latest_batch(imgs, gap_hours=6):
+    """按下载时间自动取「最新的一批」。
+
+    下载目录里混着几个月的历史 ChatGPT 图，全都拿来会把组号整体排错
+    （实测今天的第一张被编成组 9，切出来全部张冠李戴）。
+    同一批图是连着几分钟内下载的，跟历史图之间必然隔着很长时间 ——
+    从最新一张往回走，遇到超过 gap_hours 的断层就停。
+    """
+    if not imgs:
+        return []
+    imgs = sorted(imgs, key=lambda p: p.stat().st_mtime)
+    batch = [imgs[-1]]
+    for i in range(len(imgs) - 2, -1, -1):
+        if imgs[i + 1].stat().st_mtime - imgs[i].stat().st_mtime > gap_hours * 3600:
+            break
+        batch.insert(0, imgs[i])
+    return batch
+
+
+def guess_start_group():
+    """从第一个「还是旧图」的姿势推断这批该从第几组开始。
+
+    高清图高度都在 1000 上下，旧图只有 300 上下，一眼能分。
+    这样明天生成完直接跑脚本就行，不用记上次做到第几组。
+    """
+    for g in sorted(GROUPS):
+        for name in GROUPS[g]:
+            p = HERE / f"{name}.png"
+            if not p.exists():
+                return g
+            try:
+                if Image.open(p).size[1] < MIN_H * 0.85:
+                    return g
+            except OSError:
+                return g
+    return 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--group", type=int, help="只处理某一组")
     ap.add_argument("--src", help="指定单张源图（配合 --group）")
     ap.add_argument("--dir", default=str(DOWNLOADS), help="源图目录，默认 ~/Downloads")
-    ap.add_argument("--since", help="只取这个日期之后的图，格式 YYYY-MM-DD。"
-                                    "下载目录里常混着历史图，不过滤会把组号全排错")
-    ap.add_argument("--start-group", type=int, default=1, help="第一张对应第几组")
+    ap.add_argument("--all", action="store_true",
+                    help="不做批次识别，目录下所有 ChatGPT_Image_*.png 都算（一般不需要）")
+    ap.add_argument("--start-group", type=int,
+                    help="第一张对应第几组（默认从第一个还是旧图的姿势自动推断）")
     args = ap.parse_args()
 
     if args.src:
@@ -163,15 +218,21 @@ def main() -> int:
         pairs = [(args.group, Path(args.src))]
     else:
         # 按修改时间排序 = ChatGPT 的生成顺序 = 组顺序
-        imgs = sorted(Path(args.dir).glob("ChatGPT_Image_*.png"), key=lambda p: p.stat().st_mtime)
-        if args.since:
-            import datetime
-            cut = datetime.datetime.fromisoformat(args.since).timestamp()
-            imgs = [p for p in imgs if p.stat().st_mtime >= cut]
+        found = list(Path(args.dir).glob("ChatGPT_Image_*.png"))
+        done = load_done()
+        fresh = [p for p in found if p.name not in done]
+        imgs = sorted(fresh, key=lambda p: p.stat().st_mtime) if args.all else latest_batch(fresh)
         if not imgs:
-            print(f"{args.dir} 下没有符合条件的 ChatGPT_Image_*.png", file=sys.stderr)
-            return 1
-        pairs = [(i, p) for i, p in enumerate(imgs, args.start_group)]
+            print(f"没有未处理的新图（{args.dir} 下 {len(found)} 张，"
+                  f"{len(done)} 张已切过）。新生成的图放进来再跑即可。")
+            return 0
+        start = args.start_group or guess_start_group()
+        import datetime as _dt
+        span = [_dt.datetime.fromtimestamp(p.stat().st_mtime).strftime("%m-%d %H:%M")
+                for p in (imgs[0], imgs[-1])]
+        print(f"新图 {len(imgs)} 张（{span[0]} → {span[1]}）· 目录共 {len(found)} 张"
+              f"（{len(done)} 张已切过，跳过）· 从组 {start} 开始\n")
+        pairs = [(i, p) for i, p in enumerate(imgs, start)]
 
     print(f"{'[dry-run] ' if args.dry_run else ''}共 {len(pairs)} 张源图\n")
     allok = True
@@ -184,7 +245,8 @@ def main() -> int:
         allok &= split_one(src, names, args.dry_run)
         print()
     if not args.dry_run:
-        print("完成。旧图已备份到 _原图备份/")
+        mark_done([p for _, p in pairs])
+        print("完成。旧图已备份到 _原图备份/，本批源图已记入 .split_state.json（下次自动跳过）")
     return 0 if allok else 1
 
 

@@ -46,6 +46,9 @@ xhs/素材库/职场面试_记忆库.csv
 xhs/素材库/关键词池.csv
 xhs/素材库/选题库.csv
 xhs/素材库/运行日志.csv
+xhs/素材库/探测原始/
+xhs/素材库/.bak/
+xhs/素材库/探测日志.csv
 xhs/素材库/待激活素材库.csv
 xhs/素材库/scripts/produce_config.env
 xhs/素材库/备份归档_*.tar.gz
@@ -79,3 +82,7 @@ xhs/素材库/candidate_keywords_raw.json
 xhs/素材库/collected_items.json
 xhs/素材库/excel_rows.json
 xhs/素材库/dedupe_check.py
+xhs/素材库/发布数据.csv
+
+# 切图进度记录，只对本机下载目录有意义
+xhs/素材库/图文模板/.split_state.json
