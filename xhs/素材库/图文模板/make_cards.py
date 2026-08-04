@@ -31,7 +31,11 @@ def render(cards, outdir: Path):
         qb = f'<div class="quote">「{html.escape(quote)}」</div>' if quote else ""
         ip = (f'<img class="ipimg" src="file://{IP_IMG}">'
               if c.get("type") == "cover" and IP_IMG.exists() else "")
-        pose_name = c.get("pose") or POSE_MAP.get(c.get("type", ""), "")
+        # cover 卡右下角已经有圆形 IP 头像，再挂一张大姿势图就成了一张卡上两个人。
+        # 2026-08-04 Eric 定：封面保持右下角圆形图，不放第二张。
+        # （成稿现在会给每张卡都指定 pose，所以这里必须显式挡掉 cover。）
+        ctype = c.get("type", "")
+        pose_name = "" if ctype == "cover" else (c.get("pose") or POSE_MAP.get(ctype, ""))
         pose_file = Path(__file__).parent / f"{pose_name}.png"
         pose = (f'<img class="poseimg" src="file://{pose_file}">'
                 if pose_name and pose_file.exists() else "")
