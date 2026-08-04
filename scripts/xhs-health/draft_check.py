@@ -26,6 +26,12 @@ DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 SIGNATURES = ["我面过300", "上周一个候选人", "笔都没动", "在表上打了叉", "45分钟"]
 CTA_HINTS = ["评论区", "你呢", "你遇到过", "你会怎么", "留言", "？\n", "?\n"]
 NOT_BUT = re.compile(r"不是[^，。；\n]{1,15}[，,]?[是而]")
+# 把读者归进第三方群体的表达。视角跳动整体上机械判不了（要判「他」指的是对方
+# 还是读者同类，那是语义），但这类泛指词是其中能机械抓的一半。
+# 阈值 3 有数据支撑：8 月以来的稿都 ≤1 个，只有 7 月老稿出现过 3-4 个。
+# 定位是异常检测，不是质量评分 —— 完整规则见 必须命中清单.md 第 16 条，由审核员判。
+GENERIC_READER = re.compile(r"很多人|有些人|有的人|大部分人|大多数人|不少人|多数人|一些人|大家都")
+MAX_GENERIC = 2
 _EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿️]")
 
 
@@ -126,6 +132,11 @@ def check_one(d, f, all_drafts, lane_override=None):
     nb = len(NOT_BUT.findall(body))
     if nb > 2:
         issues.append(f"「不是X是Y」句式 {nb} 处（>2，AI 味硬指标）")
+
+    gen = GENERIC_READER.findall(body)
+    if len(gen) > MAX_GENERIC:
+        issues.append(f"泛指群体词 {len(gen)} 处（>{MAX_GENERIC}）：{'、'.join(gen[:4])}"
+                      f" —— 把读者归进第三方群体，视角该对着读者说")
 
     issues.extend(style_issues(text))
 
