@@ -7,6 +7,7 @@
 """
 import html
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,15 @@ from pathlib import Path
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 TPL = (Path(__file__).parent / "card.html").read_text(encoding="utf-8")
 IP_IMG = Path(__file__).parent / "ip.png"  # IP 形象（存在则自动上封面）
+# 版面预算：按**渲染后的估算行数**算，不是按字数。
+# 字数会骗人 —— 实测某张卡 110 字（未超字数阈值），但每行都写得很长，
+# 折行后 body 实际占 7 行，人物被压到 60px 高，等于白放。
+# 每行容纳字数 ≈ (1242 - 左右padding176) / 字号；行高按字号×行距折算成权重。
+CHARS_PER_LINE = {"title": 10, "quote": 14, "body": 19}   # 字号 104 / 72 / 54
+LINE_WEIGHT = {"title": 1.5, "quote": 1.15, "body": 1.0}  # 行高相对 body 的倍数
+# 等效行数上限。10.0 太松 —— 实测 9.9 行那张人物只剩约 100px；
+# 8.8 行那张约 200px 尚可，所以卡在 9.0。
+LINE_BUDGET = 9.0
 POSE_MAP = {  # 卡型 → **兜底**姿势。正常情况下卡片 JSON 的 "pose" 字段会覆盖它 —— 
 # 只靠这张表的话，每篇笔记 7 张图的姿势完全相同（卡型顺序是固定的），
 # 30 个姿势里只用得到下面这 9 个。2026-08-03 起由成稿按内容逐卡指定。
@@ -22,6 +32,19 @@ POSE_MAP = {  # 卡型 → **兜底**姿势。正常情况下卡片 JSON 的 "po
     "formula": "pose5_白板", "boundary": "pose11_打勾打叉", "quote": "pose8_被追问冒汗",
     "coverbig": "pose1_站立", "covertalk": "pose9_推眼镜反击", "coversplit": "pose5_白板",
 }
+
+
+def est_lines(card) -> float:
+    """估算这张卡的文字占多少「等效行」。<br> 手动换行和自动折行都要算进去。"""
+    total = 0.0
+    for field in ("title", "quote", "body"):
+        text = re.sub(r"<(?!br)[^>]+>", "", card.get(field, ""))
+        if not text:
+            continue
+        per = CHARS_PER_LINE[field]
+        lines = sum(max(1, -(-len(seg) // per)) for seg in text.split("<br>"))
+        total += lines * LINE_WEIGHT[field]
+    return total
 
 
 def render(cards, outdir: Path):
@@ -36,6 +59,12 @@ def render(cards, outdir: Path):
         # （成稿现在会给每张卡都指定 pose，所以这里必须显式挡掉 cover。）
         ctype = c.get("type", "")
         pose_name = "" if ctype == "cover" else (c.get("pose") or POSE_MAP.get(ctype, ""))
+        # 版面守恒：文字占满时人物会被 flex 压成一个点。
+        # 与其放个看不清的小人，不如不放，并把超标的卡报出来让成稿改短。
+        if pose_name and est_lines(c) > LINE_BUDGET:
+            print(f"   ⚠️ 第{i}张文案约 {est_lines(c):.1f} 等效行（上限 {LINE_BUDGET}），"
+                  f"人物会被挤没，本张不放姿势图")
+            pose_name = ""
         pose_file = Path(__file__).parent / f"{pose_name}.png"
         pose = (f'<img class="poseimg" src="file://{pose_file}">'
                 if pose_name and pose_file.exists() else "")

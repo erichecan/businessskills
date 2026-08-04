@@ -210,6 +210,14 @@ draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，�
  type 依次为 cover,scene,contrast,quote,why,formula,boundary，body 内换行用 <br>>
 {SEP_END}
 
+【卡片文案长度上限 —— 超了人物就被挤没】
+一张卡的版面是守恒的：文字占得越多，底部人物图能占的高度越少。
+实测有张卡 body 写了 9 行，人物被压到 60px 高，等于白放。所以每张卡：
+- title ≤ 18 字（最多两行）
+- quote ≤ 35 字
+- body ≤ 90 字，且 `<br>` 换行不超过 4 个（即最多 5 行）
+话术模板类内容装不下就拆成两张卡，别硬塞进一张。
+
 【pose 字段 —— 每张卡必须给，按这张卡讲的内容选人物姿势】
 可选姿势（文件名自带语义，照抄名字，不要加 .png）：
 {pose_library()}
