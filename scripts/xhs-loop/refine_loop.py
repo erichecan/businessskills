@@ -168,9 +168,23 @@ def recent_drafts(n=5) -> str:
     return "\n\n".join(f"【{f.name}】\n{f.read_text(encoding='utf-8')[:1500]}" for f in files)
 
 
-def build_prompt(row: dict, feedback: str, round_no: int, lane: str = "搜索流") -> str:
+def build_prompt(row: dict, feedback: str, round_no: int, lane: str = "搜索流",
+                 fixed_title: str = "") -> str:
     kw = row["关键词"]
     spec = LANE_SPEC[lane]
+    title_block = ""
+    if fixed_title:
+        # 标题已由人挑定时，正文必须兑现它推翻的那个预设 —— 否则标题许诺了反转、
+        # 正文却在讲别的，点进来的人会觉得被骗，评论和收藏都拿不到。
+        title_block = f"""
+【本篇标题已定，直接用作首选标题，不要另拟】
+{fixed_title}
+
+⛔ 正文必须兑现这个标题推翻的预设：标题否定了读者的哪个判断，正文就要在前三句
+把「为什么你以为的那样其实不成立」讲清楚，并给出真正成立的那一面。
+标题许诺了反转，正文却讲别的 = 骗点击，评论和收藏都会掉。
+备选标题仍出 2 个，但首选必须原样用上面这句。
+"""
     benchmark = _read_or(SUCAI / "成稿_2026-08-02_空降前30天.md", "（无范例）")
     rework = ""
     if feedback:
@@ -185,7 +199,7 @@ def build_prompt(row: dict, feedback: str, round_no: int, lane: str = "搜索流
 【本篇口径：{lane}】必须在成稿头部的引言区写一行 `> 口径：{lane}` ——
 draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，漏了会按搜索流误判。
 {spec['rules']}
-
+{title_block}
 【今天是 {date.today().isoformat()}】成稿将命名为 成稿_{date.today().isoformat()}_<你给的短名>.md，
 文中提到日期或引用卡片文件名时按这个日期写。
 
@@ -302,8 +316,8 @@ def run_claude(prompt: str, tag: str) -> str:
     return ""
 
 
-def write_draft(row, feedback, round_no, dry_run=False, lane="搜索流"):
-    prompt = build_prompt(row, feedback, round_no, lane)
+def write_draft(row, feedback, round_no, dry_run=False, lane="搜索流", fixed_title=""):
+    prompt = build_prompt(row, feedback, round_no, lane, fixed_title)
     if dry_run:
         print(f"--- [dry-run] 第 {round_no} 轮 prompt 共 {len(prompt)} 字，前 600 字：\n{prompt[:600]}\n---")
         return None, None, None
@@ -427,7 +441,7 @@ def predict_one(draft_name: str, lane: str):
     print((r.stdout or "").strip() or f"   ⚠️ 预测失败：{(r.stderr or '')[:200]}")
 
 
-def run_one(row, args, lane) -> str:
+def run_one(row, args, lane, fixed_title="") -> str:
     """跑完一篇的完整闭环。返回 过线 / 归档 / 失败。"""
     kw = row["关键词"]
     print(f"\n{'='*54}\n选题：{kw}（{lane} · 密度 {row.get('竞争密度','?')} · 意图 {row.get('意图强度','?')}）")
@@ -438,7 +452,7 @@ def run_one(row, args, lane) -> str:
     feedback, draft, score, slug, md = "", None, 0, None, None
     for rnd in range(1, args.rounds + 1):
         print(f"\n--- 第 {rnd}/{args.rounds} 轮 ---")
-        new_slug, md, cards = write_draft(row, feedback, rnd, lane=lane)
+        new_slug, md, cards = write_draft(row, feedback, rnd, lane=lane, fixed_title=fixed_title)
         if not new_slug or not md:
             print("⛔ 成稿输出解析失败（原始输出见 loop日志/）")
             break
@@ -495,6 +509,7 @@ def main() -> int:
     ap.add_argument("--threshold", type=int, default=PASS_SCORE)
     ap.add_argument("--count", type=int, default=1, help="连跑几篇（消化候选积压用）")
     ap.add_argument("--lane", default="搜索流", choices=["搜索流", "推荐流"])
+    ap.add_argument("--title", default="", help="指定首选标题（人已挑定时用），正文须兑现它推翻的预设")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -516,9 +531,9 @@ def main() -> int:
 
         if args.dry_run:
             print(f"选题：{row['关键词']}（{args.lane}）")
-            write_draft(row, "", 1, dry_run=True, lane=args.lane)
+            write_draft(row, "", 1, dry_run=True, lane=args.lane, fixed_title=args.title)
             return 0
-        tally[run_one(row, args, args.lane)] += 1
+        tally[run_one(row, args, args.lane, args.title)] += 1
 
     if args.count > 1:
         print(f"\n{'='*54}\n本轮 {args.count} 篇："
