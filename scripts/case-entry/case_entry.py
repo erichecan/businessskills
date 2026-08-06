@@ -135,31 +135,46 @@ async function loadDrafts(){
  allDrafts=await (await fetch('/drafts')).json();
  renderDrafts();
 }
+const PSTATE=['已发布','已定时','已预填','预填失败','未处理'];
 function renderDrafts(){
  const f=document.querySelector('input[name=tf]:checked')?.value||'all';
- const ds=f==='all'?allDrafts:allDrafts.filter(d=>d.tverdict!=='合格');
+ let ds=allDrafts;
+ if(f==='badtitle') ds=ds.filter(d=>d.tverdict!=='合格');
+ else if(f!=='all') ds=ds.filter(d=>(d.pub||{}).state===f);
  const bad=allDrafts.filter(d=>d.tverdict!=='合格').length;
+ const cnt={}; for(const s of PSTATE) cnt[s]=allDrafts.filter(d=>(d.pub||{}).state===s).length;
+ const rb=(v,t,n)=>`<label style="display:inline;font-weight:400;margin-right:10px"><input type="radio" name="tf" value="${v}" ${f===v?'checked':''} onchange="renderDrafts()"> ${t}${n===undefined?'':' '+n}</label>`;
  document.getElementById('dcnt').innerHTML=
-  `共 <b>${allDrafts.length}</b> 篇（含归档）· 标题不合新规 <b style="color:#c0392b">${bad}</b> 篇
-   <div style="margin:8px 0 10px;font-size:12px">
-    <label style="display:inline;font-weight:400"><input type="radio" name="tf" value="all" ${f==='all'?'checked':''} onchange="renderDrafts()"> 全部</label>
-    <label style="display:inline;font-weight:400;margin-left:10px"><input type="radio" name="tf" value="bad" ${f==='bad'?'checked':''} onchange="renderDrafts()"> 只看标题有问题的</label></div>`;
+  `共 <b>${allDrafts.length}</b> 篇（含归档）· 显示 <b>${ds.length}</b>
+   <div style="margin:8px 0 4px;font-size:12px">${rb('all','全部')}${rb('badtitle','标题有问题',bad)}</div>
+   <div style="margin:2px 0 10px;font-size:12px">
+    ${rb('已发布','🟢 已发布',cnt['已发布'])}${rb('已定时','🔵 已定时',cnt['已定时'])}<br>
+    ${rb('已预填','🟡 已预填未点',cnt['已预填'])}${rb('未处理','⚪️ 未发布',cnt['未处理'])}
+    ${cnt['预填失败']?rb('预填失败','🔴 预填失败',cnt['预填失败']):''}</div>`;
  document.getElementById('dlist').innerHTML=ds.map(d=>{
-  const [c,ic]=TV[d.tverdict]||['#999','·'];
+  const [c,ic]=TV[d.tverdict]||['#999','·'];const p=d.pub||{};
   return `<div class="ditem" onclick="showDraft('${d.name}',${d.archived})" style="padding:9px 12px;border:1px solid #ddd;border-left:3px solid ${c};border-radius:6px;margin-bottom:6px;cursor:pointer;background:#fff;font-size:13px">
-    <b>${d.name.replace(/^成稿_/,'').replace(/\\.md$/,'')}</b>${d.archived?' <span style="color:#999">[归档]</span>':''}
-    <span style="font-size:11px;padding:1px 6px;border-radius:8px;background:${d.lane==='推荐流'?'#e8e0f5':'#e0eef5'};color:#555">${d.lane}</span><br>
+    <div style="display:flex;justify-content:space-between;gap:6px">
+     <b>${d.name.replace(/^成稿_/,'').replace(/\\.md$/,'')}</b>
+     <span style="color:${p.color||'#bbb'};white-space:nowrap;font-size:11.5px">${p.label||''}</span></div>
+    ${d.archived?'<span style="color:#999">[归档]</span> ':''}<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:${d.lane==='推荐流'?'#e8e0f5':'#e0eef5'};color:#555">${d.lane}</span>
     <span style="color:${d.score===null?'#bbb':!d.independent?'#999':d.score>=85?'#2f7d4f':d.score>=70?'#b06c00':'#c0392b'}">${
       d.score===null?'未审核':d.score+' 分 · '+(d.grade||'')+(d.independent?'':' ⚠️ 仅自评')}</span>
     <span style="color:#aaa">· 图 ${d.images}</span>${d.disposition?` <span style="color:#888">· ${d.disposition}</span>`:''}<br>
     <span style="color:${c};font-size:12px">${ic} 标题${d.tverdict}（${d.tlen}字）</span>
+    ${p.detail?`<br><span style="color:#888;font-size:11.5px">${p.detail}</span>`:''}
    </div>`}).join('');
 }
 let curDraft=null;
 async function showDraft(name,arch){
  const d=await (await fetch('/draft?name='+encodeURIComponent(name)+'&arch='+(arch?1:0))).json();
  curDraft={name,arch};
- document.getElementById('daudit').innerHTML=(d.audit?`审核：${d.audit}`:'尚无审核记录')
+ const p=d.pub||{};
+ document.getElementById('daudit').innerHTML=
+   `<div style="border-left:3px solid ${p.color||'#bbb'};padding:6px 12px;margin-bottom:8px;background:#fafaf7">
+     <b style="color:${p.color||'#888'}">${p.label||''}</b>
+     ${p.detail?`<span style="color:#666"> · ${p.detail}</span>`:''}</div>`
+   +(d.audit?`审核：${d.audit}`:'尚无审核记录')
    +(d.predict?`<br><span style="color:#666">📊 ${d.predict}</span>`:'');
  document.getElementById('dimgs').innerHTML=(d.images||[]).map(u=>
   `<div style="text-align:center"><img src="${u}" style="height:240px;border-radius:6px;border:1px solid #ddd;display:block"><a href="${u}" download style="font-size:12px">下载</a></div>`).join('')
@@ -300,6 +315,7 @@ def prediction_map():
 
 def list_drafts():
     indep, own = audit_map()
+    pub, plog = _pub_sources()
     out = []
     for base, archived in [(SUCAI, False), (SUCAI / "归档稿", True)]:
         if not base.is_dir():
@@ -324,6 +340,7 @@ def list_drafts():
                 "disposition": (src.get("处置") if src else None),
                 "title": title,
                 "tverdict": tc.get("verdict"), "twhy": tc.get("why"), "tlen": tc.get("length"),
+                "pub": publish_status(f.name, title, pub, plog),
                 "images": len(list((SUCAI / "成品图" /
                                     f.name.removeprefix("成稿_").removesuffix(".md")).glob("*.png")))
                 if (SUCAI / "成品图" / f.name.removeprefix("成稿_").removesuffix(".md")).is_dir() else 0,
@@ -488,7 +505,65 @@ def draft_detail(name, archived):
         imgs = [f"/img?f=成品图/{stem}/{p.name}" for p in sorted(img_dir.glob("*.png"))]
     return {"content": text, "audit": audit, "predict": predict,
             "lane": lane_of_draft(text), "images": imgs,
-            "title_check": title_verdict(parsed.get("title", "")), **parsed}
+            "title_check": title_verdict(parsed.get("title", "")),
+            "pub": publish_status(name, parsed.get("title", "")), **parsed}
+
+
+def _pub_sources():
+    """（后台已发笔记 by 标题, 本地发布日志最新一行 by 成稿文件）。
+
+    两个来源不是一回事，必须都读：
+      · 发布数据.csv 是每天从创作后台抓回来的**真实已发列表**，是硬事实；
+      · 发布日志.csv 只记录走过 auto_publish 这条脚本路径的动作，
+        人工在页面上直接发的它不知道。
+    实测差异：谈薪预算就这么多 / 结构化面试不能说 两篇，本地日志停在
+    「— dry-run 未点发布」，后台却早就有了 —— 只信日志会把已发的当成没发，
+    再发一次就是重复占位。所以后台优先。
+    """
+    pub = {}
+    p = SUCAI / "发布数据.csv"
+    if p.exists():
+        for r in csv.DictReader(p.open(encoding="utf-8-sig")):
+            t = (r.get("标题") or "").strip()
+            if t:
+                pub[t] = r          # 同一篇会按抓取日重复出现，留最后一条（最新数据）
+    log = {}
+    p = SUCAI / "发布日志.csv"
+    if p.exists():
+        for r in csv.DictReader(p.open(encoding="utf-8-sig")):
+            n = (r.get("成稿文件") or "").strip()
+            if n:
+                log[n] = r
+    return pub, log
+
+
+def publish_status(name, title, pub=None, log=None):
+    """这篇稿走到发布流程的哪一步了。返回 {state, label, detail, color}。"""
+    if pub is None or log is None:
+        pub, log = _pub_sources()
+    row = log.get(name)
+    # 标题可能在发布之后又被改过，所以先用当前标题匹配后台，
+    # 匹配不上再用发布日志当时记下的标题兜一次。
+    hit = pub.get((title or "").strip())
+    if hit is None and row:
+        hit = pub.get((row.get("标题") or "").strip())
+    if hit:
+        n = lambda k: (hit.get(k) or "0").strip() or "0"
+        return {"state": "已发布", "label": "🟢 已发布", "color": "#2f7d4f",
+                "detail": f"{hit.get('发布时间','')} · 观看 {n('观看')} 赞 {n('点赞')} "
+                          f"藏 {n('收藏')} 评 {n('评论')}"}
+    if not row:
+        return {"state": "未处理", "label": "⚪️ 未发布", "color": "#bbb", "detail": ""}
+    done = (row.get("发布") or "").strip()
+    if done.startswith("✅"):
+        # 已点定时但后台还没抓到：要么没到点，要么抓取任务当天没跑
+        return {"state": "已定时", "label": "🔵 已定时待生效", "color": "#2563eb",
+                "detail": f"{done}（后台数据里还没出现，等 daily_data 抓取）"}
+    if (row.get("预填") or "").strip() == "✅":
+        return {"state": "已预填", "label": "🟡 已预填·最后一步没点", "color": "#b06c00",
+                "detail": f"{row.get('日期','')} 预填 · 建议时段 {row.get('定时','')} · {done}"}
+    return {"state": "预填失败", "label": "🔴 预填失败", "color": "#c0392b",
+            "detail": (row.get("备注") or done)[:80]}
 
 
 def rerender_cards(name):
