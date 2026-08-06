@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.eric.xhsbrief</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/xhs-health/nightly_brief.py</string>
+    </array>
+    <!-- 21:00：晚上 4 轮采集已跑完、成稿也出了，此时的数字才是当天的定论。
+         比 22:00 发布窗口早一小时，brief 里的「真正可发 N 篇」还来得及照着做。 -->
+    <key>StartCalendarInterval</key>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+    <!-- 日志分两个文件：brief 正文写进 docs/YYYYMMDD-brief.md，这里只留失败堆栈。
+         ⛔ 本仓库在 USB 外置卷上，launchd 默认没有该卷的读权限（TCC），
+         装完必须去「系统设置 → 隐私与安全性 → 完全磁盘访问权限」把
+         /Library/Developer/CommandLineTools/usr/bin/python3（/usr/bin/python3 只是它的 shim）加进去，
+         否则这个任务会和其余 5 个一样静默失败（退出码 2/126），日志只写「Operation not permitted」。 -->
+    <key>StandardOutPath</key>
+    <string>/tmp/xhsbrief.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/xhsbrief.log</string>
+</dict>
+</plist>
