@@ -129,16 +129,31 @@ function showTab(name){
  if(name==='view') renderList();
  if(name==='drafts') loadDrafts();
 }
+let allDrafts=[];
+const TV={'合格':['#2f7d4f','✅'],'疑似不合格':['#b06c00','⚠️'],'作废':['#c0392b','⛔']};
 async function loadDrafts(){
- const ds=await (await fetch('/drafts')).json();
- document.getElementById('dcnt').textContent=`共 ${ds.length} 篇（含归档）`;
- document.getElementById('dlist').innerHTML=ds.map(d=>
-  `<div class="ditem" onclick="showDraft('${d.name}',${d.archived})" style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;margin-bottom:6px;cursor:pointer;background:#fff;font-size:13px">
+ allDrafts=await (await fetch('/drafts')).json();
+ renderDrafts();
+}
+function renderDrafts(){
+ const f=document.querySelector('input[name=tf]:checked')?.value||'all';
+ const ds=f==='all'?allDrafts:allDrafts.filter(d=>d.tverdict!=='合格');
+ const bad=allDrafts.filter(d=>d.tverdict!=='合格').length;
+ document.getElementById('dcnt').innerHTML=
+  `共 <b>${allDrafts.length}</b> 篇（含归档）· 标题不合新规 <b style="color:#c0392b">${bad}</b> 篇
+   <div style="margin:8px 0 10px;font-size:12px">
+    <label style="display:inline;font-weight:400"><input type="radio" name="tf" value="all" ${f==='all'?'checked':''} onchange="renderDrafts()"> 全部</label>
+    <label style="display:inline;font-weight:400;margin-left:10px"><input type="radio" name="tf" value="bad" ${f==='bad'?'checked':''} onchange="renderDrafts()"> 只看标题有问题的</label></div>`;
+ document.getElementById('dlist').innerHTML=ds.map(d=>{
+  const [c,ic]=TV[d.tverdict]||['#999','·'];
+  return `<div class="ditem" onclick="showDraft('${d.name}',${d.archived})" style="padding:9px 12px;border:1px solid #ddd;border-left:3px solid ${c};border-radius:6px;margin-bottom:6px;cursor:pointer;background:#fff;font-size:13px">
     <b>${d.name.replace(/^成稿_/,'').replace(/\\.md$/,'')}</b>${d.archived?' <span style="color:#999">[归档]</span>':''}
     <span style="font-size:11px;padding:1px 6px;border-radius:8px;background:${d.lane==='推荐流'?'#e8e0f5':'#e0eef5'};color:#555">${d.lane}</span><br>
     <span style="color:${d.score===null?'#bbb':!d.independent?'#999':d.score>=85?'#2f7d4f':d.score>=70?'#b06c00':'#c0392b'}">${
       d.score===null?'未审核':d.score+' 分 · '+(d.grade||'')+(d.independent?'':' ⚠️ 仅自评')}</span>
-   </div>`).join('');
+    <span style="color:#aaa">· 图 ${d.images}</span>${d.disposition?` <span style="color:#888">· ${d.disposition}</span>`:''}<br>
+    <span style="color:${c};font-size:12px">${ic} 标题${d.tverdict}（${d.tlen}字）</span>
+   </div>`}).join('');
 }
 let curDraft=null;
 async function showDraft(name,arch){
@@ -150,15 +165,32 @@ async function showDraft(name,arch){
   `<div style="text-align:center"><img src="${u}" style="height:240px;border-radius:6px;border:1px solid #ddd;display:block"><a href="${u}" download style="font-size:12px">下载</a></div>`).join('')
   ||'<span style="color:#999;font-size:13px">封面生成中，稍后重新点击本篇即可看到</span>';
  const cp=(id,txt)=>`<button style="margin:0;padding:5px 14px;font-size:12px" onclick="navigator.clipboard.writeText(document.getElementById('${id}').textContent).then(()=>this.textContent='已拷贝 ✓')">拷贝</button>`;
+ const t=d.title_check||{};const [tc,tic]=TV[t.verdict]||['#999','·'];
+ const rows=(l,ic)=>(l||[]).map(x=>`<div>${ic} ${x.replace(/</g,'&lt;')}</div>`).join('');
  document.getElementById('dbody').innerHTML=
   `<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px"><h2 id="dtitle" style="margin:0;font-size:22px">${d.title||'（未解析出标题）'}</h2>${cp('dtitle')}</div>
-   <div style="display:flex;gap:12px;align-items:flex-start;margin:14px 0 4px"><b style="flex-shrink:0">正文</b>${cp('dtext')}
+   <div style="border-left:3px solid ${tc};background:#fafaf7;padding:8px 12px;font-size:13px;margin:6px 0 14px">
+     <b style="color:${tc}">${tic} 标题体检：${t.verdict||'?'}</b>（${t.length||0} 字，上限 20）
+     <div style="color:#555;margin-top:4px">${rows(t.hits,'✅')}${rows(t.fatal,'⛔')}${rows(t.misses,'⚠️')}</div>
+     <div style="color:#888;margin-top:6px;font-size:12px">规则：skills/eric-xhs-title「⭐ 最高优先级」— 关键词 + 推翻一个预设；疑问句 −35、写读者困境 −32</div>
+   </div>
+   <div style="display:flex;gap:10px;align-items:center;margin:14px 0 4px;flex-wrap:wrap"><b style="flex-shrink:0">成稿全文</b>
+    <button style="margin:0;padding:5px 14px;font-size:12px;background:#2f7d4f" onclick="saveDraft(this)">保存修改</button>
+    <button style="margin:0;padding:5px 14px;font-size:12px;background:#566270" onclick="rerender(this)">只重生成本篇图片</button>
     <button style="margin:0;padding:5px 14px;font-size:12px;background:#c0392b" onclick="prefill(this)">预填到小红书发布页</button>
-    <button style="margin:0;padding:5px 14px;font-size:12px;background:#566270" onclick="rerender(this)">重新生成图片</button></div>
-   <div id="dtext" style="white-space:pre-wrap;background:#fafaf7;border:1px solid #eee;border-radius:6px;padding:14px">${(d.body||d.content).replace(/</g,'&lt;')}</div>
-   <div style="display:flex;gap:12px;align-items:center;margin-top:12px"><b>标签</b><span id="dtags">${d.tags||''}</span>${d.tags?cp('dtags'):''}</div>
-   <div id="dlog" style="font-size:12.5px;color:#666;white-space:pre-wrap;margin-top:10px"></div>
-   <details style="margin-top:16px;border:none"><summary style="font-size:13px;color:#999;cursor:pointer">查看原始 md 全文</summary><pre style="white-space:pre-wrap;font-size:13px">${d.content.replace(/</g,'&lt;')}</pre></details>`;
+    ${cp('dtags')}</div>
+   <textarea id="dedit" spellcheck="false" style="width:100%;box-sizing:border-box;height:460px;font:13px/1.7 ui-monospace,Menlo,monospace;padding:14px;border:1px solid #ddd;border-radius:6px;background:#fafaf7">${d.content.replace(/</g,'&lt;')}</textarea>
+   <div style="display:flex;gap:12px;align-items:center;margin-top:12px"><b>标签</b><span id="dtags">${d.tags||''}</span></div>
+   <div id="dlog" style="font-size:12.5px;color:#666;white-space:pre-wrap;margin-top:10px"></div>`;
+}
+async function saveDraft(btn){
+ if(!curDraft) return;
+ btn.textContent='保存中…';
+ const r=await (await fetch('/savedraft',{method:'POST',body:JSON.stringify(
+   {name:curDraft.name,arch:curDraft.arch,text:document.getElementById('dedit').value})})).json();
+ btn.textContent=r.ok?'已保存 ✓':'保存失败';
+ document.getElementById('dlog').textContent=r.log||'';
+ if(r.ok){await loadDrafts();showDraft(curDraft.name,curDraft.arch);}
 }
 let curTid=null;
 async function prefill(btn){
@@ -180,8 +212,9 @@ async function rerender(btn){
  if(!curDraft) return;
  btn.textContent='重渲染中…';
  const r=await (await fetch('/rerender?name='+encodeURIComponent(curDraft.name)+'&arch='+(curDraft.arch?1:0))).json();
- btn.textContent=r.ok?'已重新生成 ✓':'失败';
- if(r.ok) showDraft(curDraft.name,curDraft.arch);
+ btn.textContent=r.ok?'已重新生成 ✓':'失败，见下方日志';
+ document.getElementById('dlog').textContent=r.log||'';
+ if(r.ok){await loadDrafts();showDraft(curDraft.name,curDraft.arch);}
 }
 async function doclick(btn,mode,t){
  if(!curTid) return;
@@ -275,15 +308,25 @@ def list_drafts():
             a, o = indep.get(f.name), own.get(f.name)
             src = a or o
             try:
-                head = f.read_text(encoding="utf-8")[:800]
+                text = f.read_text(encoding="utf-8")
             except OSError:
-                head = ""
+                text = ""
+            # 标题整篇解析，不能只读前 800 字：「## 发布标题」在引言区之后，
+            # 截断会让老稿全部退化成用 H1 当标题，体检结果就全错了。
+            title = parse_draft(text).get("title", "") if text else ""
+            tc = title_verdict(title)
             out.append({
                 "name": f.name, "archived": archived,
                 "score": int(src["总分"]) if src and (src.get("总分") or "").isdigit() else None,
                 "grade": (src.get("评级") if src else None),
                 "independent": a is not None,          # False = 只有自评，不算过审
-                "lane": lane_of_draft(head),
+                "lane": lane_of_draft(text[:800]),
+                "disposition": (src.get("处置") if src else None),
+                "title": title,
+                "tverdict": tc.get("verdict"), "twhy": tc.get("why"), "tlen": tc.get("length"),
+                "images": len(list((SUCAI / "成品图" /
+                                    f.name.removeprefix("成稿_").removesuffix(".md")).glob("*.png")))
+                if (SUCAI / "成品图" / f.name.removeprefix("成稿_").removesuffix(".md")).is_dir() else 0,
             })
     out.sort(key=lambda d: d["name"], reverse=True)
     return out
@@ -297,15 +340,23 @@ def parse_draft(text):
     if m:
         for line in m.group(1).splitlines():
             line = line.strip()
-            if not line or line == "---":
-                continue
-            line = re.sub(r"——?触发器[^\n]*", "", line)          # 去触发器注释
-            line = re.sub(r"（[^）]*触发器[^）]*）", "", line)
-            line = re.sub(r"[（(][^）)]*\d+\s*字[^）)]*[）)]", "", line)  # 去（12字）/（13字，搜索原句，关键词最左）等整段注释
-            line = re.sub(r"【(首选|备选|推荐)】", "", line)        # 去【首选】等标记
-            line = line.replace("*", "")                          # 去残留粗体星号
-            line = line.strip(" *-①②③").lstrip("0123456789.．、 ")
-            line = line.strip("*《》「」 ").strip()
+            if not line or line == "---" or line.startswith(">"):
+                continue                                          # > 开头是自评注释，不是标题
+            # ⛔ 清洗顺序是有讲究的，改动前先想清楚：原来「去领起词」排在「去序号」前面，
+            # 而实际行长这样 `**① 主推**「HR说…」`——序号在领起词前面，
+            # 于是领起词规则永远匹配不上，「主推「」就跟着标题被填进了小红书。
+            # 现在按 由外到内 的顺序剥：注释 → 装饰 → 序号 → 领起词 → 括号块 → 引号。
+            line = re.split(r"\s*[—–]{2,}", line)[0]              # ①「—— 触发器：…」整段砍掉
+            line = re.sub(r"[→>]\s*(触发器|公式|口径)[^\n]*", "", line)
+            line = re.sub(r"【[^】]*】", "", line)                  # ②【首选：认知冲突 × …】整块
+            line = line.replace("*", "")                          # ③ 粗体星号
+            line = line.strip(" -–—①②③④⑤⑥⑦⑧⑨").lstrip("0123456789.．、 ")  # ④ 序号
+            line = re.sub(r"^\s*(主推|首选|备选|备用|推荐)\s*[：:]?\s*", "", line)      # ⑤ 领起词
+            # ⑥ 括号注释。原来只删含「字」的，于是「…该不该追问（搜索原句，关键词最左）」
+            # 这种不含字数的注释整段留在标题里 —— 而这个标题会被 auto_publish 填进发布页。
+            ANNO = r"字|搜索原句|关键词|触发器|公式|张力|首选|备选|备用|推荐|口径|命中"
+            line = re.sub(rf"[（(][^）)]*(?:{ANNO})[^）)]*[）)]", "", line)
+            line = line.strip("*《》「」『』\"' ").strip()          # ⑦ 包裹引号
             if line:
                 title = line
                 break
@@ -436,7 +487,72 @@ def draft_detail(name, archived):
     if img_dir.is_dir():
         imgs = [f"/img?f=成品图/{stem}/{p.name}" for p in sorted(img_dir.glob("*.png"))]
     return {"content": text, "audit": audit, "predict": predict,
-            "lane": lane_of_draft(text), "images": imgs, **parsed}
+            "lane": lane_of_draft(text), "images": imgs,
+            "title_check": title_verdict(parsed.get("title", "")), **parsed}
+
+
+def rerender_cards(name):
+    """按本篇自己的 cards.json 重新渲染全部 7 张卡，只动这一篇。
+
+    ⛔ 这里原来是个会毁稿的坑：旧实现只 rmtree 了 成品图/<stem>/ 然后重新读一遍详情，
+    而重新读详情时 ensure_cover 只会补一张 01_cover.png —— 点一次「重新生成图片」，
+    7 张正片被删光、只剩一张封面。更糟的是发布闸门只检查「目录里有没有 png」，
+    剩那一张照样算通过，于是会发出一篇只有封面的笔记。
+
+    现在直接调 make_cards.py 按 图文_<stem>_cards.json 全量重渲。
+    渲染成功才替换原目录：渲到一半失败的话，原来的 7 张还在，不至于既没新的也没旧的。
+    """
+    import shutil
+    import subprocess as sp
+    import tempfile
+    stem = name.removeprefix("成稿_").removesuffix(".md")
+    cards = SUCAI / f"图文_{stem}_cards.json"
+    if not cards.exists():
+        return {"ok": False, "log": f"找不到 {cards.name}，无法重渲（这篇可能从未生成过卡片）"}
+    out = SUCAI / "成品图" / stem
+    with tempfile.TemporaryDirectory() as tmp:
+        r = sp.run(["python3", str(SUCAI / "图文模板" / "make_cards.py"), str(cards), tmp + "/"],
+                   capture_output=True, text=True, timeout=300)
+        made = sorted(Path(tmp).glob("*.png"))
+        if r.returncode != 0 or not made:
+            return {"ok": False, "log": (r.stderr or r.stdout or "渲染无输出")[-400:]}
+        shutil.rmtree(out, ignore_errors=True)
+        out.mkdir(parents=True, exist_ok=True)
+        for p in made:
+            shutil.copy2(p, out / p.name)
+    return {"ok": True, "log": f"已重新渲染 {len(made)} 张 → 成品图/{stem}/"}
+
+
+def save_draft(name, archived, text):
+    """把编辑后的成稿写回磁盘。改完顺手报一下标题体检结果，省得改完还要自己去看。"""
+    if "/" in name or ".." in name or not name.endswith(".md"):
+        return {"ok": False, "log": "非法文件名"}
+    f = (SUCAI / "归档稿" / name) if archived else (SUCAI / name)
+    if not f.exists():
+        return {"ok": False, "log": "成稿不存在"}
+    if not text.strip():
+        return {"ok": False, "log": "内容为空，拒绝写入"}
+    # 存一份改前的：手改正文很容易把 draft_check 的机械项（字数/句长）碰坏，
+    # 想退回去时得有东西可退。同名只留最近一份，不做版本堆积。
+    (SUCAI / "归档稿" / "_编辑备份").mkdir(parents=True, exist_ok=True)
+    (SUCAI / "归档稿" / "_编辑备份" / name).write_text(
+        f.read_text(encoding="utf-8"), encoding="utf-8")
+    f.write_text(text, encoding="utf-8")
+    title = parse_draft(text).get("title", "")
+    return {"ok": True, "log": f"已保存（改前版本备份在 归档稿/_编辑备份/{name}）",
+            "title": title, "title_check": title_verdict(title)}
+
+
+def title_verdict(title):
+    """标题体检。判定规则不在这里实现——统一走 scripts/xhs-health/title_check.py，
+    否则页面和脚本会各有一套规则，迟早对不上。"""
+    import sys as _s
+    _s.path.insert(0, str(REPO / "scripts" / "xhs-health"))
+    try:
+        from title_check import check
+        return check(title)
+    except Exception as e:
+        return {"verdict": "?", "why": f"体检不可用：{e}", "length": len(title or "")}
 
 
 def prefill_xhs(name, archived):
@@ -573,15 +689,14 @@ class H(BaseHTTPRequestHandler):
                 self._send(json.dumps(d, ensure_ascii=False), "application/json")
         elif u.path == "/rerender":
             name = q.get("name", [""])[0]
-            if "/" not in name and ".." not in name:
-                import shutil
-                stem = name.removeprefix("成稿_").removesuffix(".md")
-                shutil.rmtree(SUCAI / "成品图" / stem, ignore_errors=True)
+            if "/" in name or ".." in name:
+                self._send('{"ok":false,"log":"非法文件名"}', "application/json", 400)
+                return
+            r = rerender_cards(name)
+            if r["ok"]:
                 d = draft_detail(name, q.get("arch", ["0"])[0] == "1")
-                self._send(json.dumps({"ok": d is not None, "images": (d or {}).get("images", [])},
-                                      ensure_ascii=False), "application/json")
-            else:
-                self._send('{"ok":false}', "application/json", 400)
+                r["images"] = (d or {}).get("images", [])
+            self._send(json.dumps(r, ensure_ascii=False), "application/json")
         elif u.path == "/doclick":
             r = do_publish_click(q.get("tid", [""])[0], q.get("mode", ["now"])[0], q.get("time", [""])[0])
             self._send(json.dumps(r, ensure_ascii=False), "application/json")
@@ -603,6 +718,10 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         d = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        if self.path.startswith("/savedraft"):
+            r = save_draft(d.get("name", ""), bool(d.get("arch")), d.get("text", ""))
+            self._send(json.dumps(r, ensure_ascii=False), "application/json")
+            return
         rows = read_rows()
         if d["idx"] == "new":
             row = {k: "" for k in FIELDS}
