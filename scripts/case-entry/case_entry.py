@@ -7,7 +7,7 @@ import csv
 import json
 import re
 import webbrowser
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -186,17 +186,59 @@ async function showDraft(name,arch){
   `<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px"><h2 id="dtitle" style="margin:0;font-size:22px">${d.title||'（未解析出标题）'}</h2>${cp('dtitle')}</div>
    <div style="border-left:3px solid ${tc};background:#fafaf7;padding:8px 12px;font-size:13px;margin:6px 0 14px">
      <b style="color:${tc}">${tic} 标题体检：${t.verdict||'?'}</b>（${t.length||0} 字，上限 20）
+     <button style="margin:0 0 0 10px;padding:4px 12px;font-size:12px;background:#8a6d2f" onclick="genTitle(this)">重新生成标题</button>
      <div style="color:#555;margin-top:4px">${rows(t.hits,'✅')}${rows(t.fatal,'⛔')}${rows(t.misses,'⚠️')}</div>
+     <div id="dtcand" style="margin-top:8px"></div>
      <div style="color:#888;margin-top:6px;font-size:12px">规则：skills/eric-xhs-title「⭐ 最高优先级」— 关键词 + 推翻一个预设；疑问句 −35、写读者困境 −32</div>
    </div>
    <div style="display:flex;gap:10px;align-items:center;margin:14px 0 4px;flex-wrap:wrap"><b style="flex-shrink:0">成稿全文</b>
     <button style="margin:0;padding:5px 14px;font-size:12px;background:#2f7d4f" onclick="saveDraft(this)">保存修改</button>
     <button style="margin:0;padding:5px 14px;font-size:12px;background:#566270" onclick="rerender(this)">只重生成本篇图片</button>
     <button style="margin:0;padding:5px 14px;font-size:12px;background:#c0392b" onclick="prefill(this)">预填到小红书发布页</button>
+    ${p.state==='已发布'&&p.detail&&!p.detail.includes('人工')?'':
+      `<button style="margin:0;padding:5px 14px;font-size:12px;background:${p.state==='已发布'?'#999':'#2f7d4f'}" onclick="markPub(this,${p.state==='已发布'?1:0})">${p.state==='已发布'?'撤销「已发布」标记':'标记为已发布'}</button>`}
     ${cp('dtags')}</div>
    <textarea id="dedit" spellcheck="false" style="width:100%;box-sizing:border-box;height:460px;font:13px/1.7 ui-monospace,Menlo,monospace;padding:14px;border:1px solid #ddd;border-radius:6px;background:#fafaf7">${d.content.replace(/</g,'&lt;')}</textarea>
    <div style="display:flex;gap:12px;align-items:center;margin-top:12px"><b>标签</b><span id="dtags">${d.tags||''}</span></div>
    <div id="dlog" style="font-size:12.5px;color:#666;white-space:pre-wrap;margin-top:10px"></div>`;
+}
+async function markPub(btn,undo){
+ if(!curDraft) return;
+ if(undo && !confirm('撤销人工标记？只会删掉「人工标记已发布」那条记录，脚本流程写的日志和后台抓到的数据不动。')) return;
+ let link='';
+ if(!undo){ link=prompt('笔记链接（可留空，之后 health_check 会提醒补）','')||''; }
+ btn.textContent='处理中…';
+ const r=await (await fetch('/markpub?name='+encodeURIComponent(curDraft.name)
+   +'&undo='+(undo?1:0)+'&link='+encodeURIComponent(link))).json();
+ document.getElementById('dlog').textContent=r.log||'';
+ btn.textContent=r.ok?'已更新 ✓':'失败';
+ if(r.ok){await loadDrafts();showDraft(curDraft.name,curDraft.arch);}
+}
+async function genTitle(btn){
+ if(!curDraft) return;
+ const box=document.getElementById('dtcand');
+ btn.textContent='生成中…（调 claude，约 30-60 秒）';btn.disabled=true;
+ box.innerHTML='<span style="color:#888;font-size:12px">正在按 eric-xhs-title 的实证规律出 3 个候选…</span>';
+ const r=await (await fetch('/gentitle?name='+encodeURIComponent(curDraft.name))).json();
+ btn.disabled=false;btn.textContent='重新生成标题';
+ if(!r.ok){box.innerHTML=`<span style="color:#c0392b;font-size:12px">${r.log}</span>`;return;}
+ box.innerHTML=r.candidates.map((c,i)=>{
+  const [cc,ci]=TV[c.check.verdict]||['#999','·'];
+  return `<div style="background:#fff;border:1px solid #ddd;border-left:3px solid ${cc};border-radius:6px;padding:8px 10px;margin-bottom:6px">
+    <b style="font-size:14px">${c.title.replace(/</g,'&lt;')}</b>
+    <span style="color:${cc};font-size:12px">　${ci} ${c.check.verdict}（${c.check.length}字）</span>
+    <button style="margin:0 0 0 8px;padding:3px 10px;font-size:12px;background:#2f7d4f" onclick="useTitle(${i})">用这个</button>
+    ${c.why?`<div style="color:#888;font-size:12px;margin-top:3px">推翻：${c.why.replace(/</g,'&lt;')}</div>`:''}
+   </div>`}).join('');
+ window._cands=r.candidates;
+}
+async function useTitle(i){
+ const c=(window._cands||[])[i];if(!c||!curDraft) return;
+ if(!confirm(`把首选标题换成：\\n\\n${c.title}\\n\\n原有候选会保留在下面备查。`)) return;
+ const r=await (await fetch('/settitle',{method:'POST',body:JSON.stringify(
+   {name:curDraft.name,arch:curDraft.arch,title:c.title})})).json();
+ document.getElementById('dlog').textContent=r.log||'';
+ if(r.ok){await loadDrafts();showDraft(curDraft.name,curDraft.arch);}
 }
 async function saveDraft(btn){
  if(!curDraft) return;
@@ -555,6 +597,13 @@ def publish_status(name, title, pub=None, log=None):
     if not row:
         return {"state": "未处理", "label": "⚪️ 未发布", "color": "#bbb", "detail": ""}
     done = (row.get("发布") or "").strip()
+    if "人工标记已发布" in done:
+        # 人是最终事实来源：他说发了就是发了，不该显示成「待生效」。
+        # 但要标出这条还没被后台数据印证 —— 后台每天才抓一次（08:30 daily_data），
+        # 印证之前不该拿它当已核实的数据用。
+        return {"state": "已发布", "label": "🟢 已发布（人工标记）", "color": "#2f7d4f",
+                "detail": f"{row.get('日期','')} 人工标记 · 后台数据尚未印证"
+                          + (f" · {row.get('笔记链接')}" if row.get("笔记链接") else "（笔记链接待补）")}
     if done.startswith("✅"):
         # 已点定时但后台还没抓到：要么没到点，要么抓取任务当天没跑
         return {"state": "已定时", "label": "🔵 已定时待生效", "color": "#2563eb",
@@ -564,6 +613,159 @@ def publish_status(name, title, pub=None, log=None):
                 "detail": f"{row.get('日期','')} 预填 · 建议时段 {row.get('定时','')} · {done}"}
     return {"state": "预填失败", "label": "🔴 预填失败", "color": "#c0392b",
             "detail": (row.get("备注") or done)[:80]}
+
+
+def mark_published(name, link=""):
+    """人工把一篇标成已发布：写进发布日志 + 回填词库。
+
+    为什么需要手动这一档：状态是靠「后台抓取 + 发布日志」两头对出来的，
+    而后台数据每天才抓一次（com.eric.xhsdata 08:30）。刚在页面上点完定时发布的稿，
+    要等到第二天才会变绿；期间它看着像没发，很容易被再发一遍。
+    这个按钮就是让人把「我确实发了」这件事立刻记下来，不用等抓取。
+
+    回填词库复用 auto_publish.backfill_ciku —— 它按成稿头部声明的关键词精确定位，
+    比拿标题去猜可靠（标题策略早就不复读搜索原句了，按标题匹配一个都对不上）。
+    """
+    import sys as _s
+    _s.path.insert(0, str(REPO / "scripts" / "xhs-publish"))
+    from datetime import datetime
+    f = SUCAI / name
+    if not f.exists():
+        f = SUCAI / "归档稿" / name
+    if not f.exists():
+        return {"ok": False, "log": "成稿不存在"}
+    title = parse_draft(f.read_text(encoding="utf-8")).get("title", "")
+    note = ""
+    try:
+        from auto_publish import backfill_ciku, log_run, PUB_LOG_COLS
+        note = backfill_ciku(title, link, name)
+        log_run({"日期": datetime.now().strftime("%Y-%m-%d %H:%M"), "成稿文件": name,
+                 "标题": title, "闸门": "—", "预填": "—", "定时": "",
+                 "发布": "✅ 人工标记已发布", "笔记链接": link,
+                 "备注": f"在成稿预览页人工标记；{note}"})
+    except Exception as e:
+        return {"ok": False, "log": f"写入失败：{e}"}
+    return {"ok": True, "log": f"已标记为已发布。{note}",
+            "pub": publish_status(name, title)}
+
+
+def unmark_published(name):
+    """撤销人工标记：把发布日志里该稿的「✅ 人工标记已发布」行删掉。
+
+    只删人工标记的行，不碰脚本流程写的记录 —— 那些是真发生过的操作日志，
+    删掉就没法回溯了。后台抓到的已发布状态也不受影响（那是硬事实，撤不掉）。
+    """
+    p = SUCAI / "发布日志.csv"
+    if not p.exists():
+        return {"ok": False, "log": "无发布日志"}
+    with p.open(encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.DictReader(f))
+        cols = list(rows[0].keys()) if rows else []
+    keep = [r for r in rows if not ((r.get("成稿文件") or "").strip() == name
+                                    and "人工标记已发布" in (r.get("发布") or ""))]
+    if len(keep) == len(rows):
+        return {"ok": False, "log": "这篇没有人工标记记录可撤销"}
+    tmp = p.with_suffix(".csv.tmp")
+    with tmp.open("w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        w.writerows(keep)
+    tmp.replace(p)
+    f2 = SUCAI / name
+    if not f2.exists():
+        f2 = SUCAI / "归档稿" / name
+    title = parse_draft(f2.read_text(encoding="utf-8")).get("title", "") if f2.exists() else ""
+    return {"ok": True, "log": f"已撤销 {len(rows)-len(keep)} 条人工标记",
+            "pub": publish_status(name, title)}
+
+
+def gen_titles(name):
+    """按 eric-xhs-title 的实证规律重出 3 个候选标题，每个都跑一遍机械体检。
+
+    规则不在这里重写一份，直接从 SKILL.md 抠「⭐ 最高优先级」整节喂给模型 ——
+    refine_loop 踩过这个坑：内嵌副本没跟上 SKILL.md 的硬约束，模型照副本写出了
+    前半段带疑问句的标题（疑问句 −35、写困境 −32，实测最强的两个负信号）。
+    """
+    import subprocess as sp
+    f = SUCAI / name
+    if not f.exists():
+        f = SUCAI / "归档稿" / name
+    if not f.exists():
+        return {"ok": False, "log": "成稿不存在"}
+    text = f.read_text(encoding="utf-8")
+    skill = (REPO / "skills" / "eric-xhs-title" / "SKILL.md").read_text(encoding="utf-8")
+    m = re.search(r"^## ⭐ 最高优先级.*?(?=^## )", skill, re.M | re.S)
+    if not m:
+        return {"ok": False, "log": "取不到标题规则（SKILL.md 的「⭐ 最高优先级」一节缺失）"}
+    parsed = parse_draft(text)
+    kw = ""
+    mk = re.search(r"关键词来源[^「]*「([^」]+)」", text[:2000])
+    if mk:
+        kw = mk.group(1).strip()
+    prompt = f"""{m.group(0)}
+
+【本篇关键词】{kw or '（未声明）'}
+【当前标题】{parsed.get('title','')}
+【正文】
+{(parsed.get('body') or text)[:1800]}
+
+按上面那一节的规律，为本篇出 **3 个** 候选标题。
+硬性要求：每个 ≤20 字含标点；关键词主体要在（可改写，含疑问词的必须去掉疑问尾巴）；
+每个都必须推翻一个读者笃信的预设。
+输出格式：只输出 3 行，每行一个标题，行尾用制表符跟一句「推翻了什么预设」。
+不要序号、不要引号、不要任何其它文字。"""
+    claude = Path.home() / ".local/bin/claude"
+    try:
+        r = sp.run([str(claude), "-p", prompt], capture_output=True, text=True, timeout=300)
+    except sp.TimeoutExpired:
+        return {"ok": False, "log": "claude 调用超时（300s）"}
+    out = (r.stdout or "").strip()
+    if re.search(r"session limit|usage limit|rate.?limit", out, re.I):
+        return {"ok": False, "log": f"撞到额度限制：{out[:120]}"}
+    if not out:
+        return {"ok": False, "log": (r.stderr or "claude 无输出")[:200]}
+    cands = []
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        t, _, why = line.partition("\t")
+        t = t.strip(" -*0123456789.．、「」\"'")
+        if not t:
+            continue
+        cands.append({"title": t, "why": why.strip(), "check": title_verdict(t)})
+        if len(cands) == 3:
+            break
+    if not cands:
+        return {"ok": False, "log": f"解析不出候选：{out[:200]}"}
+    return {"ok": True, "candidates": cands, "log": f"生成 {len(cands)} 个候选"}
+
+
+def set_title(name, archived, title):
+    """把选定标题写进成稿的「发布标题」段首位，原候选保留在下面备查。"""
+    from datetime import date as _d
+    title = (title or "").strip()
+    if not title:
+        return {"ok": False, "log": "标题为空"}
+    if "/" in name or ".." in name:
+        return {"ok": False, "log": "非法文件名"}
+    f = (SUCAI / "归档稿" / name) if archived else (SUCAI / name)
+    if not f.exists():
+        return {"ok": False, "log": "成稿不存在"}
+    text = f.read_text(encoding="utf-8")
+    m = re.search(r"(^#{1,3}\s*发布标题[^\n]*\n)", text, re.M)
+    if not m:
+        return {"ok": False, "log": "这篇没有「发布标题」段，无法写入"}
+    # 新标题插在段首，parse_draft 取第一条非空行，所以它自然成为首选；
+    # 旧候选整段留在下面 —— 换标题是可能换错的，原来的得留着能对照。
+    line = f"1. **【首选】{title}**（{len(title)}字 · {_d.today().isoformat()} 人工重生成）\n"
+    (SUCAI / "归档稿" / "_编辑备份").mkdir(parents=True, exist_ok=True)
+    (SUCAI / "归档稿" / "_编辑备份" / name).write_text(text, encoding="utf-8")
+    text = text[:m.end()] + line + text[m.end():]
+    f.write_text(text, encoding="utf-8")
+    new = parse_draft(text).get("title", "")
+    return {"ok": True, "log": f"已写入（改前版本备份在 归档稿/_编辑备份/{name}）",
+            "title": new, "title_check": title_verdict(new)}
 
 
 def rerender_cards(name):
@@ -762,6 +964,14 @@ class H(BaseHTTPRequestHandler):
                 self._send('{"error":"not found"}', "application/json", 404)
             else:
                 self._send(json.dumps(d, ensure_ascii=False), "application/json")
+        elif u.path == "/gentitle":
+            self._send(json.dumps(gen_titles(q.get("name", [""])[0]),
+                                  ensure_ascii=False), "application/json")
+        elif u.path == "/markpub":
+            r = (unmark_published(q.get("name", [""])[0])
+                 if q.get("undo", ["0"])[0] == "1"
+                 else mark_published(q.get("name", [""])[0], q.get("link", [""])[0]))
+            self._send(json.dumps(r, ensure_ascii=False), "application/json")
         elif u.path == "/rerender":
             name = q.get("name", [""])[0]
             if "/" in name or ".." in name:
@@ -793,6 +1003,10 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         d = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        if self.path.startswith("/settitle"):
+            r = set_title(d.get("name", ""), bool(d.get("arch")), d.get("title", ""))
+            self._send(json.dumps(r, ensure_ascii=False), "application/json")
+            return
         if self.path.startswith("/savedraft"):
             r = save_draft(d.get("name", ""), bool(d.get("arch")), d.get("text", ""))
             self._send(json.dumps(r, ensure_ascii=False), "application/json")
@@ -822,4 +1036,4 @@ class H(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     print(f"案例库填写界面: http://localhost:{PORT}  （Ctrl+C 退出）")
     webbrowser.open(f"http://localhost:{PORT}")
-    HTTPServer(("127.0.0.1", PORT), H).serve_forever()
+    ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()
