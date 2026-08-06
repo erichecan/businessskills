@@ -30,8 +30,14 @@ JOBS = {
     "com.eric.xhsaudit":   ("xhs-health/independent_audit.py", [], [(9, 5)]),
     "com.eric.xhshealth":  ("xhs-health/health_check.py", [], [(9, 30), (19, 30)]),
     "com.eric.xhsdata":    ("xhs-publish/daily_data.sh", [], [(8, 30)]),
-    "com.eric.xhswrite":   ("xhs-loop/refine_loop.py", ["--rework", "3", "--count", "3"],
-                            [(4, 30), (14, 30)]),
+    # 一天四批，每批 返工2 + 新稿2 = 4 篇，理论 16 篇/天。
+    # 时点按 Claude 的 5 小时额度窗口切：额度 4am 重置，之后每 5 小时一个窗口，
+    # 每个窗口开头半小时开跑，一批只吃一个窗口的额度，不会把后面几批饿死。
+    # 返工排在新稿前面且占一半：今天实测返工 3 篇全过线（84→89 / 82→88 / 76→87），
+    # 其中两篇只用 1 轮 ≈ 2 次 claude 调用，而新稿要跑满 3 轮 ≈ 6 次。
+    # 同样的额度，返工的产出效率是新稿的三倍。
+    "com.eric.xhswrite":   ("xhs-loop/refine_loop.py", ["--rework", "2", "--count", "2"],
+                            [(4, 30), (9, 30), (14, 30), (19, 30)]),
     "com.eric.xhspublish": ("xhs-publish/auto_publish.py", [], [(9, 0), (14, 0), (21, 0)]),
     "com.eric.xhsbrief":   ("xhs-health/nightly_brief.py", [], [(21, 0)]),
 }
@@ -87,6 +93,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--verify", action="store_true")
+    ap.add_argument("--reset-times", nargs="*", metavar="LABEL",
+                    help="用 JOBS 里的时点覆盖磁盘上已有的。可跟 label 子串只覆盖指定任务，"
+                         "不跟参数则覆盖全部。默认沿用磁盘上的时点，不冲掉手调过的")
     args = ap.parse_args()
 
     if args.verify:
@@ -98,7 +107,9 @@ def main():
 
     AGENTS.mkdir(parents=True, exist_ok=True)
     for label, (rel, extra, times) in JOBS.items():
-        times = existing_times(label) or times
+        reset = args.reset_times is not None and (
+            not args.reset_times or any(s in label for s in args.reset_times))
+        times = times if reset else (existing_times(label) or times)
         data = build(label, rel, extra, times)
         path = AGENTS / f"{label}.plist"
         when = " ".join(f"{h:02d}:{m:02d}" for h, m in times)
@@ -112,10 +123,10 @@ def main():
         print("\n[dry-run] 未写入")
         return 0
     print(f"\n✅ 已重装 {len(JOBS)} 个任务，Program 统一为 {PYTHON}")
-    print("   接下来只需在「完全磁盘访问权限」里加这一个（.app 包，面板里可选）：")
-    print("   /opt/homebrew/opt/python@3.14/Frameworks/Python.framework/Versions/3.14/"
-          "Resources/Python.app")
-    print("   加完验证：python3 scripts/install_agents.py --verify")
+    print("   2026-08-05 实测：换成 Homebrew python 后外置卷读得到了，"
+          "不需要任何「完全磁盘访问权限」授权。")
+    print("   验证：python3 scripts/install_agents.py --verify")
+    print("   真跑一次：launchctl kickstart -k gui/$(id -u)/com.eric.xhsbrief")
     return 0
 
 
