@@ -289,6 +289,12 @@ def publish_one(name, dry_run, immediate=False):
         return 0 if res.get("ok") else 1
 
     sw = open_sched_switch(pre["tid"])
+    # 切到前台，否则这一步等于没做：cdp-proxy 用 background:true 建 tab，
+    # 预填完的页面一直躲在后台，日志写着「已打开创作平台」而人根本看不见
+    # （2026-08-05 实测，Eric 找不到页面，最后一步没人点，稿就卡在那）。
+    focus = subprocess.run([sys.executable, str(Path(__file__).parent / "focus_tab.py"),
+                            "--target", pre["tid"]], capture_output=True, text=True)
+    print((focus.stdout or focus.stderr or "").strip())
     row["发布"] = "⏸ 待人工定时"
     row["备注"] = f"定时开关：{sw}"
     log_run(row)
