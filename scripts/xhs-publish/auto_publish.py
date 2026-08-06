@@ -28,6 +28,8 @@ JS 合成 click、完整鼠标事件序列、CDP Input.dispatchMouseEvent 全部
 import argparse
 import csv
 import json
+import os
+import re
 import subprocess
 import sys
 from datetime import date, datetime, timedelta
@@ -48,7 +50,7 @@ PUB_LOG_COLS = ["日期", "成稿文件", "标题", "闸门", "预填", "定时"
 # 发布时段轮换池 — 每次发布取下一个，用来测出哪个时段搜索进入占比最高。
 # 一轮 7 个点跑完，配合词库的「搜索来源占比」回填即可横向比较。
 SLOT_HOURS = [9, 11, 12, 17, 18, 20, 22]
-DAILY_QUOTA = 2          # 每天发 2 篇，不是一天占满 7 个时段
+DAILY_QUOTA = 3          # 每天发 3 篇，不是一天占满 7 个时段
 SCHED_LEAD = timedelta(minutes=30)   # 小红书定时发布需要提前量，太近会被拒
 TRUSTED_AUDITORS = {"独立审核", "人工放行"}
 
@@ -148,29 +150,50 @@ def log_run(row):
         w.writerow({c: row.get(c, "") for c in PUB_LOG_COLS})
 
 
-def backfill_ciku(title, link):
-    """把发布日/笔记链接写回词库。关键词按标题包含关系匹配，匹配不到就不猜。"""
+def keyword_of(name):
+    """从成稿正文头部取它写的是哪个词。成稿模板里「关键词来源：`词库.csv`「X」」是确定信息，
+    比拿标题去猜可靠。2026-08-05 之前只按标题匹配，而标题策略早已改成「不复读搜索原句」
+    （见 commit ee904ce），于是每篇都匹配不上、发布日和笔记链接一路空着没人发现。"""
+    f = SUCAI / name
+    if not f.exists():
+        return ""
+    head = f.read_text(encoding="utf-8")[:2000]
+    m = re.search(r"关键词来源[^「]*「([^」]+)」", head)
+    return m.group(1).strip() if m else ""
+
+
+def backfill_ciku(title, link, name=""):
+    """把发布日/笔记链接写回词库。先按成稿声明的关键词精确定位，取不到再退回标题包含匹配。"""
     rows = read_csv(CIKU)
     if not rows:
         return "词库为空"
     cols = list(rows[0].keys())
     hit = None
-    for r in rows:
-        kw = (r.get("关键词") or "").strip()
-        if kw and (kw in title or title in kw):
-            hit = r
-            break
+    declared = keyword_of(name) if name else ""
+    if declared:
+        hit = next((r for r in rows if (r.get("关键词") or "").strip() == declared), None)
     if hit is None:
-        return f"词库无匹配关键词（标题「{title}」），发布日未回填"
+        for r in rows:
+            kw = (r.get("关键词") or "").strip()
+            if kw and (kw in title or title in kw):
+                hit = r
+                break
+    if hit is None:
+        hint = f"；成稿声明的词「{declared}」不在词库里" if declared else ""
+        return f"词库无匹配关键词（标题「{title}」{hint}），发布日未回填"
     hit["状态"] = "已发布"
     hit["发布日"] = date.today().isoformat()
     if link:
         hit["笔记链接"] = link
-    with CIKU.open("w", encoding="utf-8-sig", newline="") as f:
+    # 原子替换：refine_loop 可能正并发读词库选题，直接 open("w") 会有一段
+    # 文件被截断、只写了一半的窗口，读者这时读到的是残缺 CSV。
+    tmp = CIKU.with_suffix(".csv.tmp")
+    with tmp.open("w", encoding="utf-8-sig", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols)
         w.writeheader()
         for r in rows:
             w.writerow({c: r.get(c, "") for c in cols})
+    os.replace(tmp, CIKU)
     return f"已回填词库「{hit['关键词']}」" + ("" if link else "（笔记链接待人工补）")
 
 
@@ -261,7 +284,7 @@ def publish_one(name, dry_run, immediate=False):
         res = do_publish_click(pre["tid"], "now", "")
         row["发布"] = "✅ 已点击立即发布" if res.get("ok") else "❌ 点击失败"
         print(res.get("log", ""))
-        row["备注"] = (backfill_ciku(title, "") if res.get("ok") else "") or ""
+        row["备注"] = (backfill_ciku(title, "", name) if res.get("ok") else "") or ""
         log_run(row)
         return 0 if res.get("ok") else 1
 
@@ -290,7 +313,7 @@ def confirm(name, at):
         print(f"找不到 {f}", file=sys.stderr)
         return 1
     title = parse_draft(f.read_text(encoding="utf-8"))["title"]
-    note = backfill_ciku(title, "")
+    note = backfill_ciku(title, "", name)
     log_run({"日期": datetime.now().strftime("%Y-%m-%d %H:%M"), "成稿文件": name,
              "标题": title, "闸门": "✅ 通过", "预填": "✅", "定时": at,
              "发布": f"✅ 人工确认已定时 {at}", "备注": note})
@@ -372,7 +395,8 @@ def main():
     # ⛔ 一次只预填一篇。创作平台的发布页一次只承载一篇稿，连续预填第二篇会把第一篇
     # 直接覆盖掉 —— 而预填后最后一步（选时段、点发布）要人来点，人还没点，稿就没了。
     # 2026-08-03 实测：连预填 3 篇，页面上只剩最后一篇，前两篇白填。
-    # DAILY_QUOTA=2 的含义是「一天发 2 篇」，靠一天跑两次实现，不是一次填两篇。
+    # DAILY_QUOTA=3 的含义是「一天发 3 篇」，靠一天跑三次实现，不是一次填三篇。
+    # 所以改配额必须同步改 plist 的 StartCalendarInterval 触发点数量，否则配额是空头支票。
     rest = batch[1:]
     name, why = batch[0]
     print(f"--- {name}\n    {why}")

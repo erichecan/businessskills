@@ -257,6 +257,10 @@ JS_CARDS = """(()=>JSON.stringify([...document.querySelectorAll("section.note-it
   likes_raw:s.querySelector(".count")?.innerText||null,
   date_raw:dl||null}})))()"""
 
+# 正文和评论一起取：详情页已经打开了，多跑一个 querySelector 是零成本，
+# 而单独为正文再点开一次笔记等于把反封控的点击预算翻倍。
+# 正文选择器按特异性排序 —— #detail-desc 是笔记正文容器，
+# 但要排除评论区里同样带 .note-text 的节点，所以先限定在 desc 容器内找。
 JS_COMMENTS = """(()=>{const out=[];
  document.querySelectorAll("[class*=comment-item]").forEach(e=>{
   if(e.className.includes("comment-item-sub"))return;
@@ -264,7 +268,16 @@ JS_COMMENTS = """(()=>{const out=[];
   const c=e.querySelector(".note-text")||e.querySelector("[class*=content] .note-text")||e.querySelector("[class*=content]");
   out.push({raw:txt,content:c?(c.innerText||"").trim():null,
    is_author:/\\s作者\\s/.test(" "+txt+" ")});});
- return JSON.stringify({url:location.href,comments:out.slice(0,30)})})()"""
+ const dc=document.querySelector("#detail-desc")||document.querySelector(".note-content")
+   ||document.querySelector("[class*=note-scroller] [class*=desc]");
+ const de=dc?(dc.querySelector(".note-text")||dc):null;
+ const tt=document.querySelector("#detail-title")||document.querySelector(".note-content .title");
+ const tags=[...document.querySelectorAll("#detail-desc a[href*='/search_result'], .note-content a.tag")]
+   .map(a=>(a.innerText||"").trim()).filter(Boolean);
+ return JSON.stringify({url:location.href,comments:out.slice(0,30),
+  note_title:tt?(tt.innerText||"").trim():null,
+  note_body:de?(de.innerText||"").trim():null,
+  note_tags:tags.slice(0,20)})})()"""
 
 JS_BACK = """(()=>{history.back();return "back"})()"""
 
@@ -281,6 +294,7 @@ def probe_keyword(keyword):
         "note_count": None,          # 网页端不提供，恒为 null（保留字段便于将来接口化）
         "autocomplete": [],          # v1 不采集，见文件头实测修正
         "top_notes": [],
+        "note_bodies": [],           # 2026-08-05 加：点开的那几篇的正文全文
         "comments": [],
         "density": {"verdict": "待探测", "rule_version": RULE_VERSION},
     }
@@ -323,6 +337,18 @@ def probe_keyword(keyword):
                 data = proxy_eval(target, JS_COMMENTS)
                 if "/explore/" not in (data.get("url") or ""):
                     continue
+                # 正文：2026-08-05 加。此前只存标题，而标题只能告诉你「别人写了这个角度」，
+                # 告诉不了你「他是怎么答的」——判答案空缺、找可迁移的说法都得看正文。
+                body = (data.get("note_body") or "").strip()
+                if body:
+                    result["note_bodies"].append({
+                        "note_id": c["note_id"],
+                        "note_url": data["url"],
+                        "title": (data.get("note_title") or c.get("title") or "").strip(),
+                        "likes": c.get("likes"),
+                        "body": body[:4000],
+                        "tags": data.get("note_tags") or [],
+                    })
                 for cm in data.get("comments", []):
                     if cm.get("is_author"):
                         continue
@@ -445,7 +471,8 @@ def main():
         path.write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
         d = r.get("density", {})
         print(f"    → {r['completeness']} | 密度={d.get('verdict','—')} | "
-              f"笔记={len(r.get('top_notes',[]))} 评论={len(r.get('comments',[]))} "
+              f"笔记={len(r.get('top_notes',[]))} 正文={len(r.get('note_bodies',[]))} "
+              f"评论={len(r.get('comments',[]))} "
               f"| {path.name}", flush=True)
         if d.get("reason"):
             print(f"      {d['reason']}", flush=True)

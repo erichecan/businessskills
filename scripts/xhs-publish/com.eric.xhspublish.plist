@@ -9,9 +9,14 @@
         <string>/usr/bin/python3</string>
         <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/xhs-publish/auto_publish.py</string>
     </array>
+    <!-- 触发点数量 = auto_publish.py 的 DAILY_QUOTA。一次只预填一篇（创作平台一次只放得下
+         一篇稿），所以「每天发 N 篇」必须靠「一天跑 N 次」实现，改配额要同步改这里。
+         时点选在人醒着的时候：预填后最后一步（选时段、点定时发布）仍需人点。 -->
     <key>StartCalendarInterval</key>
     <array>
-        <dict><key>Hour</key><integer>22</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
     </array>
     <key>StandardOutPath</key>
     <string>/tmp/xhspublish.log</string>

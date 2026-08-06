@@ -27,6 +27,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 SUCAI = REPO / "xhs" / "素材库"
 DOCS = REPO / "docs"
+PREVIEW = REPO / "preview"
 RUN_LOG = SUCAI / "运行日志.csv"
 KW_POOL = SUCAI / "关键词池.csv"
 AUDIT_LOG = SUCAI / "审核记录.csv"
@@ -38,6 +39,7 @@ LAUNCHD_JOBS = {
     "com.eric.xhsaudit": "独立审核",
     "com.eric.xhshealth": "健康检查",
     "com.eric.xhspublish": "半自动发布",
+    "com.eric.xhswrite": "写稿 loop",
     # 把自己也列进来：这份 brief 本身也是 launchd 任务，它静默失败时不会有人发现，
     # 只能靠下一次成功运行（或人肉跑）时看见「上次退出码 2」才知道中间断过。
     "com.eric.xhsbrief": "每日 brief（本任务）",
@@ -176,6 +178,91 @@ def section_launchd():
     return [head] + lines, healthy
 
 
+CSS = """
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1a1d21;--dim:#6b7280;--line:#e5e7eb;
+ --ok:#0f9d58;--warn:#d97706;--bad:#dc2626;--accent:#2563eb}
+@media (prefers-color-scheme:dark){:root{--bg:#14161a;--card:#1c1f24;--fg:#e8eaed;
+ --dim:#9aa0a6;--line:#2c3036;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--accent:#60a5fa}}
+*{box-sizing:border-box}
+body{margin:0;padding:28px 18px 64px;background:var(--bg);color:var(--fg);
+ font:15px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif}
+.wrap{max-width:860px;margin:0 auto}
+h1{font-size:23px;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--dim);font-size:13px;margin-bottom:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+ padding:16px 18px;margin-bottom:14px;border-left:4px solid var(--ok)}
+.card.bad{border-left-color:var(--bad)}
+.card h2{font-size:15px;margin:0 0 10px;font-weight:600;display:flex;
+ align-items:center;gap:8px;flex-wrap:wrap}
+.pill{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;
+ background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+.card.bad .pill{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
+ul{margin:0;padding-left:0;list-style:none}
+li{padding:5px 0 5px 14px;border-left:2px solid var(--line);margin-left:2px;
+ color:var(--dim);font-size:13.5px}
+li.warn{border-left-color:var(--warn);color:var(--fg)}
+li.err{border-left-color:var(--bad);color:var(--fg)}
+b{font-weight:600;color:var(--fg)}
+.todo{background:color-mix(in srgb,var(--bad) 8%,var(--card));
+ border:1px solid color-mix(in srgb,var(--bad) 30%,var(--line));border-left-width:4px;
+ border-left-color:var(--bad)}
+code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;
+ background:color-mix(in srgb,var(--fg) 7%,transparent);padding:1px 5px;border-radius:4px}
+.foot{color:var(--dim);font-size:12px;margin-top:26px;text-align:center}
+"""
+
+
+def _esc(s):
+    return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+def _inline(s):
+    """把 brief 行里的 **粗体** 和 `代码` 转成标签。转义在前，避免正文里的 < 破坏结构。"""
+    s = _esc(s)
+    s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
+    return re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+
+
+def render_html(today, blocks):
+    """和 md 版共用同一批 blocks —— 两个格式各渲染一遍同一份数据，
+    不是各算各的。否则哪天改了统计口径，两份 brief 会悄悄给出不同的数字。"""
+    cards = []
+    for lines, ok in blocks:
+        head, *rest = lines
+        # 首行形如「✅ **采集**：4 轮…」：拆出 emoji、标题、结论三段
+        m = re.match(r"^(\S+)\s+\*\*(.+?)\*\*[：:]\s*(.*)$", head)
+        icon, name, summary = m.groups() if m else ("•", head, "")
+        items = []
+        for l in rest:
+            t = l.strip().lstrip("　").strip()
+            if not t:
+                continue
+            cls = "err" if t.startswith("❌") else ("warn" if t.startswith(("⚠️", "·")) else "")
+            items.append(f'<li class="{cls}">{_inline(t)}</li>')
+        cards.append(
+            f'<div class="card{"" if ok else " bad"}">'
+            f'<h2><span>{icon}</span>{_esc(name)}'
+            f'<span class="pill">{"正常" if ok else "需处理"}</span></h2>'
+            f'<div>{_inline(summary)}</div>'
+            + (f'<ul>{"".join(items)}</ul>' if items else "")
+            + "</div>")
+
+    fails = [lines[0] for lines, ok in blocks if not ok]
+    todo = ""
+    if fails:
+        rows = "".join(f'<li class="err">{_inline(f)}</li>' for f in fails)
+        todo = f'<div class="card todo"><h2><span>⚠️</span>今天需要你处理</h2><ul>{rows}</ul></div>'
+
+    return (f'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<title>每日 brief · {today}</title><style>{CSS}</style></head><body><div class="wrap">'
+            f'<h1>小红书 · 每日 brief</h1>'
+            f'<div class="sub">{today} · 由 <code>nightly_brief.py</code> 每晚 21:00 生成</div>'
+            f'{todo}{"".join(cards)}'
+            f'<div class="foot">数据源：运行日志 · 关键词池 · 审核记录 · 发布数据 · launchctl</div>'
+            f'</div></body></html>')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--stdout", action="store_true", help="只打印不写文件")
@@ -195,9 +282,13 @@ def main():
     print(text)
     if not args.stdout:
         DOCS.mkdir(exist_ok=True)
-        out = DOCS / f"{today.replace('-', '')}-brief.md"
-        out.write_text(text, encoding="utf-8")
-        print(f"→ 已写入 {out}")
+        md_out = DOCS / f"{today.replace('-', '')}-brief.md"
+        md_out.write_text(text, encoding="utf-8")
+        print(f"→ 已写入 {md_out}")
+        PREVIEW.mkdir(exist_ok=True)
+        html_out = PREVIEW / f"{today.replace('-', '')}-brief.html"
+        html_out.write_text(render_html(today, blocks), encoding="utf-8")
+        print(f"→ 已写入 {html_out}")
     return 0
 
 

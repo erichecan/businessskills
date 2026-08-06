@@ -28,6 +28,33 @@ MODEL_HEADER = ("日期,成稿文件,总分,评级,口径,选题,标题,首图,�
                 "可信度,CTA,红线,处置,备注")
 AUDITOR_COL_INDEX = 13  # 红线之后、处置之前
 HEADER = MODEL_HEADER.replace("红线,处置", "红线,审核方,处置")
+DISPOSITION_COL_INDEX = 14  # 插入审核方之后，处置就落在这一列
+
+
+def decide_disposition(score, redline):
+    """处置由代码算，不让模型自己填 —— 和「审核方」「口径」两列同一个道理（D7）。
+
+    ⛔ 这是 2026-08-05 查出的真 bug。原先 prompt 只写「处置用 发布/待人工/归档」，
+    没给任何分档规则，模型就自己发挥：`成稿_2026-08-05_干最多的常被刷.md` 第 1 轮
+    拿到 **85 分 绿 红线无**（refine_loop 的过线线正好是 85），审核员却写
+    「85分擦线故转人工」判了「待人工」。loop 的过线条件是 分数≥85 且 无红线 且
+    **处置=发布**，于是这篇明明达标的稿被判未过线、继续返工，第 2 轮掉到 84 分，
+    最后当作失败归档。评级表（SKILL.md）写得清清楚楚 ≥85 = 🟢 可发，
+    但那张表管的是「评级」列，没人把它接到「处置」列上。
+
+    接上之后 loop 才真的可能过线 —— 在此之前，只要审核员觉得「擦线」，
+    这套 loop 在结构上就永远出不了一篇可发的稿。
+    """
+    clean = (redline or "").strip() in ("", "无", "无。", "None")
+    if not clean:
+        return "归档"
+    try:
+        s = int(str(score).strip())
+    except (TypeError, ValueError):
+        return "待人工"
+    if s >= 85:
+        return "发布"
+    return "待人工" if s >= 55 else "归档"
 
 
 def unaudited_drafts():
@@ -133,7 +160,10 @@ def audit_one(draft: Path, lane: str = None) -> bool:
 第 1 行输出且仅输出一行 CSV（不加代码块），列顺序为：
 {MODEL_HEADER}
 其中 日期={date.today().isoformat()}，成稿文件={draft.name}，口径填 {lane}，
-评级用 绿/黄/橙/红，红线用 无 或简述，处置用 发布/待人工/归档，
+评级用 绿/黄/橙/红，红线用 无 或简述，
+处置列**照实填 发布/待人工/归档 即可，不必纠结**——这一列会被代码按
+「无红线且≥85 → 发布 / 55-84 → 待人工 / <55 或有红线 → 归档」统一改判，你填什么都不影响结果。
+你要做的是把**总分和红线判准**，那两列才是真正决定处置的输入。
 七个维度列按 skill 的评分卡顺序填分（搜索意图/标题/首图/开头/正文/原话可信度/CTA），
 备注以「独立审核」开头并给一句关键结论（备注内不得含逗号，用分号代替）。
 第 2 行起输出完整审核报告（7 维逐项+最高优先级改一句）。"""
@@ -148,6 +178,13 @@ def audit_one(draft: Path, lane: str = None) -> bool:
     if len(fields) > 4:
         fields[4] = lane      # 口径由代码填，跟审核方一样不让模型自称
     fields.insert(AUDITOR_COL_INDEX, "独立审核")
+    if len(fields) > DISPOSITION_COL_INDEX:
+        model_said = fields[DISPOSITION_COL_INDEX].strip()
+        decided = decide_disposition(fields[2] if len(fields) > 2 else "",
+                                     fields[12] if len(fields) > 12 else "")
+        fields[DISPOSITION_COL_INDEX] = decided
+        if model_said and model_said != decided:
+            print(f"   处置：模型写「{model_said}」→ 按分档规则改判「{decided}」")
     buf = io.StringIO()
     csv.writer(buf, lineterminator="").writerow(fields)
     with AUDIT_LOG.open("a", encoding="utf-8") as f:
