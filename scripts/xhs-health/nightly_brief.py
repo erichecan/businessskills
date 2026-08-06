@@ -38,6 +38,9 @@ LAUNCHD_JOBS = {
     "com.eric.xhsaudit": "独立审核",
     "com.eric.xhshealth": "健康检查",
     "com.eric.xhspublish": "半自动发布",
+    # 把自己也列进来：这份 brief 本身也是 launchd 任务，它静默失败时不会有人发现，
+    # 只能靠下一次成功运行（或人肉跑）时看见「上次退出码 2」才知道中间断过。
+    "com.eric.xhsbrief": "每日 brief（本任务）",
 }
 
 
