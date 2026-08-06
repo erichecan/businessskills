@@ -460,6 +460,109 @@ def audit(fname: str, lane="搜索流"):
     return score, (last.get("红线") or "").strip(), report, (last.get("处置") or "").strip()
 
 
+def rework_queue() -> list:
+    """处置=返工 的稿，按分数从高到低排 —— 离 85 最近的先改，最省额度。
+
+    这一档是 2026-08-05 加的（原先 75-84 全落进「待人工」这个死档，人不看就永远停在那）。
+    实测这批稿的扣分极其集中，审核报告里常常直接写着「改一句即可上 85」：
+    84 分那篇是「首图大字非搜索原句 + 开头首句未含关键词」，两处都是一句话的事。
+    所以返工不是从头重写，是拿着审核报告做定向修改 —— prompt 里喂的 feedback
+    就是上一次的完整审核报告。
+
+    稿可能在 素材库/ 也可能已经被 park 进 归档稿/，两处都要找。
+    """
+    latest, released = {}, set()
+    for r in csv.DictReader(AUDIT_LOG.open(encoding="utf-8-sig")) if AUDIT_LOG.exists() else []:
+        who, fname = (r.get("审核方") or "").strip(), (r.get("成稿文件") or "").strip()
+        if who == "独立审核":
+            latest[fname] = r
+        elif who == "人工放行":
+            released.add(fname)
+    # 已发出去的稿不该再返工：改了也不会重发，纯烧额度。
+    # 两个来源都要查——发布日志记流程走过的，人工放行记人拍板放行的。
+    sys.path.insert(0, str(REPO / "scripts" / "xhs-publish"))
+    try:
+        from auto_publish import published_already
+        released |= published_already()
+    except Exception:
+        pass
+    out = []
+    for fname, r in latest.items():
+        if (r.get("处置") or "").strip() != "返工" or fname in released:
+            continue
+        path = next((p for p in (SUCAI / fname, SUCAI / "归档稿" / fname) if p.exists()), None)
+        if not path:
+            continue
+        try:
+            score = int((r.get("总分") or "0").strip())
+        except ValueError:
+            score = 0
+        out.append({"file": fname, "path": path, "score": score, "row": r})
+    return sorted(out, key=lambda x: -x["score"])
+
+
+def rework_one(item, args, lane="搜索流"):
+    """对一篇已有的稿做定向返工：喂上一次的审核报告，改完重审，过线就渲染图交闸门。
+
+    与 run_one 的区别是不重新选题、不从零写 —— 关键词、卡片、结构都沿用原稿，
+    只按审核意见改。所以 feedback 从第 1 轮就带着，不像 run_one 第 1 轮是空的。
+    """
+    fname, draft = item["file"], item["path"]
+    kw = keyword_of_draft(draft)
+    row = next((r for r in csv.DictReader(CIKU.open(encoding="utf-8-sig"))
+                if (r.get("关键词") or "").strip() == kw), {"关键词": kw}) if kw else {"关键词": ""}
+    report = _read_or(SUCAI / "审核报告" / f"{draft.stem}_独立审核.md", item["row"].get("备注", ""))
+    print(f"\n{'='*54}\n返工 {fname}（上次 {item['score']} 分，差 {85-item['score']} 分到线）")
+
+    # 归档稿里的先挪回素材库根目录：draft_check / independent_audit 都只扫根目录，
+    # 留在归档稿里改完了也没人审。过不了线时 park() 会把它再放回去。
+    if draft.parent.name == "归档稿":
+        draft = draft.replace(SUCAI / fname)
+
+    slug = fname.removeprefix("成稿_").removesuffix(".md").split("_", 1)[-1]
+    feedback = (f"【上一次独立审核 {item['score']} 分，未过线（需 ≥{args.threshold}）。"
+                f"这是定向返工：只改下面点到的问题，其余保持原样，不要重写。】\n"
+                f"{report[:4000]}\n{KEEP_PASSED}")
+    best = {"score": item["score"], "md": draft.read_text(encoding="utf-8"), "cards": None}
+    for rnd in range(1, args.rounds + 1):
+        print(f"\n--- 返工第 {rnd}/{args.rounds} 轮 ---")
+        new_slug, md, cards = write_draft(row, feedback, rnd, lane=lane)
+        if not md:
+            print("⛔ 返工输出解析失败（原始输出见 loop日志/）")
+            break
+        draft = save(slug, md, cards)
+        ok, mech = mech_check(draft.name, lane)
+        if not ok:
+            print(f"机械检查未过：\n{mech}")
+            feedback = f"【机械检查（代码硬核对，必须全部修掉）】\n{mech}\n{KEEP_PASSED}"
+            continue
+        score, redline, report, disposition = audit(draft.name, lane)
+        if score is None:
+            print("⛔ 独立审核未写出记录，停手")
+            break
+        print(f"独立审核：{score} 分 · 红线：{redline or '无'} · 处置：{disposition or '?'}")
+        if score > best["score"]:
+            best = {"score": score, "md": md, "cards": cards}
+        if score >= args.threshold and redline in ("", "无") and disposition == "发布":
+            print(f"\n✅ 返工过线（{item['score']} → {score}）")
+            render_cards(slug)
+            predict_one(draft.name, lane)
+            return "过线"
+        feedback = (f"【独立审核 {score} 分 · 处置「{disposition}」，仍未过线】\n"
+                    f"{report[:4000]}\n{KEEP_PASSED}")
+    if best["md"] and best["md"] != draft.read_text(encoding="utf-8"):
+        draft = save(slug, best["md"], best["cards"])
+        print(f"回滚到最佳版本（{best['score']} 分）")
+    park(draft, best["score"], feedback if "feedback" in dir() else "返工未过线")
+    return "归档"
+
+
+def keyword_of_draft(path: Path) -> str:
+    """成稿头部写着「关键词来源：`词库.csv`「XXX」」，直接取，不靠标题猜。"""
+    m = re.search(r"关键词来源[^「]*「([^」]+)」", path.read_text(encoding="utf-8")[:2000])
+    return m.group(1).strip() if m else ""
+
+
 def park(draft: Path, score, note):
     """3 轮仍不过 → 移进 归档稿/ 并登记待激活库，停手不再消耗。
 
@@ -561,12 +664,43 @@ def main() -> int:
     ap.add_argument("--rounds", type=int, default=MAX_ROUNDS)
     ap.add_argument("--threshold", type=int, default=PASS_SCORE)
     ap.add_argument("--count", type=int, default=1, help="连跑几篇（消化候选积压用）")
+    ap.add_argument("--rework", type=int, nargs="?", const=3, metavar="N",
+                    help="先返工 N 篇处置=返工 的旧稿（默认 3），再写新稿。"
+                         "返工优先：这批离 85 只差一两分，改一句就能过，比从零写新稿省得多")
+    ap.add_argument("--rework-only", action="store_true", help="只返工，不写新稿")
+    ap.add_argument("--rework-file", action="append", metavar="FILENAME",
+                    help="指定返工哪几篇（可重复），不按分数自动排队")
     ap.add_argument("--lane", default="搜索流", choices=["搜索流", "推荐流"])
     ap.add_argument("--title", default="", help="指定首选标题（人已挑定时用），正文须兑现它推翻的预设")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
     tally = {"过线": 0, "归档": 0, "失败": 0}
+
+    # 返工排在写新稿前面：这批稿离 85 只差一两分、扣分点已由审核报告点名，
+    # 一次定向修改的成本远低于从零写一篇，额度花在这里回报最高。
+    n_rework = args.rework if args.rework is not None else (3 if (args.rework_only or args.rework_file) else 0)
+    if n_rework:
+        queue = rework_queue()
+        if args.rework_file:
+            want = set(args.rework_file)
+            missing = want - {q["file"] for q in queue}
+            for m in missing:
+                print(f"⛔ {m} 不在返工队列里（处置不是「返工」，或已发布）")
+            queue = [q for q in queue if q["file"] in want]
+        else:
+            queue = queue[:n_rework]
+        if not queue:
+            print("返工队列为空（没有处置=返工 的稿）")
+        for item in queue:
+            if args.dry_run:
+                print(f"[dry-run] 返工 {item['file']}（{item['score']} 分）")
+                continue
+            tally[rework_one(item, args, args.lane)] += 1
+    if args.rework_only:
+        print(f"\n{'='*54}\n返工 {n_rework} 篇：过线 {tally['过线']} · 归档 {tally['归档']}")
+        return 0
+
     for i in range(args.count):
         if args.topic and i == 0:
             rows = [r for r in csv.DictReader(CIKU.open(encoding="utf-8-sig"))
