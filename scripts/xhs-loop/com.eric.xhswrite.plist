@@ -23,7 +23,11 @@
 
          --count 3：一篇最多 3 轮 × （写稿 + 独立审核）两次 claude -p 调用，
          3 篇约 18 次调用。再往上加会在同一个额度周期里把后面的篇数饿死，
-         不如分两个时点各 3 篇。 -->
+         不如分两个时点各 3 篇。
+
+         ⚠️ 撞额度后 refine_loop 会每 30 分钟重试、最长熬 5 小时（额度窗口），
+         所以 04:30 那批理论上可能跑到 09:30 之后。launchd 对同一个 Label
+         不会并发启动第二个实例，14:30 撞上未结束的实例会自动跳过，不会打架。 -->
     <key>StartCalendarInterval</key>
     <array>
         <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>30</integer></dict>

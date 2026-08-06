@@ -41,8 +41,10 @@ CLAUDE = Path.home() / ".local/bin/claude"
 PASS_SCORE = 85
 MAX_ROUNDS = 3
 WRITE_TIMEOUT = 900
-RETRIES = 2          # claude -p 调用失败重试次数
-RETRY_WAIT = 45      # 重试前等待秒数（失败多半是限流，立刻重试没意义）
+RETRIES = 2          # claude -p 普通失败（格式跑偏/超时）的重试次数
+RETRY_WAIT = 45      # 普通失败重试前等待秒数
+LIMIT_WAIT = 30 * 60         # 撞额度后每次等 30 分钟
+LIMIT_MAX_WAIT = 5 * 3600    # 额度窗口 5 小时，熬满还没回来就真停手
 LOG_DIR = REPO / "xhs" / "素材库" / "loop日志"
 
 SEP_SLUG, SEP_MD, SEP_JSON, SEP_END = "===SLUG===", "===MARKDOWN===", "===CARDS_JSON===", "===END==="
@@ -306,6 +308,9 @@ def parse_output(out: str):
     return slug, md, cards
 
 
+LIMIT_RE = re.compile(r"session limit|usage limit|rate.?limit|429|resets? \d+\s*(am|pm)", re.I)
+
+
 def run_claude(prompt: str, tag: str) -> str:
     """调 headless claude，失败重试并把原始输出留档。
 
@@ -313,13 +318,23 @@ def run_claude(prompt: str, tag: str) -> str:
     首跑实测：第 2 轮审核和第 3 轮成稿接连返回异常输出，第一次失败就放弃，
     等于把前面两轮的工都扔了。失败时把 stdout/stderr 存进 loop日志/ ——
     不然只看到「解析失败」四个字，没法判断是限流、超时还是格式跑偏。
+
+    ⛔ 撞额度和「调用失败」要分开处理（2026-08-05 Eric 定）。
+    普通失败（格式跑偏、超时）重试 2 次、间隔 45s 就够，再多是浪费。
+    但撞额度不是失败，是**还没到时候** —— 08-05 凌晨那次 02:48–03:10 连撞六次
+    "You've hit your session limit · resets 4am"，三篇稿两篇没跑满轮次直接归档，
+    而只要再等 50 分钟额度就回来了。所以额度错误单独一条路径：
+    每 30 分钟试一次，最多熬 5 小时（额度窗口就是 5 小时），期间不消耗普通重试次数。
     """
-    for attempt in range(1, RETRIES + 2):
+    limit_waited = 0
+    attempt = 0
+    while True:
+        attempt += 1
         try:
             r = subprocess.run([str(CLAUDE), "-p", prompt],
                                capture_output=True, text=True, timeout=WRITE_TIMEOUT)
             out = (r.stdout or "").strip()
-            if r.returncode == 0 and out:
+            if r.returncode == 0 and out and not LIMIT_RE.search(out):
                 return out
             err = (r.stderr or "")[:2000]
         except subprocess.TimeoutExpired:
@@ -328,10 +343,25 @@ def run_claude(prompt: str, tag: str) -> str:
         stamp = datetime.now().strftime("%H%M%S")
         (LOG_DIR / f"{date.today().isoformat()}_{tag}_try{attempt}_{stamp}.txt").write_text(
             f"=== stderr ===\n{err}\n\n=== stdout ===\n{out[:5000]}", encoding="utf-8")
+
+        # 额度限制：出现在 stdout（claude CLI 把它当正常输出打印，returncode 仍是 0），
+        # 所以上面必须连 returncode==0 的分支一起查，不然会把这句提示当成稿子存下来。
+        if LIMIT_RE.search(out) or LIMIT_RE.search(err):
+            if limit_waited + LIMIT_WAIT > LIMIT_MAX_WAIT:
+                print(f"   ⛔ {tag} 撞额度已累计等待 {limit_waited//60} 分钟，"
+                      f"超过上限 {LIMIT_MAX_WAIT//3600} 小时，停手")
+                return ""
+            limit_waited += LIMIT_WAIT
+            print(f"   ⏳ {tag} 撞额度限制，等 {LIMIT_WAIT//60} 分钟后重试"
+                  f"（已累计 {limit_waited//60}/{LIMIT_MAX_WAIT//60} 分钟）", flush=True)
+            time.sleep(LIMIT_WAIT)
+            attempt -= 1        # 等额度不算失败，不消耗普通重试次数
+            continue
+
         print(f"   ⚠️ {tag} 第 {attempt} 次调用失败（原始输出已存 loop日志/）")
-        if attempt <= RETRIES:
-            time.sleep(RETRY_WAIT * attempt)
-    return ""
+        if attempt > RETRIES:
+            return ""
+        time.sleep(RETRY_WAIT * attempt)
 
 
 def write_draft(row, feedback, round_no, dry_run=False, lane="搜索流", fixed_title=""):
@@ -404,7 +434,10 @@ def audit(fname: str, lane="搜索流"):
     before = len(_audit_rows(fname))
     for attempt in (1, 2):
         r = subprocess.run([sys.executable, str(HEALTH / "independent_audit.py"), "--force", fname,
-                            "--lane", lane], capture_output=True, text=True, timeout=WRITE_TIMEOUT)
+                            "--lane", lane], capture_output=True, text=True,
+                           # ⛔ 不能用 WRITE_TIMEOUT(900s)：independent_audit 撞额度时会自己
+                           # 等到 5 小时，900s 就把它掐死了，等于额度退避在审核这一步失效。
+                           timeout=LIMIT_MAX_WAIT + WRITE_TIMEOUT)
         rows = _audit_rows(fname)
         if len(rows) > before:
             break

@@ -13,6 +13,7 @@ import io
 import re
 import subprocess
 import sys
+import time
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -44,17 +45,68 @@ def decide_disposition(score, redline):
 
     接上之后 loop 才真的可能过线 —— 在此之前，只要审核员觉得「擦线」，
     这套 loop 在结构上就永远出不了一篇可发的稿。
+
+    ── 分档为什么是这四档（阈值由 45 篇独立审核实测标定，不是拍脑袋）──
+
+    历史分布：中位 81、最高 89、**从没有一篇到过 90**。
+      85-89 → 10 篇（全部无红线）    80-84 → 14 篇（全部无红线）
+      70-79 → 17 篇（13 篇无红线）   <70  →  4 篇
+
+    每一档回答的是同一个问题：**下一步谁来动手。**
+      发布   ≥85 且无红线 —— auto_publish 直接取。85 是实测天花板 89 往下一档，
+             定 90 等于永远不过（历史零篇），这也是 PASS_SCORE 当初定 85 的原因。
+      返工   75-84 —— 这是最大的一块（14+ 篇），且**全部无红线**，
+             扣分多是「首图不是搜索原句」「开头没关键词」这种改一句的事
+             （08-05 那篇 84 分的审核原话就是「改一句即可上 85」）。
+             这一档给 loop 自己改，不惊动人 —— 原先它落进「待人工」，
+             人不看它就永远停在那，等于把最容易救的一批稿全废了。
+      待人工 55-74 —— 短板是结构性的（选题偏、通篇没有原话），改一句救不回来，
+             值不值得再投入得由人判断。这一档才配叫「待人工」。
+      归档   <55，或红线 + 分数 <70 —— 停手不再消耗。
+
+    红线不再一律归档：红线里像「AI 味强信号≥3 处」是机械可修的，
+    分数还在 70 以上就给 loop 一次返工机会。安全性不受影响 ——
+    发布仍然要求「≥85 且红线为无」，返工过程中修不掉红线就发不出去。
     """
     clean = (redline or "").strip() in ("", "无", "无。", "None")
-    if not clean:
-        return "归档"
     try:
         s = int(str(score).strip())
     except (TypeError, ValueError):
-        return "待人工"
+        return "待人工"          # 分数都没解析出来，别替人做决定
+    if not clean:
+        return "返工" if s >= 70 else "归档"
     if s >= 85:
         return "发布"
+    if s >= 75:
+        return "返工"
     return "待人工" if s >= 55 else "归档"
+
+
+LIMIT_RE = re.compile(r"session limit|usage limit|rate.?limit|429|resets? \d+\s*(am|pm)", re.I)
+LIMIT_WAIT = 30 * 60         # 与 refine_loop 同一策略：撞额度每 30 分钟试一次
+LIMIT_MAX_WAIT = 5 * 3600    # 额度窗口 5 小时
+
+
+def run_claude_waiting_out_limits(prompt):
+    """撞额度就等，不当失败（2026-08-05 Eric 定）。
+
+    审核和写稿在同一个额度池里，写稿那边熬过了额度、轮到审核又立刻撞上并放弃，
+    等于前面白等。所以两边必须用同一套退避策略，否则 loop 仍然会在审核这一步断掉。
+    """
+    waited = 0
+    while True:
+        r = subprocess.run([str(CLAUDE), "-p", prompt],
+                           capture_output=True, text=True, timeout=600)
+        out = (r.stdout or "").strip()
+        if not LIMIT_RE.search(out) and not LIMIT_RE.search(r.stderr or ""):
+            return out
+        if waited + LIMIT_WAIT > LIMIT_MAX_WAIT:
+            print(f"   ⛔ 审核撞额度累计等待 {waited//60} 分钟，超过 {LIMIT_MAX_WAIT//3600} 小时上限，停手")
+            return ""
+        waited += LIMIT_WAIT
+        print(f"   ⏳ 审核撞额度，等 {LIMIT_WAIT//60} 分钟后重试"
+              f"（已累计 {waited//60}/{LIMIT_MAX_WAIT//60} 分钟）", flush=True)
+        time.sleep(LIMIT_WAIT)
 
 
 def unaudited_drafts():
@@ -161,15 +213,15 @@ def audit_one(draft: Path, lane: str = None) -> bool:
 {MODEL_HEADER}
 其中 日期={date.today().isoformat()}，成稿文件={draft.name}，口径填 {lane}，
 评级用 绿/黄/橙/红，红线用 无 或简述，
-处置列**照实填 发布/待人工/归档 即可，不必纠结**——这一列会被代码按
-「无红线且≥85 → 发布 / 55-84 → 待人工 / <55 或有红线 → 归档」统一改判，你填什么都不影响结果。
+处置列**随便填一个，不必纠结**——这一列会被代码按下面的规则统一改判，你填什么都不影响结果：
+  无红线：≥85 发布 / 75-84 返工 / 55-74 待人工 / <55 归档
+  有红线：≥70 返工 / <70 归档
 你要做的是把**总分和红线判准**，那两列才是真正决定处置的输入。
 七个维度列按 skill 的评分卡顺序填分（搜索意图/标题/首图/开头/正文/原话可信度/CTA），
 备注以「独立审核」开头并给一句关键结论（备注内不得含逗号，用分号代替）。
 第 2 行起输出完整审核报告（7 维逐项+最高优先级改一句）。"""
 
-    r = subprocess.run([str(CLAUDE), "-p", prompt], capture_output=True, text=True, timeout=600)
-    out = (r.stdout or "").strip()
+    out = run_claude_waiting_out_limits(prompt)
     first = next((l for l in out.splitlines() if draft.name in l and l.count(",") >= 14), None)
     if not first:
         print(f"⛔ {draft.name}: 未能解析 CSV 行\n{out[:300]}")
