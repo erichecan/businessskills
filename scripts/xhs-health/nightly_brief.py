@@ -34,6 +34,8 @@ AUDIT_LOG = SUCAI / "审核记录.csv"
 PUB_DATA = SUCAI / "发布数据.csv"
 
 LAUNCHD_JOBS = {
+    # 常驻服务，不是定时任务，但它一挂后面全挂 —— 采集/发布/数据回收都要经过它
+    "com.eric.cdpproxy": "CDP 代理（常驻）",
     "com.eric.xhsprobe": "采集探测",
     "com.eric.xhsdata": "发布数据回收",
     "com.eric.xhsaudit": "独立审核",
@@ -156,6 +158,29 @@ def section_publish():
     return lines, len(real) > 0
 
 
+def section_calibrate():
+    """审核标准的校准进度 —— 唯一会「反向改标准」的回路，别让它静默停着。
+
+    这一节存在的理由和第 5 项一样：没有它，「等数据够了再校准」会变成永远不校准，
+    因为没有任何地方会提醒你还差几篇。
+    """
+    sys.path.insert(0, str(REPO / "scripts" / "xhs-health"))
+    try:
+        from calibrate_audit import MIN_SAMPLE, build_pairs
+        paired, pending = build_pairs(7)
+    except Exception as e:
+        return [f"⚠️ **审核校准**：算不出来（{e}）"], False
+    n, need = len(paired), MIN_SAMPLE
+    if n >= need:
+        return [f"🔬 **审核校准**：样本 {n}/{need} 篇**已够**，"
+                f"跑 `python3 scripts/xhs-health/calibrate_audit.py` 出报告"], True
+    lines = [f"🔬 **审核校准**：样本 {n}/{need} 篇，还差 {need - n} 篇才够反推审核标准"]
+    for r in sorted(pending, key=lambda x: -x["天数"])[:3]:
+        lines.append(f"　　· {r['发布标题'][:24]} — 已发 {int(r['天数'])} 天，还差 {7 - int(r['天数'])} 天")
+    # 不算失败：样本在攒是正常状态，标红只会让人对红色脱敏
+    return lines, True
+
+
 def section_launchd():
     lines, healthy = [], True
     for label, desc in LAUNCHD_JOBS.items():
@@ -270,7 +295,7 @@ def main():
 
     today = date.today().isoformat()
     blocks = [section_collect(today), section_keywords(today), section_drafts(today),
-              section_publish(), section_launchd()]
+              section_publish(), section_calibrate(), section_launchd()]
     body = [f"# 每日 brief · {today}", ""]
     for lines, _ in blocks:
         body += lines + [""]

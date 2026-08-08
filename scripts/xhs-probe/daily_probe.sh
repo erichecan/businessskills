@@ -31,7 +31,7 @@ import probe; print(len(probe.load_pending(99999)))
 " 2>/dev/null || echo 0)
 echo "探测队列剩余 $queue 个词"
 if [ "$queue" -lt "$QUEUE_FLOOR" ]; then
-  echo "低于下限 $QUEUE_FLOOR，从关键词池补 $REFILL 个"
+  echo "低于下限 ${QUEUE_FLOOR}，从关键词池补 $REFILL 个"
   "$PY" "$DIR/import_pool.py" --limit "$REFILL"
 fi
 
@@ -40,7 +40,7 @@ probe_rc=$?
 if [ $probe_rc -ne 0 ]; then
   # 探测失败多半是 CDP 代理没起或小红书要验证码。分析和回填没有新数据可吃，
   # 但仍然跑一遍——之前几轮可能有没分析完的存量。
-  echo "⚠️ probe.py 退出码 $probe_rc，继续处理存量"
+  echo "⚠️ probe.py 退出码 ${probe_rc}，继续处理存量"
 fi
 
 "$PY" "$DIR/auto_analyze.py" --date "$DAY" --limit 10
