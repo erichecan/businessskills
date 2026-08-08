@@ -1,0 +1,27 @@
+--- /Volumes/datacenter/04-eric/AIcoding/businessskills/skills/eric-wechat-html/SKILL.md	2026-07-30 22:55:52
++++ /var/folders/b_/rvnfgp8159q1x74n0x5675r00000gn/T/tmp.G7Fc3xvPFY	2026-08-07 22:26:39
+@@ -1,9 +1,6 @@
+ ---
+ name: eric-wechat-html
+-description: |
+-  微信公众号 HTML 生成。把 Markdown 转成可粘贴到微信公众号后台的 HTML，内置 15 种经典媒体/科技产品/中文公众号风格。
+-  触发方式：/eric-wechat-html、/公众号HTML、「生成公众号 HTML」「做微信公众号版本」「微信排版」
+-  WeChat Official Account HTML generator. Converts Markdown into WeChat-ready HTML with 15 built-in publishing styles.
++description: 把 Markdown 转成可粘贴到微信公众号后台的 HTML，并提供 15 种内置风格。用户要求生成公众号 HTML、制作微信版本或排版公众号文章时使用。
+ ---
+ 
+ # eric-wechat-html：微信公众号 HTML 生成
+@@ -375,10 +372,10 @@
+ 
+ ## 不知道下一步用哪个 Skill？
+ 
+-输入 `/eric`。
++输入 `/dbs`。
+ 
+ 这是商业工具箱的导航入口。它会读取刚才的具体结论和你的最新目标，选择当前最值得处理的一个方向，并直接路由到对应 Skill。
+ 
+-你也可以直接说你想做什么。`/eric` 会尊重你的明确选择。
++你也可以直接说你想做什么。`/dbs` 会尊重你的明确选择。
+ 
+-不熟悉所有 Skill 没关系，下一步不确定时就回 `/eric`。
++不熟悉所有 Skill 没关系，下一步不确定时就回 `/dbs`。

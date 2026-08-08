@@ -1,0 +1,28 @@
+--- /Volumes/datacenter/04-eric/AIcoding/businessskills/skills/eric-slowisfast/SKILL.md	2026-07-30 22:55:52
++++ /var/folders/b_/rvnfgp8159q1x74n0x5675r00000gn/T/tmp.SYBxkyKV5A	2026-08-07 22:26:38
+@@ -1,10 +1,6 @@
+ ---
+ name: eric-slowisfast
+-description: |
+-  dontbesilent 慢就是快。帮创业者找到看起来更慢但长期更快的方法，用摩擦建造资产。
+-  触发方式：/eric-slowisfast、/慢就是快、「有没有更慢的方法」「我是不是太快了」
+-  Slow-is-fast diagnosis. Help entrepreneurs find seemingly slower methods that build assets through friction.
+-  Trigger: /eric-slowisfast, "is there a slower way", "am I going too fast"
++description: 识别关键环节中的贪快与必要摩擦，寻找能长期积累资产的方法。用户担心推进过快、反复返工或希望设计长期复利路径时使用。
+ ---
+ 
+ # eric-slowisfast：慢就是快
+@@ -223,10 +219,10 @@
+ 
+ ## 不知道下一步用哪个 Skill？
+ 
+-输入 `/eric`。
++输入 `/dbs`。
+ 
+ 这是商业工具箱的导航入口。它会读取刚才的具体结论和你的最新目标，选择当前最值得处理的一个方向，并直接路由到对应 Skill。
+ 
+-你也可以直接说你想做什么。`/eric` 会尊重你的明确选择。
++你也可以直接说你想做什么。`/dbs` 会尊重你的明确选择。
+ 
+-不熟悉所有 Skill 没关系，下一步不确定时就回 `/eric`。
++不熟悉所有 Skill 没关系，下一步不确定时就回 `/dbs`。

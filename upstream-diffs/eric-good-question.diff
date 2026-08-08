@@ -1,0 +1,28 @@
+--- /Volumes/datacenter/04-eric/AIcoding/businessskills/skills/eric-good-question/SKILL.md	2026-07-30 22:55:52
++++ /var/folders/b_/rvnfgp8159q1x74n0x5675r00000gn/T/tmp.Kw3Gv6aoOi	2026-08-07 22:26:38
+@@ -1,10 +1,6 @@
+ ---
+ name: eric-good-question
+-description: |
+-  dontbesilent 好问题生成器。把模糊问题改写成 Agent 可推理、可批评、可验证的问题说明书，并判断它能被自动化解决到什么程度。
+-  触发方式：/eric-good-question、/好问题、/问题说明书、/Agent可解性、「这个问题能不能自动化解决」「帮我把问题说清楚」
+-  Turn fuzzy problems into agent-solvable problem briefs and evaluate automation readiness.
+-  Trigger: /eric-good-question, "clarify this problem", "can an agent solve this"
++description: 把模糊问题改写成 Agent 可推理、可批评、可验证的问题说明书，并判断自动化解决程度。用户要求把问题说清、生成好问题或评估 Agent 可解性时使用。
+ ---
+ 
+ # eric-good-question：好问题生成器
+@@ -457,10 +453,10 @@
+ 
+ ## 不知道下一步用哪个 Skill？
+ 
+-输入 `/eric`。
++输入 `/dbs`。
+ 
+ 这是商业工具箱的导航入口。它会读取刚才的具体结论和你的最新目标，选择当前最值得处理的一个方向，并直接路由到对应 Skill。
+ 
+-你也可以直接说你想做什么。`/eric` 会尊重你的明确选择。
++你也可以直接说你想做什么。`/dbs` 会尊重你的明确选择。
+ 
+-不熟悉所有 Skill 没关系，下一步不确定时就回 `/eric`。
++不熟悉所有 Skill 没关系，下一步不确定时就回 `/dbs`。
