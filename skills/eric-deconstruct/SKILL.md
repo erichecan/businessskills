@@ -1,10 +1,6 @@
 ---
 name: eric-deconstruct
-description: |
-  dontbesilent 概念拆解。用维特根斯坦 + 奥派经济学的方法，把模糊的商业概念拆到原子级别。
-  触发方式：/eric-deconstruct、/拆概念、「帮我拆解这个概念」「这个词到底什么意思」
-  Concept deconstruction using Wittgenstein + Austrian economics framework.
-  Trigger: /eric-deconstruct, "deconstruct this concept", "what does this really mean"
+description: 用维特根斯坦与奥派经济学方法拆解模糊的商业概念。用户要求解释一个词、澄清概念边界或识别概念混用时使用。
 ---
 
 # eric-deconstruct：概念拆解

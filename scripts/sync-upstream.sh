@@ -23,6 +23,18 @@ warn()  { echo -e "${YELLOW}⚠️  $1${NC}"; }
 step()  { echo -e "${BLUE}▶  $1${NC}"; }
 error() { echo -e "${RED}❌ $1${NC}"; exit 1; }
 
+# 上游命名 → 本仓库命名。
+# ⛔ 必须用 perl，不能用 sed：macOS 自带的是 BSD sed，**不支持 \b 词边界**，
+# 于是 s/\/dbs\b/\/eric/g 静默失配，独立出现的 `/dbs` 原样留了下来。
+# 后果不是报错而是同步进来的 skill 结尾都写着「下一步不确定就回 /dbs」——
+# 这个命令在本仓库根本不存在（我们叫 /eric），用户照做就是死路。
+# skills/eric-upgrade 里的 /dbs 就是上一次同步用坏 sed 留下的。
+# 注意 `~/.dbs/` 是数据目录，前一个字符是 `.` 不是 `/`，不会被这条规则误伤，
+# 上游和本仓库都用它，保持原样才对。
+rename_upstream() {
+  perl -pe 's/dbs-/eric-/g; s{/dbs\b}{/eric}g; s/dbskill/eric/g' "$@"
+}
+
 cleanup() {
   rm -rf "$TMPDIR_UPSTREAM"
 }
@@ -90,7 +102,7 @@ for upstream_skill_dir in "$TMPDIR_UPSTREAM/skills"/*/; do
     NEW_SKILLS+=("$upstream_skill → $eric_skill")
   else
     # 比较内容是否有变化（用 dbs→eric 替换后对比）
-    upstream_content=$(sed 's/dbs-/eric-/g; s/\/dbs\b/\/eric/g; s/dbskill/eric/g' "$upstream_skill_dir/SKILL.md" 2>/dev/null || echo "")
+    upstream_content=$(rename_upstream "$upstream_skill_dir/SKILL.md" 2>/dev/null || echo "")
     eric_content=$(cat "$PROJECT_ROOT/skills/$eric_skill/SKILL.md" 2>/dev/null || echo "")
     if [ "$upstream_content" != "$eric_content" ]; then
       UPDATED_SKILLS+=("$upstream_skill → $eric_skill")
@@ -170,8 +182,7 @@ for entry in "${NEW_SKILLS[@]}"; do
   step "复制新 Skill: $upstream_skill → skills/$eric_skill/"
   mkdir -p "$PROJECT_ROOT/skills/$eric_skill"
   # 复制并把 dbs 命名替换为 eric
-  sed 's/dbs-/eric-/g; s/\/dbs\b/\/eric/g; s/dbskill/eric/g' \
-    "$TMPDIR_UPSTREAM/skills/$upstream_skill/SKILL.md" \
+  rename_upstream "$TMPDIR_UPSTREAM/skills/$upstream_skill/SKILL.md" \
     > "$PROJECT_ROOT/skills/$eric_skill/SKILL.md"
 done
 
@@ -183,8 +194,7 @@ for entry in "${UPDATED_SKILLS[@]}"; do
   step "生成 diff: $eric_skill → upstream-diffs/${eric_skill}.diff"
   # 先把上游内容做 dbs→eric 替换，再 diff
   upstream_converted=$(mktemp)
-  sed 's/dbs-/eric-/g; s/\/dbs\b/\/eric/g; s/dbskill/eric/g' \
-    "$TMPDIR_UPSTREAM/skills/$upstream_skill/SKILL.md" > "$upstream_converted"
+  rename_upstream "$TMPDIR_UPSTREAM/skills/$upstream_skill/SKILL.md" > "$upstream_converted"
   diff -u "$PROJECT_ROOT/skills/$eric_skill/SKILL.md" "$upstream_converted" \
     > "$diff_file" || true  # diff 有差异时返回 1，用 || true 忽略
   rm "$upstream_converted"

@@ -1,10 +1,6 @@
 ---
 name: eric
-description: |
-  Eric 商业工具箱主入口（基于 dontbesilent 方法论 + Eric 扩展：小红书内容流水线、文彬教练求职辅导）。三种模式：新手教程、任务前路由、任务后导航。
-  触发方式：/eric、/eric（兼容）、/eric 新手入门、/商业、「帮我看看」、「下一步怎么走」
-  Main entry point for Eric's business toolkit. Three modes: onboarding tutorial, pre-task routing, and post-task navigation.
-  Trigger: /eric, /eric, /eric 新手入门, "help me with my business", "what's next"
+description: Eric 商业工具箱主入口（dontbesilent 方法论 + 小红书内容流水线、文彬教练求职辅导），提供新手教程、任务前路由和任务后导航。用户不知道该用哪个 eric Skill、要求分析商业问题或询问下一步时使用。
 ---
 
 # eric：商业工具箱

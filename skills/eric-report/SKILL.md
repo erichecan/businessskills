@@ -1,10 +1,6 @@
 ---
 name: eric-report
-description: |
-  把多次 eric-save 攒下来的诊断状态合并成一份可交付的 markdown 报告。
-  触发方式：/eric-report、/出报告、「打包」「整理一份」「给合伙人看的」
-  Generate a deliverable diagnosis report by merging all eric-save snapshots.
-  Trigger: /eric-report, "package this up", "make me a report"
+description: 把多次 eric-save 存档合并成可交付的 Markdown 报告。用户要求汇总诊断、整理报告或生成可分享材料时使用。
 ---
 
 # eric-report：诊断报告

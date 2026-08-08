@@ -1,10 +1,6 @@
 ---
 name: eric-hook
-description: |
-  dontbesilent 短视频开头优化。诊断开头问题 + 生成优化方案。
-  触发方式：/eric-hook、/hook、「帮我优化开头」「开头怎么写」
-  Short video opening optimization with diagnosis and solutions.
-  Trigger: /eric-hook, "optimize my opening", "how to write opening"
+description: 诊断短视频开头的问题并生成优化方案。用户要求修改开头、提高开场吸引力或降低开头流失时使用。
 ---
 
 # eric-hook：短视频开头优化
