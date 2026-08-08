@@ -145,7 +145,9 @@ async function main() {
   const cdp = await attach();
   await cdp.send('Runtime.enable');
   await cdp.send('Page.enable');
-  await cdp.send('DOM.enable');     // 穿透 closed shadow root 找发布按钮时要用
+  // 原来这里还开了 DOM 域，专为 DOM.getDocument({pierce:true}) 穿透 shadow root
+  // 找发布按钮。发布改走事件派发后就不需要了 —— 日历那几步的坐标是
+  // getBoundingClientRect 拿的，走 Runtime 域即可。
   // ⛔ 必须先把 tab 切到前台。cdp-proxy 用 background:true 建 tab，
   // 后台标签页收不到有效的合成鼠标输入 —— 2026-08-06 22:12 实测：
   // 同一段代码手工对前台 tab 跑一次就成，对刚预填出来的后台 tab 跑就报「面板没能打开」。
@@ -243,47 +245,44 @@ async function main() {
     return;
   }
 
-  // ⛔ 提交按钮在 <xhs-publish-btn> 的 **closed shadow root** 里。
-  // 这是今晚一切「点了没反应」的总根源：页面里任何基于 document.querySelector /
-  // innerText 的查找**都看不见它**（closed shadow root 对 JS 不可见），
-  // 于是先是「找不到按钮」，后来正则放宽后又误匹配到左侧导航栏那个「发布笔记」
-  // （<div class="publish-video"> 里），点下去只是跳到一个空白发布页，
-  // URL 变成 from=menu&target=video —— 看起来像发布失败，其实是根本没点到发布。
+  // 提交不点按钮，派发按钮自己的事件。
   //
-  // 唯一能穿透 closed shadow root 的是 CDP：DOM.getDocument({pierce:true})。
-  // 找到文本节点后用 DOM.getBoxModel 取真实坐标，再按坐标点。
-  const doc = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });
-  const texts = [];
-  (function walk(n) {
-    if (n.nodeType === 3 && /定时发布|立即发布/.test(n.nodeValue || '')) {
-      texts.push({ text: n.nodeValue.trim(), parentId: n.parentId });
-    }
-    (n.children || []).forEach(walk);
-    (n.shadowRoots || []).forEach(walk);
-    if (n.contentDocument) walk(n.contentDocument);
-  })(doc.root);
-
-  let target = null;
-  for (const t of texts) {
-    try {
-      const bm = await cdp.send('DOM.getBoxModel', { nodeId: t.parentId });
-      // 尺寸过滤：开关那行的「定时发布」标签是 56x17，真按钮是 120x40。
-      // 不加这一条会点到开关标签上，把定时开关关掉。
-      if (bm.model.width >= 60 && bm.model.height >= 28) {
-        const q = bm.model.content;
-        target = { label: t.text, x: (q[0] + q[4]) / 2, y: (q[1] + q[5]) / 2 };
-        break;
-      }
-    } catch { /* 节点已失效，跳过 */ }
+  // 提交按钮在 <xhs-publish-btn> 的 **closed shadow root** 里，页面里任何基于
+  // document.querySelector / innerText 的查找都看不见它 —— 先是「找不到按钮」，
+  // 正则放宽后又误匹配到左侧导航栏那个「发布笔记」（<div class="publish-video">），
+  // 点下去只是跳到空白发布页，URL 变成 from=menu&target=video，
+  // 看起来像发布失败，其实根本没点到发布。
+  //
+  // 曾经的解法是 CDP DOM.getDocument({pierce:true}) 穿透进去拿文本节点坐标，
+  // 再配一条尺寸过滤（开关那行的「定时发布」标签是 56x17，真按钮 120x40，
+  // 不过滤会点到标签上、把定时开关关掉），最后按坐标 dispatchMouseEvent。
+  // 能用，但**依赖坐标和像素尺寸**：小红书改一次布局或按钮尺寸就会静默失效
+  // —— 而静默失效正是这条链路反复出问题的方式。
+  //
+  // 2026-08-08 找到了不依赖坐标的路子。这个自定义元素的类定义里写着，
+  // 它自己只是个事件源（customElements.get('xhs-publish-btn').toString()）：
+  //   _onPublish = () => e.dispatchEvent(new CustomEvent("publish",{bubbles:!0,composed:!0}))
+  //   _onSave    = () => e.dispatchEvent(new CustomEvent("save",   {bubbles:!0,composed:!0}))
+  // 干活的是外面监听 publish 的那段。宿主元素本身在普通 DOM 里，
+  // querySelector 找得到 —— 所以既不用穿透 shadow root，也不用碰坐标。
+  //
+  // ⛔ 只能派发 publish。save 是「暂存离开」，会把稿退回草稿箱，排期就没了。
+  const label = '定时发布';
+  const fired = await evaluate(cdp, `(() => {
+    const h = document.querySelector('xhs-publish-btn');
+    if (!h) return 'no-host';
+    if (h.getAttribute('submit-disabled') === 'true') return 'disabled';
+    h.dispatchEvent(new CustomEvent('publish', { bubbles: true, composed: true }));
+    return 'fired:' + (h.getAttribute('submit-text') || '');
+  })()`);
+  if (fired === 'no-host') throw new Error('页面上找不到 <xhs-publish-btn>（页面结构可能已变）');
+  if (fired === 'disabled') throw new Error('发布按钮处于禁用态，不派发事件');
+  // submit-text 就是按钮上写的字。它要是变成「立即发布」，说明定时开关掉了，
+  // 这时候发出去就是即时发布 —— 上面回读那一关本该拦住，这里再兜一道。
+  if (!String(fired).includes('定时发布')) {
+    throw new Error(`按钮文案是「${String(fired).replace('fired:', '')}」而不是「定时发布」，不发`);
   }
-  if (!target) throw new Error('穿透 shadow DOM 后仍找不到发布按钮（页面结构可能已变）');
-
-  console.log(`\n点击发布按钮「${target.label}」@ (${Math.round(target.x)}, ${Math.round(target.y)})`);
-  await cdp.send('Input.dispatchMouseEvent',
-    { type: 'mousePressed', x: target.x, y: target.y, button: 'left', clickCount: 1 });
-  await cdp.send('Input.dispatchMouseEvent',
-    { type: 'mouseReleased', x: target.x, y: target.y, button: 'left', clickCount: 1 });
-  const label = target.label;
+  console.log(`\n已派发 publish 事件（按钮文案「${label}」，未使用坐标点击）`);
   // ⛔ 点了 ≠ 发出去了。必须看到页面真的变了才算数 —— 退出码 0 会让调用方
   // （auto_publish 的 full_auto 分支）直接记 ✅ 并回填词库，记错比没记严重得多：
   // 稿会被当成已发布，闸门第 3 条从此永远拦着它，这篇就再也发不出去了。
