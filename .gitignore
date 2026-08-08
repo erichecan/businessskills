@@ -37,6 +37,10 @@ Thumbs.db
 # xhs/素材库：定时任务的运行时数据不入库，只提交规则/大脑文件与成稿
 xhs/素材库/*.xlsx
 xhs/素材库/*.docx
+xhs/素材库/*.pdf
+xhs/素材库/*.tmp
+xhs/素材库/*_debug.txt
+xhs/素材库/loop日志/
 xhs/素材库/*.bak_*
 xhs/素材库/.~lock*
 xhs/素材库/*_[0-9][0-9][0-9][0-9]run*
