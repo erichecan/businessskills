@@ -256,8 +256,17 @@ def main():
         if not targets:
             print("\n没指定要改哪篇。用 --note <id> 改一篇，或 --all 改全部。")
             return 1
-        ok = sum(1 for n in targets if fix_one(tid, n, a.submit))
+
+        # 不提交时**每篇单开一个 tab**：最后那一下要人来点，几篇共用一个 tab
+        # 的话，前面几篇会被后一篇的导航冲掉，人只剩最后一篇可点。
+        ok = 0
+        for n in targets:
+            t = tid if a.submit else api("/new?url=" + up.quote("about:blank", safe=""))["targetId"]
+            if fix_one(t, n, a.submit):
+                ok += 1
         print(f"\n完成 {ok}/{len(targets)} 篇。")
+        if not a.submit and ok:
+            print("去 Chrome 里逐个点底部红色「定时发布」保存（每篇约 3 秒）。")
         return 0 if ok == len(targets) else 1
     finally:
         if a.submit:
