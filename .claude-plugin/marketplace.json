@@ -299,6 +299,24 @@
       ]
     },
     {
+      "name": "eric-xhs-probe",
+      "description": "搜索位空缺探测。给候选长尾词，核验竞争密度、找出前排答案空缺、筛评论区原话，结论回填词库。搜索流范式专用。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": [
+        "xiaohongshu",
+        "search-gap",
+        "keyword-probe",
+        "long-tail",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-xhs-probe"
+      ]
+    },
+    {
       "name": "eric-xhs-cover",
       "description": "小红书封面提示词生成（CP5）。按 6 维输出 nanobanana 提示词，支持参考截图输入，给 2-3 个变体方案。",
       "source": "./",
