@@ -38,6 +38,23 @@ PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>�
  td,th{border-bottom:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:top}
  .pending{color:#b06c00}
  .row{cursor:pointer} .row:hover td{background:#efeee7}
+ /* 手机预览：图是 1242×1660（3:4），这里按 340pt 宽等比缩，看到的就是手机上的样子 */
+ .phone{width:340px;border:10px solid #1c1c1c;border-radius:38px;background:#fff;position:relative;box-shadow:0 8px 28px rgba(0,0,0,.18)}
+ .pnotch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:112px;height:20px;background:#1c1c1c;border-radius:0 0 13px 13px;z-index:3}
+ .pscreen{height:680px;overflow-y:auto;border-radius:28px;background:#fff}
+ .pscreen::-webkit-scrollbar{width:0}
+ .ptop{position:sticky;top:0;background:rgba(255,255,255,.94);backdrop-filter:blur(6px);padding:26px 14px 8px;font-size:12.5px;color:#666;border-bottom:1px solid #f2f2f2;z-index:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .pimgs{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+ .pimgs::-webkit-scrollbar{display:none}
+ .pimgs img{flex:0 0 340px;width:340px;height:453px;scroll-snap-align:start;object-fit:cover;display:block;cursor:zoom-in}
+ .pempty{flex:0 0 340px;height:453px;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:13px;background:#f4f4f2}
+ .pdots{display:flex;align-items:center;gap:5px;padding:9px 14px 4px;font-size:11px;color:#aaa}
+ .pdot{width:5px;height:5px;border-radius:50%;background:#dcdcdc}
+ .pdot.on{background:#ff2442}
+ .pbody{padding:2px 14px 30px}
+ .ptitle{font-size:16.5px;font-weight:700;line-height:1.45;margin-bottom:9px;color:#1a1a1a}
+ .ptext{font-size:14.5px;line-height:1.78;color:#2b2b2b;white-space:pre-wrap;word-break:break-word}
+ .ptags{margin-top:12px;font-size:14px;color:#3b6ea5;line-height:1.75;word-break:break-all}
 </style></head><body>
 <div class="main">
  <h1>案例库</h1>
@@ -80,6 +97,7 @@ PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>�
     <div id="daudit" style="font-size:13px;color:#8a6d2f;margin-bottom:10px"></div>
     <div id="dbody" style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:24px 28px;font-size:15px;line-height:1.9;white-space:pre-wrap;word-break:break-word">← 从左侧选择一篇成稿</div>
    </div>
+   <div id="dphone" style="width:362px;flex-shrink:0;position:sticky;top:20px;align-self:flex-start"></div>
   </div>
  </div>
 </div>
@@ -126,10 +144,14 @@ function showTab(name){
   document.getElementById('t-'+t).className='tab'+(t===name?' active':'');
  }
  document.getElementById('side').style.display=name==='entry'?'':'none';
+ // 成稿页要并排放「列表 + 全文 + 手机预览」三列，1080 装不下
+ document.querySelector('.main').style.maxWidth=name==='drafts'?'1560px':'1080px';
  if(name==='view') renderList();
  if(name==='drafts') loadDrafts();
 }
 let allDrafts=[];
+// null = 还没初始化。首次渲染时把除最新一天外的全部折叠，之后由用户点击控制。
+let collapsed=null;
 const TV={'合格':['#2f7d4f','✅'],'疑似不合格':['#b06c00','⚠️'],'作废':['#c0392b','⛔']};
 async function loadDrafts(){
  allDrafts=await (await fetch('/drafts')).json();
@@ -151,11 +173,38 @@ function renderDrafts(){
     ${rb('已发布','🟢 已发布',cnt['已发布'])}${rb('已定时','🔵 已定时',cnt['已定时'])}<br>
     ${rb('已预填','🟡 已预填未点',cnt['已预填'])}${rb('未处理','⚪️ 未发布',cnt['未处理'])}
     ${cnt['预填失败']?rb('预填失败','🔴 预填失败',cnt['预填失败']):''}</div>`;
- document.getElementById('dlist').innerHTML=ds.map(d=>{
+ // 按成稿日期分组折叠 —— 一天出十几篇时平铺根本看不出「今天做了多少」
+ const groups={};
+ for(const d of ds){(groups[dayOf(d.name)]=groups[dayOf(d.name)]||[]).push(d);}
+ const days=Object.keys(groups).sort().reverse();
+ if(collapsed===null) collapsed=new Set(days.slice(1));   // 默认只展开最新一天
+ const today=new Date().toLocaleDateString('sv');         // sv locale 就是 YYYY-MM-DD
+ document.getElementById('dlist').innerHTML=days.map(k=>{
+  const g=groups[k], open=!collapsed.has(k);
+  const c={};for(const s of PSTATE) c[s]=g.filter(d=>(d.pub||{}).state===s).length;
+  const pass=g.filter(d=>d.independent&&d.score>=85).length;
+  const chips=[['🟢',c['已发布']],['🔵',c['已定时']],['🟡',c['已预填']],['⚪️',c['未处理']],['🔴',c['预填失败']]]
+    .filter(([,n])=>n).map(([e,n])=>e+n).join(' ');
+  return `<div onclick="toggleDay('${k}')" style="padding:7px 11px;margin:${open?'12px 0 6px':'6px 0'};border-radius:6px;cursor:pointer;user-select:none;font-size:13px;background:${k===today?'#1c1c1c':'#e6e5de'};color:${k===today?'#fff':'#444'}">
+    <span style="display:flex;justify-content:space-between;gap:8px">
+     <b>${open?'▾':'▸'} ${k}${k===today?' · 今天':''}</b>
+     <span style="font-size:11.5px;white-space:nowrap;opacity:.85">${g.length} 篇 · 过线 ${pass}　${chips}</span></span>
+   </div>`+(open?g.map(draftItem).join(''):'');
+ }).join('')||'<div style="color:#999;font-size:13px">当前筛选下没有成稿</div>';
+}
+function dayOf(name){
+ const m=name.match(/成稿_(\\d{4}-\\d{2}-\\d{2})_/);
+ return m?m[1]:'未标日期';
+}
+function toggleDay(k){
+ collapsed.has(k)?collapsed.delete(k):collapsed.add(k);
+ renderDrafts();
+}
+function draftItem(d){
   const [c,ic]=TV[d.tverdict]||['#999','·'];const p=d.pub||{};
   return `<div class="ditem" onclick="showDraft('${d.name}',${d.archived})" style="padding:9px 12px;border:1px solid #ddd;border-left:3px solid ${c};border-radius:6px;margin-bottom:6px;cursor:pointer;background:#fff;font-size:13px">
     <div style="display:flex;justify-content:space-between;gap:6px">
-     <b>${d.name.replace(/^成稿_/,'').replace(/\\.md$/,'')}</b>
+     <b>${d.name.replace(/^成稿_\\d{4}-\\d{2}-\\d{2}_/,'').replace(/^成稿_/,'').replace(/\\.md$/,'')}</b>
      <span style="color:${p.color||'#bbb'};white-space:nowrap;font-size:11.5px">${p.label||''}</span></div>
     ${d.archived?'<span style="color:#999">[归档]</span> ':''}<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:${d.lane==='推荐流'?'#e8e0f5':'#e0eef5'};color:#555">${d.lane}</span>
     <span style="color:${d.score===null?'#bbb':!d.independent?'#999':d.score>=85?'#2f7d4f':d.score>=70?'#b06c00':'#c0392b'}">${
@@ -163,7 +212,42 @@ function renderDrafts(){
     <span style="color:#aaa">· 图 ${d.images}</span>${d.disposition?` <span style="color:#888">· ${d.disposition}</span>`:''}<br>
     <span style="color:${c};font-size:12px">${ic} 标题${d.tverdict}（${d.tlen}字）</span>
     ${p.detail?`<br><span style="color:#888;font-size:11.5px">${p.detail}</span>`:''}
-   </div>`}).join('');
+   </div>`;
+}
+// 手机预览 —— 预览的必须是**真正会发出去的那份文本**，所以这里照抄 prefill_xhs 的清洗：
+// 去 markdown 粗体、去残留标题标记、去分隔线。否则预览里好好的排版，发出去多一堆 ** 号。
+function pubBody(d){
+ return (d.body||'').replace(/\\*\\*(.+?)\\*\\*/g,'$1')
+                    .replace(/^#{1,6}\\s+/gm,'')
+                    .replace(/^---+\\s*$/gm,'').trim();
+}
+function renderPhone(d){
+ const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+ const imgs=d.images||[], body=pubBody(d);
+ const chars=body.replace(/\\s/g,'').length;
+ const lines=body.split('\\n').filter(x=>x.trim()).length;
+ document.getElementById('dphone').innerHTML=`
+  <div style="font-size:12px;color:#888;margin-bottom:8px;display:flex;justify-content:space-between;gap:8px">
+   <span>手机预览 · 图 ${imgs.length} 张</span><span>正文 ${chars} 字 / ${lines} 段</span></div>
+  <div class="phone"><div class="pnotch"></div><div class="pscreen">
+   <div class="ptop">‹　${esc(d.title)}</div>
+   <div class="pimgs" id="pimgs" onscroll="pdot()">${
+     imgs.map(u=>`<img src="${u}" onclick="window.open('${u}')">`).join('')
+     ||'<div class="pempty">还没有成品图</div>'}</div>
+   <div class="pdots"><span id="pidx">${imgs.length?1:0}</span>/${imgs.length}　${
+     imgs.map((_,i)=>`<span class="pdot${i?'':' on'}"></span>`).join('')}</div>
+   <div class="pbody">
+    <div class="ptitle">${esc(d.title)||'（未解析出标题）'}</div>
+    <div class="ptext">${esc(body)}</div>
+    <div class="ptags">${esc(d.tags)}</div>
+   </div>
+  </div></div>`;
+}
+function pdot(){
+ const el=document.getElementById('pimgs');if(!el||!el.clientWidth)return;
+ const i=Math.round(el.scrollLeft/el.clientWidth);
+ document.getElementById('pidx').textContent=i+1;
+ document.querySelectorAll('.pdot').forEach((d,j)=>d.className='pdot'+(j===i?' on':''));
 }
 let curDraft=null;
 async function showDraft(name,arch){
@@ -201,6 +285,7 @@ async function showDraft(name,arch){
    <textarea id="dedit" spellcheck="false" style="width:100%;box-sizing:border-box;height:460px;font:13px/1.7 ui-monospace,Menlo,monospace;padding:14px;border:1px solid #ddd;border-radius:6px;background:#fafaf7">${d.content.replace(/</g,'&lt;')}</textarea>
    <div style="display:flex;gap:12px;align-items:center;margin-top:12px"><b>标签</b><span id="dtags">${d.tags||''}</span></div>
    <div id="dlog" style="font-size:12.5px;color:#666;white-space:pre-wrap;margin-top:10px"></div>`;
+ renderPhone(d);
 }
 async function markPub(btn,undo){
  if(!curDraft) return;
@@ -947,6 +1032,10 @@ class H(BaseHTTPRequestHandler):
     def _send(self, body, ctype="text/html; charset=utf-8", code=200):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
+        # 页面和数据一律不许缓存。这里没有 ETag / Last-Modified，Chrome 会启发式缓存，
+        # 结果是改完 PAGE 重启服务、刷新浏览器，看到的还是旧页面 —— 你会以为改动没生效
+        # （2026-08-06 实测踩过：#dphone 明明在 HTML 里，页面上就是没有）。
+        self.send_header("Cache-Control", "no-store, must-revalidate")
         self.end_headers()
         self.wfile.write(body.encode("utf-8"))
 

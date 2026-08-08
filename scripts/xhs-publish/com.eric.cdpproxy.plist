@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.eric.cdpproxy</string>
+    <!-- CDP 代理是整条链的地基：采集探测、半自动发布、发布数据回收全都要它。
+         2026-08-06 查出今天采集只跑了 2 轮，20:30 那轮日志写着「CDP Proxy 未就绪」——
+         此前没有任何东西负责把它拉起来，全靠人在会话里手动跑一次，
+         人一走它就没了，之后所有依赖浏览器的定时任务全部静默失败。 -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/node</string>
+        <string>/Users/eric/.claude/skills/web-access/scripts/cdp-proxy.mjs</string>
+    </array>
+    <!-- 指到自动化专用 Chrome（com.eric.xhschrome，端口 9333）。
+         不指定的话代理会自动发现，而自动发现会一路选中日常 Chrome 的 9222 ——
+         那个端口通但不应答（Chrome 150 的 Allow remote debugging 是会过期的会话级授权）。 -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CHROME_DEBUG_PORT</key>
+        <string>9333</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- KeepAlive：挂了就拉起来。它是常驻服务，不是定时任务。 -->
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>/tmp/cdpproxy.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/cdpproxy.log</string>
+</dict>
+</plist>

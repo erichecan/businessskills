@@ -4,19 +4,27 @@
 <dict>
     <key>Label</key>
     <string>com.eric.xhspublish</string>
+    <!-- Homebrew python + launchd_runner：系统 /usr/bin/python3 在 launchd 下读不了
+         /Volumes 外置卷（commit 75cad98）。7 个任务统一走这条路径。 -->
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
-        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/xhs-publish/auto_publish.py</string>
+        <string>/opt/homebrew/bin/python3</string>
+        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/launchd_runner.py</string>
+        <string>xhs-publish/auto_publish.py</string>
+        <!-- 全自动：连最后那下「定时发布」也自己点，全程无人（Eric 2026-08-06 明确要求）。
+             安全垫仍在：四道闸门照走；set_schedule.mjs 选完时间会回读校验，对不上就不点发布；
+             点完还要等页面真的跳走才算发布成功，否则退出码 1、记 ⏸ 不记 ✅。 -->
+        <string>--full-auto</string>
     </array>
-    <!-- 触发点数量 = auto_publish.py 的 DAILY_QUOTA。一次只预填一篇（创作平台一次只放得下
-         一篇稿），所以「每天发 N 篇」必须靠「一天跑 N 次」实现，改配额要同步改这里。
-         时点选在人醒着的时候：预填后最后一步（选时段、点定时发布）仍需人点。 -->
+    <!-- 每天只跑一次，22:00。
+         2026-08-06 之前是 9:00/14:00/21:00 三次，因为一次只预填得了一篇
+         （创作平台一次只放得下一篇稿），「每天发 3 篇」只能靠「一天跑 3 次」凑。
+         现在 auto_publish.py 有了接力模式：预填一篇 → 轮询等你点完定时发布 →
+         自动预填下一篇，一次运行就能把 DAILY_QUOTA 篇走完，不再需要多个触发点。
+         时点定在 22:00：这一步仍要人点最后一下，得挑你在电脑前的时候。 -->
     <key>StartCalendarInterval</key>
     <array>
-        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
-        <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
-        <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>22</integer><key>Minute</key><integer>0</integer></dict>
     </array>
     <key>StandardOutPath</key>
     <string>/tmp/xhspublish.log</string>

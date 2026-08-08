@@ -35,8 +35,26 @@ PORT_FILE = (Path.home() / "Library/Application Support/Google/Chrome/DevToolsAc
 
 
 def browser_ws():
+    """先问自动化专用实例（com.eric.xhschrome，端口 9333），再兜底到日常 Chrome。
+
+    专用实例是命令行带 --remote-debugging-port 起的，HTTP 端点正常应答，
+    **不需要** chrome://inspect 那个开关；而日常 Chrome 的授权是会话级、会过期的
+    （2026-08-06 实测：过期后新连接一律被拒，整条链静默瘫掉）。
+    """
+    import json as _json
+    import urllib.request as _rq
+    port = int(os.environ.get("CHROME_DEBUG_PORT", "9333"))
+    try:
+        with _rq.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=2.5) as r:
+            u = _json.load(r).get("webSocketDebuggerUrl", "")
+        if u:
+            return port, u.split(f":{port}", 1)[1]
+    except Exception:
+        pass
+
     if not PORT_FILE.exists():
-        raise SystemExit(f"⛔ 找不到 {PORT_FILE}（Chrome 没开，或用的不是默认 profile）")
+        raise SystemExit(f"⛔ 专用实例（端口 {port}）没应答，也找不到 {PORT_FILE}。"
+                         f"\n   检查：launchctl list com.eric.xhschrome")
     lines = PORT_FILE.read_text().strip().splitlines()
     if len(lines) < 2:
         raise SystemExit(f"⛔ {PORT_FILE} 格式异常：{lines}")

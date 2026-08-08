@@ -4,6 +4,11 @@
 为什么是半自动：小红书发布页的日历组件（d-datepicker）只认 isTrusted 的原生手势，
 JS 合成 click、完整鼠标事件序列、CDP Input.dispatchMouseEvent 全部试过，
 元素能点中但面板不展开。选时段这一下没法程序化，索性交给人——每篇约 10 秒。
+（还没穷尽：现有 /clickAt 只发了 mousePressed+mouseReleased，没有前置 mouseMoved、
+没带 buttons、两个事件之间没有延迟。click_probe.mjs 就是来逐条试这些的。）
+
+接力模式（2026-08-06 起默认开）：预填一篇 → 轮询盯着这个 tab 等它离开发布页 →
+自动预填下一篇。所以 plist 只需要 22:00 一个触发点就能走完 DAILY_QUOTA 篇。
 
 复用 scripts/case-entry/case_entry.py 的 prefill_xhs / do_publish_click，不重写发布流程。
 
@@ -30,10 +35,26 @@ import csv
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
-from datetime import date, datetime, timedelta
+import time
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+
+# ⛔ 小红书发布页的日历是**北京时间**（页面上就写着「北京时间」），而本机在北美（EDT，
+# 比北京慢 12 小时）。时段轮换池那 7 个点是给中国读者选的，本来就该按北京时间算。
+#
+# 2026-08-06 实测这个 bug 的后果：next_slot 用 datetime.now()（本机 22:30）算出「09:00」，
+# 填进日历变成**北京 08-07 09:00** —— 而当时北京已经 10:30，时间在过去，
+# 小红书不报错，直接把稿立刻发了出去（后台显示 10:36 发布，不是定时）。
+# 也就是说：时区搞错不会失败，只会**安静地变成立即发布**，时段实验的数据全废。
+BEIJING = timezone(timedelta(hours=8))
+
+
+def bj_now():
+    """当前的北京墙上时间（不带时区信息，直接可与日历上的数字比较）。"""
+    return datetime.now(BEIJING).replace(tzinfo=None)
 
 REPO = Path(__file__).resolve().parents[2]
 SUCAI = REPO / "xhs" / "素材库"
@@ -54,11 +75,20 @@ DAILY_QUOTA = 3          # 每天发 3 篇，不是一天占满 7 个时段
 SCHED_LEAD = timedelta(minutes=30)   # 小红书定时发布需要提前量，太近会被拒
 TRUSTED_AUDITORS = {"独立审核", "人工放行"}
 
+# 接力模式：预填一篇 → 轮询等人点完「定时发布」→ 自动预填下一篇。
+# 有了它，一天跑一次（22:00）就能走完 DAILY_QUOTA 篇；此前只能靠一天跑三次凑。
+RELAY_POLL = 6                  # 每 6 秒看一眼页面
+RELAY_TIMEOUT = 45 * 60         # 单篇最多等 45 分钟，超了就停手（不猜你发没发）
+RELAY_LOST_STRIKES = 3          # 连续 3 次读不到页面才判定 tab 没了，避免抖动误判
+
 
 def next_slot(now=None, skip=0):
     """按发布日志里上一次用过的时段，取池中下一个；该点今天已过就顺延到明天。
-    严格保持轮换顺序——不因今天来不及就跳号，否则时段对比会有偏。"""
-    now = now or datetime.now()
+    严格保持轮换顺序——不因今天来不及就跳号，否则时段对比会有偏。
+
+    ⛔ 全程用**北京时间**：返回值是要填进小红书日历的数字，那个日历是北京时间。
+    用本机时间算会安静地变成「立即发布」（见文件顶部 BEIJING 那段注释）。"""
+    now = now or bj_now()
     used = []
     for r in read_csv(PUB_LOG):
         # 只有真发出去的才算占用时段：dry-run 与失败记录不能推进轮换，
@@ -103,6 +133,28 @@ def published_already():
     return {r["成稿文件"].strip() for r in read_csv(PUB_LOG) if r.get("发布", "").startswith("✅")}
 
 
+def backend_titles():
+    """创作后台抓回来的真实已发标题。
+
+    ⛔ 发布日志**不足以**判重：它只记本脚本走过的流程，人工在页面上直接发的、
+    以及脚本发了但没来得及回填的，都不在里面。2026-08-05 的 brief 就点名过三篇
+    「闸门放行但后台已有同名笔记」—— 半自动时代那只是个提醒，人看一眼就绕开了；
+    全自动之后没有人看，闸门放行就等于直接发出去，那三篇会变成三条重复笔记。
+    所以判重必须以后台的真实列表为准。
+    """
+    return {(r.get("标题") or "").strip()
+            for r in read_csv(SUCAI / "发布数据.csv") if (r.get("标题") or "").strip()}
+
+
+def draft_title_of(name):
+    """成稿的 H1 是关键词，真正发出去的标题在「## 发布标题」段，必须走 parse_draft。"""
+    from case_entry import parse_draft
+    for p in (SUCAI / name, SUCAI / "归档稿" / name):
+        if p.exists():
+            return (parse_draft(p.read_text(encoding="utf-8")).get("title") or "").strip()
+    return ""
+
+
 def gate(name):
     """返回 (是否放行, 理由)。理由无论放行与否都要能解释清楚。"""
     rows = [r for r in read_csv(AUDIT_LOG) if r.get("成稿文件", "").strip() == name]
@@ -118,6 +170,11 @@ def gate(name):
 
     if name in published_already():
         return False, "发布日志显示已发布过"
+
+    # 第 3 条闸门的另一半：拿后台真实已发列表再核一遍标题
+    t = draft_title_of(name)
+    if t and t in backend_titles():
+        return False, f"创作后台已有同名笔记「{t}」（发布日志漏记，再发即重复）"
 
     stem = name.removeprefix("成稿_").removesuffix(".md")
     imgs = sorted((SUCAI / "成品图" / stem).glob("*.png")) if (SUCAI / "成品图" / stem).is_dir() else []
@@ -250,8 +307,118 @@ def open_sched_switch(tid):
               'return on?("已打开 · "+(w.innerText||"").replace(/\\n/g," ").slice(0,40)):"未打开";})()')
 
 
-def publish_one(name, dry_run, immediate=False):
-    """batch_offset：同一次运行里第 N 篇往后顺延 N 个时段，避免两篇撞同一个点。"""
+def set_schedule(tid, at, do_publish=False):
+    """调 set_schedule.mjs 自动选日期和时分（2026-08-06 起可用）。返回 (成功, 日志)。
+
+    此前这一步是留给人的 10 秒 —— 因为老注释断言 d-datepicker 点不开。实测推翻了：
+    最朴素的 CDP mousePressed+mouseReleased 就能打开面板。当初判定失败，多半是在
+    .post-time-wrapper 内部找面板，而面板其实挂在 body 下的 .d-popover 里，永远找不到。
+    """
+    # ⛔ 不能只写 "node"。launchd 给的 PATH 是 /usr/bin:/bin:/usr/sbin:/sbin，
+    # 不含 /opt/homebrew/bin —— 2026-08-06 22:00 首次全自动运行就死在这：
+    # FileNotFoundError: 'node'，预填完、定时开关也开了，然后整个进程崩掉，
+    # 一篇没发、连一行日志都没留下（崩在 log_run 之前）。
+    # 和 75cad98 修 /usr/bin/python3 是同一类坑：**launchd 里一切外部命令都要绝对路径**。
+    node = shutil.which("node") or next(
+        (p for p in ("/opt/homebrew/bin/node", "/usr/local/bin/node") if Path(p).exists()), "")
+    if not node:
+        return False, "找不到 node 可执行文件（PATH 里没有，常见安装位置也没有）"
+    js = Path(__file__).parent / "set_schedule.mjs"
+    cmd = [node, str(js), "--at", at, "--target", tid]
+    if do_publish:
+        cmd.append("--publish")
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
+
+
+PAGE_STATE_JS = (
+    'JSON.stringify({'
+    'url:location.href,'
+    'sched:(document.querySelector(".post-time-wrapper")||{}).innerText||""'
+    '})')
+
+# 页面上定时区域的文案形如「定时发布 2026-08-07 09:00」，也见过省掉年份的短格式。
+SCHED_FULL_RE = re.compile(r"(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})日?\s*(\d{1,2}):(\d{2})")
+SCHED_SHORT_RE = re.compile(r"(?<!\d)(\d{1,2})[-/月](\d{1,2})日?\s*(\d{1,2}):(\d{2})")
+
+
+def parse_sched_text(s):
+    """从定时区域文案里抠出真正选中的时间。
+
+    ⛔ 必须读页面上的真值，不能拿脚本建议的 next_slot 顶替：发布日志的「定时」列
+    喂给 next_slot() 做时段轮换，记错了 7 个时段的对比样本就有偏。读不到就留空，
+    宁可空着让人补，也不写一个看起来对的假时间。"""
+    m = SCHED_FULL_RE.search(s or "")
+    if m:
+        y, mo, d, h, mi = (int(x) for x in m.groups())
+        return f"{y:04d}-{mo:02d}-{d:02d} {h:02d}:{mi:02d}"
+    m = SCHED_SHORT_RE.search(s or "")
+    if m:
+        mo, d, h, mi = (int(x) for x in m.groups())
+        return f"{date.today().year:04d}-{mo:02d}-{d:02d} {h:02d}:{mi:02d}"
+    return ""
+
+
+def watch_until_published(tid, name, timeout=RELAY_TIMEOUT, poll=RELAY_POLL):
+    """轮询发布页，等人点完「定时发布」。返回 {state, sched, why}。
+
+    判定只认一个信号：**URL 离开了 /publish/publish**。
+    发成功后小红书会跳走（success 页或笔记管理），这是强信号。
+    刻意不用「标题输入框变空」当信号 —— 人手动刷新一下页面表单也会变空，
+    那会把一篇根本没发的稿记成已发布，比漏判严重得多。
+
+    读不到页面（人把 tab 关了）不算已发布，按 lost 停手。同理：宁可漏，不可错。
+    """
+    import urllib.request as rq
+
+    deadline = time.time() + timeout
+    last_sched, strikes = "", 0
+    print(f"\n⏳ 接力模式：等你点完「定时发布」（最多等 {timeout // 60} 分钟，"
+          f"每 {poll} 秒看一眼）。别关这个 tab。")
+    while time.time() < deadline:
+        time.sleep(poll)
+        try:
+            req = rq.Request(f"{PROXY_BASE}/eval?target={tid}",
+                             data=PAGE_STATE_JS.encode(), method="POST")
+            st = json.loads(json.loads(rq.urlopen(req, timeout=20).read()).get("value") or "{}")
+            strikes = 0
+        except Exception as e:
+            strikes += 1
+            if strikes >= RELAY_LOST_STRIKES:
+                return {"state": "lost", "sched": last_sched,
+                        "why": f"连续 {strikes} 次读不到发布页（tab 关了或代理挂了）：{e}"}
+            continue
+        url = st.get("url") or ""
+        got = parse_sched_text(st.get("sched"))
+        if got:
+            last_sched = got
+        if "/publish/publish" not in url:
+            return {"state": "published", "sched": last_sched,
+                    "why": f"页面已离开发布页 → {url[:80]}"}
+    return {"state": "timeout", "sched": last_sched,
+            "why": f"等了 {timeout // 60} 分钟仍停在发布页，没检测到发布动作"}
+
+
+def record_published(name, at, how="接力检测"):
+    """接力检测到发出去之后记账 + 回填词库。与 --confirm 走同一套账，避免两条路口径不一。"""
+    from case_entry import parse_draft
+    title = parse_draft((SUCAI / name).read_text(encoding="utf-8"))["title"]
+    note = backfill_ciku(title, "", name)
+    shown = at or "时间未读到"
+    log_run({"日期": datetime.now().strftime("%Y-%m-%d %H:%M"), "成稿文件": name,
+             "标题": title, "闸门": "✅ 通过", "预填": "✅", "定时": at,
+             "发布": f"✅ {how}已定时 {shown}",
+             "备注": note + ("" if at else "；⚠️ 页面没读到定时时间，请手工补「定时」列，"
+                             "否则时段轮换会错位")})
+    return note
+
+
+def publish_one(name, dry_run, immediate=False, full_auto=False):
+    """batch_offset：同一次运行里第 N 篇往后顺延 N 个时段，避免两篇撞同一个点。
+
+    full_auto=True 时连最后那一下「定时发布」也自己点，全程无人。
+
+    返回 (退出码, tid)。tid 给接力模式用来盯这个 tab；失败或 dry-run 时可能是 None。"""
     from case_entry import prefill_xhs, do_publish_click, parse_draft
 
     text = (SUCAI / name).read_text(encoding="utf-8")
@@ -266,7 +433,7 @@ def publish_one(name, dry_run, immediate=False):
         row["备注"] = pre.get("log", "")[-160:].replace("\n", "；")
         log_run(row)
         print(f"⛔ 预填失败：\n{pre.get('log')}", file=sys.stderr)
-        return 1
+        return 1, None
 
     print(pre["log"])
     sched_time, hour = next_slot(skip=publish_one.batch_offset)
@@ -278,7 +445,7 @@ def publish_one(name, dry_run, immediate=False):
         row["备注"] = f"预填完成；本次将用的时段是 {sched_time}（轮换池 {SLOT_HOURS}）"
         log_run(row)
         print(f"\n[dry-run] 已预填，未点发布。若继续将定时到 {sched_time}。")
-        return 0
+        return 0, pre["tid"]
 
     if immediate:
         res = do_publish_click(pre["tid"], "now", "")
@@ -286,29 +453,47 @@ def publish_one(name, dry_run, immediate=False):
         print(res.get("log", ""))
         row["备注"] = (backfill_ciku(title, "", name) if res.get("ok") else "") or ""
         log_run(row)
-        return 0 if res.get("ok") else 1
+        return (0 if res.get("ok") else 1), pre["tid"]
 
     sw = open_sched_switch(pre["tid"])
-    # 切到前台，否则这一步等于没做：cdp-proxy 用 background:true 建 tab，
+    print(f"\n定时开关：{sw}")
+
+    sched_ok, sched_log = set_schedule(pre["tid"], sched_time, do_publish=full_auto)
+    print("\n".join("  " + l for l in sched_log.strip().split("\n")))
+
+    # 切到前台，否则最后那一下等于没人能点：cdp-proxy 用 background:true 建 tab，
     # 预填完的页面一直躲在后台，日志写着「已打开创作平台」而人根本看不见
     # （2026-08-05 实测，Eric 找不到页面，最后一步没人点，稿就卡在那）。
-    focus = subprocess.run([sys.executable, str(Path(__file__).parent / "focus_tab.py"),
-                            "--target", pre["tid"]], capture_output=True, text=True)
-    print((focus.stdout or focus.stderr or "").strip())
+    # full_auto 且已点完发布时就不用切了 —— 没人需要看它。
+    if not (full_auto and sched_ok):
+        focus = subprocess.run([sys.executable, str(Path(__file__).parent / "focus_tab.py"),
+                                "--target", pre["tid"]], capture_output=True, text=True)
+        print((focus.stdout or focus.stderr or "").strip())
+
+    if full_auto and sched_ok:
+        row["发布"] = f"✅ 全自动已定时 {sched_time}"
+        row["备注"] = backfill_ciku(title, "", name)
+        log_run(row)
+        print(f"\n✅ 全自动完成：{name} → {sched_time}")
+        return 0, pre["tid"]
+
     row["发布"] = "⏸ 待人工定时"
-    row["备注"] = f"定时开关：{sw}"
+    # 失败时把 node 的最后几行塞进备注 —— 全自动模式下没人盯着终端，
+    # 日志里只写「失败」等于什么都没说，第二天没人知道是选时间挂了还是点发布挂了。
+    tail = " / ".join(l.strip() for l in sched_log.strip().split("\n")[-3:] if l.strip())
+    row["备注"] = (f"定时开关：{sw}；自动选时间："
+                   + (f"✅ {sched_time}" if sched_ok else f"❌ {tail[:160]}"))
     log_run(row)
-    print(f"\n定时开关：{sw}")
     print("─" * 58)
-    print(f"  请在 Chrome 里完成最后一步（约 10 秒）：")
-    print(f"  1. 点时间那块，日历选日期")
-    print(f"  2. 右侧两列选 {hour} 时 / 00 分")
-    print(f"  3. 点底部红色「定时发布」按钮")
-    print(f"  建议时段：{sched_time}（轮换池 {SLOT_HOURS}，本次第 {SLOT_HOURS.index(hour)+1} 个）")
-    print(f"  发完回来跑：python3 scripts/xhs-publish/auto_publish.py \\")
-    print(f"                --confirm \"{name}\" --at \"{sched_time}\"")
+    if sched_ok:
+        print(f"  时间已自动选好：{sched_time}"
+              f"（轮换池 {SLOT_HOURS}，本次第 {SLOT_HOURS.index(hour)+1} 个）")
+        print(f"  你只需在 Chrome 里点一下底部红色「定时发布」按钮。")
+    else:
+        print(f"  ⚠️ 自动选时间失败，请手工完成：点时间那块 → 选日期 → 选 {hour} 时 / 00 分 → 点定时发布")
+        print(f"  建议时段：{sched_time}")
     print("─" * 58)
-    return 0
+    return 0, pre["tid"]
 
 
 def confirm(name, at):
@@ -343,6 +528,11 @@ def main():
                     help="只处理指定成稿（可重复）。手动发布用：绕过每日配额，但**不绕闸门**")
     ap.add_argument("--confirm", metavar="FILENAME", help="人工点完定时发布后回填")
     ap.add_argument("--at", metavar="TIME", default="", help="配合 --confirm，实际定时时间")
+    ap.add_argument("--no-relay", dest="relay", action="store_false",
+                    help="退回旧行为：预填一篇就停，不等你点完、也不接力预填下一篇")
+    ap.add_argument("--full-auto", action="store_true",
+                    help="连最后那下「定时发布」也自己点，全程无人。默认不开 —— "
+                         "默认只把时间选好，红色按钮留给你点，人还在回路里")
     args = ap.parse_args()
 
     if args.approve:
@@ -398,22 +588,47 @@ def main():
         batch = passed[:max(quota, 1) if not args.dry_run else 1]
         print(f"[{datetime.now():%Y-%m-%d %H:%M}] 闸门通过 {len(passed)} 篇，"
               f"今日已发 {done_today}/{DAILY_QUOTA}，本次处理 {len(batch)} 篇\n")
-    # ⛔ 一次只预填一篇。创作平台的发布页一次只承载一篇稿，连续预填第二篇会把第一篇
-    # 直接覆盖掉 —— 而预填后最后一步（选时段、点发布）要人来点，人还没点，稿就没了。
+    # ⛔ 一次只能有一篇稿躺在发布页上。创作平台的发布页一次只承载一篇，连续预填第二篇
+    # 会把第一篇直接覆盖掉 —— 而最后一步（选时段、点发布）要人来点，人还没点稿就没了。
     # 2026-08-03 实测：连预填 3 篇，页面上只剩最后一篇，前两篇白填。
-    # DAILY_QUOTA=3 的含义是「一天发 3 篇」，靠一天跑三次实现，不是一次填三篇。
-    # 所以改配额必须同步改 plist 的 StartCalendarInterval 触发点数量，否则配额是空头支票。
-    rest = batch[1:]
-    name, why = batch[0]
-    print(f"--- {name}\n    {why}")
-    rc = publish_one(name, args.dry_run, args.now)
-    if rest:
-        print(f"\n还有 {len(rest)} 篇在队列里，**发完这篇再跑一次**才会预填下一篇"
-              f"（创作平台一次只放得下一篇）：")
-        for n, _ in rest:
-            print(f"  · {n}")
-        print(f"  发完后先回填：python3 auto_publish.py --confirm {name} --at \"YYYY-MM-DD HH:MM\"")
-    return rc
+    #
+    # 所以多篇不能并行填，只能**接力**：填一篇 → 盯着这个 tab 等它离开发布页 → 再填下一篇。
+    # 这就是 --relay（默认开）。有了它，一天跑一次就能走完 DAILY_QUOTA 篇；
+    # 2026-08-06 之前只能靠 plist 排三个触发点凑出「一天 3 篇」。
+    total = len(batch)
+    for i, (name, why) in enumerate(batch, 1):
+        print(f"--- [{i}/{total}] {name}\n    {why}")
+        rc, tid = publish_one(name, args.dry_run, args.now, args.full_auto)
+        if rc != 0:
+            return rc
+        if i == total:
+            break
+        if args.now or args.full_auto:
+            # 这两种模式下发布已经点完了，没有人工步骤要等，直接下一篇
+            time.sleep(10)
+            continue
+        if args.dry_run or not args.relay or not tid:
+            print(f"\n还有 {total - i} 篇在队列里，**发完这篇再跑一次**才会预填下一篇"
+                  f"（创作平台一次只放得下一篇）：")
+            for n, _ in batch[i:]:
+                print(f"  · {n}")
+            print(f"  发完后先回填：python3 auto_publish.py --confirm {name} --at \"YYYY-MM-DD HH:MM\"")
+            break
+
+        st = watch_until_published(tid, name)
+        if st["state"] != "published":
+            # 没确认发出去就绝不记 ✅，也绝不预填下一篇（下一篇会盖掉这一篇）
+            log_run({"日期": datetime.now().strftime("%Y-%m-%d %H:%M"), "成稿文件": name,
+                     "标题": "", "闸门": "✅ 通过", "预填": "✅",
+                     "发布": f"⏸ 接力未确认（{st['state']}）", "备注": st["why"]})
+            print(f"\n⏸ {st['why']}")
+            print(f"   队列里还剩 {total - i} 篇未预填。你若已经发出去了，跑："
+                  f"\n   python3 auto_publish.py --confirm \"{name}\" --at \"YYYY-MM-DD HH:MM\"")
+            return 0
+        note = record_published(name, st["sched"])
+        print(f"\n✅ 已发布（{st['sched'] or '时间未读到'}）· {note}")
+        print(f"   接力预填下一篇…\n")
+    return 0
 
 
 if __name__ == "__main__":
