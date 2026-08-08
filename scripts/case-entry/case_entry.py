@@ -917,6 +917,73 @@ def title_verdict(title):
         return {"verdict": "?", "why": f"体检不可用：{e}", "length": len(title or "")}
 
 
+# 话题联想面板的容器 id，来自创作平台自己的 DOM，比按「浏览」二字全文档瞎找稳。
+TOPIC_PANEL = "#creator-editor-topic-container .item"
+TOPIC_WAIT = 8.0        # 面板要发网络请求才填内容，北美打小红书冷启动能到好几秒
+TOPIC_POLL = 0.2
+
+
+def pick_topic(api, tid, tag):
+    """等话题联想面板出现，点中 tag 对应的那一条。返回是否真的生成了话题节点。
+
+    ⛔ 不要退回 time.sleep(固定值)：面板由网络请求填充，快的时候 0.6 秒，
+    慢的时候（冷启动 / 连查几十次被限流）远超 1.3 秒。等不到不会报错，
+    只会安静地留下一个没用的纯文本 #xxx —— 这正是原来那版的失败方式。
+    """
+    import time as _t
+
+    deadline = _t.time() + TOPIC_WAIT
+    while _t.time() < deadline:
+        _t.sleep(TOPIC_POLL)
+        if api(f"/eval?target={tid}",
+               f'(()=>!!document.querySelector({json.dumps(TOPIC_PANEL)}))()').get("value"):
+            break
+    else:
+        return False
+
+    # 面板按热度排序，首项未必是想要的：查「职场生存」时「职场生存术」也在列表里。
+    # 名字完全相等的优先，没有完全相等的才退回首项。
+    r = api(f"/eval?target={tid}", f'''(()=>{{
+      const items=[...document.querySelectorAll({json.dumps(TOPIC_PANEL)})];
+      if(!items.length)return "";
+      const want={json.dumps(tag)};
+      const nameOf=e=>(e.textContent||"").trim().replace(/^#/,"")
+                       .replace(/[\\d.]+[万亿]?浏览$/,"").trim();
+      const hit=items.find(e=>nameOf(e)===want)||items[0];
+      hit.click();
+      return nameOf(hit);
+    }})()''').get("value") or ""
+    _t.sleep(0.5)
+
+    # 只认编辑器里真的多出一个 a.tiptap-topic —— 点击本身不是成功
+    ok = api(f"/eval?target={tid}", f'''(()=>{{
+      const want={json.dumps(tag)};
+      return [...document.querySelectorAll("[contenteditable=true] a.tiptap-topic")]
+        .some(a=>(a.getAttribute("data-topic")||"").includes('"name":"'+want+'"'));
+    }})()''').get("value")
+    return bool(ok)
+
+
+def undo_insert(api, tid, text):
+    """把刚刚插进正文末尾的 text 原样删掉，好干净地重试一次。
+
+    ⛔ 删之前必须先确认正文确实以 text 结尾。不确认就退格，
+    一旦上一步其实没插进去，退掉的就是正文本身的字 —— 稿子会被悄悄啃掉一截。
+    """
+    ends = api(f"/eval?target={tid}", f'''(()=>{{
+      const ed=document.querySelector("[contenteditable=true]");
+      return (ed?.innerText||"").endsWith({json.dumps(text)});
+    }})()''').get("value")
+    if not ends:
+        return False
+    api(f"/eval?target={tid}", f'''(()=>{{
+      const ed=document.querySelector("[contenteditable=true]");ed.focus();
+      const s=window.getSelection();s.selectAllChildren(ed);s.collapseToEnd();
+      for(let i=0;i<{len(text)};i++)document.execCommand("delete");
+      return 1;}})()''')
+    return True
+
+
 def prefill_xhs(name, archived):
     """通过 web-access CDP 代理，在用户 Chrome 中打开小红书创作平台并预填图/题/文。
     不点发布——最后一步留给人。返回操作日志。"""
@@ -997,22 +1064,52 @@ def prefill_xhs(name, archived):
         r = api(f"/eval?target={tid}", fill)
         log.append(f"预填结果：{r.get('value')}")
 
-        # 3.5 标签逐个走话题联想（点选后才是真话题），失败则保留纯文本
-        tag_ok = 0
-        for tag in d["tags"].split()[:10]:
-            api(f"/eval?target={tid}",
-                '(()=>{const ed=document.querySelector("[contenteditable=true]");ed.focus();'
-                'const sel=window.getSelection();sel.selectAllChildren(ed);sel.collapseToEnd();'
-                f'document.execCommand("insertText",false,{json.dumps(" #" + tag.lstrip("#"))});return 1;}})()')
-            time.sleep(1.3)
-            r = api(f"/eval?target={tid}",
-                    '(()=>{const rows=[...document.querySelectorAll("*")].filter(e=>e.textContent.includes("浏览")&&e.childElementCount>=1&&e.offsetHeight>20&&e.offsetHeight<80);'
-                    'if(rows.length){rows[0].click();return "picked"}'
-                    'const ed=document.querySelector("[contenteditable=true]");ed.focus();document.execCommand("insertText",false," ");return "plain";})()')
-            if r.get("value") == "picked":
-                tag_ok += 1
-            time.sleep(0.6)
-        log.append(f"话题标签：{tag_ok}/{min(len(d['tags'].split()),10)} 个转为真话题，其余保留文本")
+        # 3.5 标签逐个走话题联想 —— 只有点中联想面板里的条目，才会生成真话题
+        # <a class="tiptap-topic" data-topic="{id,link,name}">；纯文本的 #xxx 在小红书
+        # 那边完全不参与话题聚合，等于白写。
+        #
+        # ⛔ 这一步曾经这么写，实测 5/10、6/10、0/10（/tmp/xhspublish.log）：
+        #   time.sleep(1.3) 之后，全文档扫 textContent 含「浏览」且高 20~80 的元素，点 rows[0]，
+        #   点到了就记成功。
+        # 三个错都在这一句里：
+        #   a) 固定等 1.3 秒。联想面板是**发网络请求**才填的，本机在北美打小红书，
+        #      冷启动、连发几十次查询被限流时都会超过 1.3 秒 —— 那一次 0/10 就是这么来的。
+        #      超时不报错，只是安静地退回纯文本。
+        #   b) 全文档按「浏览」二字找。面板挂在 body 末尾的 tippy 容器里，页面上任何
+        #      别处出现「浏览」的元素在文档序里都排在它前面，rows[0] 就点错人。
+        #      面板本身有稳定 id（#creator-editor-topic-container），没有理由靠猜。
+        #   c) 把「我点了一下」当成功。点击有没有真的生成 a.tiptap-topic 从来没查过，
+        #      所以日志里那个 5/10 压根不是在数真话题 —— 数字本身就不可信。
+        # 现在：轮询等面板 → 按 id 定位 → 优先选名字完全相等的那条 → 最后数
+        # a.tiptap-topic 复核。实测同一页面 10/10。
+        tags = [t.lstrip("#") for t in d["tags"].split()][:10]
+        failed = []
+        for tag in tags:
+            for attempt in (1, 2):
+                api(f"/eval?target={tid}",
+                    '(()=>{const ed=document.querySelector("[contenteditable=true]");ed.focus();'
+                    'const sel=window.getSelection();sel.selectAllChildren(ed);sel.collapseToEnd();'
+                    f'document.execCommand("insertText",false,{json.dumps(" #" + tag)});return 1;}})()')
+                if pick_topic(api, tid, tag):
+                    break
+                if attempt == 1 and undo_insert(api, tid, " #" + tag):
+                    continue     # 已把刚插进去的字撤干净，可以干净地再试一次
+                # 撤不掉、或第二次仍失败：用一个空格把悬着的联想状态落定成纯文本
+                api(f"/eval?target={tid}",
+                    '(()=>{const ed=document.querySelector("[contenteditable=true]");ed.focus();'
+                    'document.execCommand("insertText",false," ");return 1})()')
+                failed.append(tag)
+                break
+            time.sleep(0.4)
+
+        # 复核以编辑器里真实的话题节点为准，不是「我点了几次」
+        real = api(f"/eval?target={tid}",
+                   '(()=>[...document.querySelectorAll("[contenteditable=true] a.tiptap-topic")]'
+                   '.map(a=>(a.getAttribute("data-topic")||"").match(/"name":"([^"]*)"/)?.[1]||"")'
+                   '.filter(Boolean).join(" "))()').get("value") or ""
+        got = real.split()
+        log.append(f"话题标签：{len(got)}/{len(tags)} 个是真话题（a.tiptap-topic）"
+                   + (f"；仍是纯文本：{' '.join(failed)}" if failed else ""))
 
         # 4. 回读校验
         r = api(f"/eval?target={tid}",
