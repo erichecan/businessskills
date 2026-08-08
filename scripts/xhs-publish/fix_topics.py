@@ -10,27 +10,22 @@
 已发布的笔记这里不碰。
 
 用法：
-  python3 fix_topics.py --list             # 看有哪些定时笔记、各自差几个话题
-  python3 fix_topics.py --note <noteId>    # 改一篇，改完停在编辑页等你点保存
-  python3 fix_topics.py --all              # 全部定时笔记，逐篇改
+  python3 fix_topics.py --list                 # 看有哪些定时笔记、各自差几个话题
+  python3 fix_topics.py --note <noteId>        # 改一篇，改完停住不保存
+  python3 fix_topics.py --note <noteId> --submit   # 改完并保存
+  python3 fix_topics.py --all --submit         # 全部定时笔记，全程无人
 
-⛔ 最后那一下「定时发布」要人来点，脚本点不动（2026-08-07 实测）。
-标签转换这一段是可靠的：0→10、6→10，每次都全中。卡住的是保存按钮 ——
-它是自定义元素 <xhs-publish-btn>，shadow root 是 closed，四种点法全试过：
-  1) 按文本找按钮      → 找到的是左侧栏「发布笔记」（新建笔记），点了没反应
-  2) /clickAt 点宿主   → clicked:true、坐标分毫不差，页面毫无反应
-  3) /hoverAt + /clickAt → 同上
-  4) /realClick 完整手势（mouseMoved→mousePressed{buttons:1}→60ms→release）→ 同上
-每次都以为存上了，回头一读还是原样，改动静静地丢掉。
-宿主属性显示 submit-disabled=false、submit-text=定时发布，按钮是启用的、
-点了也确实保留定时 —— 就是不响应程序化的点击。原因未明，别再盲试。
+保存不走点击。<xhs-publish-btn> 那个按钮点不动（四种点法全试过，都返回
+clicked:true 而页面毫无反应，改动静静地丢掉）。它的类定义里写着自己只是
+个事件源：_onPublish 就是 dispatchEvent(new CustomEvent("publish"))。
+所以直接派发 publish 事件，让页面自己去发那个带 x-s 签名的
+PUT /web_api/sns/capa/postgw/note/update。实测保存成功且**定时排期不变**。
 
-所以现在的分工：脚本把标签全部转成真话题，然后停住；你在浏览器里点一下
-底部那个红色「定时发布」。每篇大约 3 秒。这和发布流程本来的
-「最后一下留给人」是同一个形状。
+⛔ 只能派发 "publish"，不能派发 "save" —— 后者是「暂存离开」，
+会把笔记退回草稿箱，排期就没了。
 
---submit 保留着（万一哪天那按钮能点了），但默认不开，且只在标签全部转成
-真话题、定时开关仍为 checked、时间文案未变时才会去点。
+--submit 之外还有三道闸：定时开关必须是 checked、标签必须全部转成真话题、
+保存前后定时文案必须一致。任一不满足就不保存 —— 提交一次就少一次可编辑的机会。
 """
 import argparse
 import json
@@ -210,14 +205,44 @@ def fix_one(tid, note, submit):
     # 按文本根本搜不到 —— 按文本搜会搜到左侧栏那个红色「发布笔记」（新建笔记），
     # 点了等于什么都没发生（2026-08-07 实测，改动白丢）。只能按宿主元素点。
     #
-    # ⛔ 必须用 /realClick（完整手势：mouseMoved → mousePressed{buttons:1} → 60ms → release）。
-    # /clickAt 只发 press+release、不带 buttons、中间没有延迟，这个 Web Component
-    # 收到了也不认 —— 返回 clicked:true、坐标分毫不差，然而什么都不会发生，
-    # 改动就这么静静地丢掉（2026-08-07 实测两次，都以为存上了，其实没有）。
-    r = api(f"/realClick?target={tid}", "xhs-publish-btn")
-    print(f"  点「定时发布」：{r.get('clicked')} @ ({r.get('x')}, {r.get('y')})")
-    time.sleep(8)
-    print(f"  提交后 URL：{api(f'/info?target={tid}').get('url', '')[:100]}")
+    # 保存不走点击，走派发事件。
+    #
+    # <xhs-publish-btn> 的按钮点不动 —— 四种点法（按文本找 / clickAt /
+    # hoverAt+clickAt / realClick 完整手势）全部返回 clicked:true、坐标分毫不差，
+    # 页面却毫无反应，改动静静地丢掉。shadow root 是 closed，看不到里面发生了什么。
+    #
+    # 正解在它自己的类定义里（customElements.get("xhs-publish-btn").toString()）：
+    #   _onPublish = () => e.dispatchEvent(new CustomEvent("publish",{bubbles:!0,composed:!0}))
+    #   _onSave    = () => e.dispatchEvent(new CustomEvent("save",   {bubbles:!0,composed:!0}))
+    # 按钮只是个事件源，真正干活的是外面监听 publish 的那段。直接派发即可。
+    #
+    # ⛔ 只能派发 "publish"（＝底部那个「定时发布」）。"save" 是「暂存离开」，
+    # 会把笔记退回草稿箱，定时排期就没了。
+    #
+    # 也别想着绕过页面直接打 PUT /web_api/sns/capa/postgw/note/update ——
+    # 那个接口要 x-s 签名，裸 fetch 返回 code -1。让页面自己发是最省事的路。
+    ev(tid, '(()=>{const h=document.querySelector("xhs-publish-btn");'
+            'if(!h)return 0;'
+            'h.dispatchEvent(new CustomEvent("publish",{bubbles:true,composed:true}));return 1})()')
+
+    # ⛔ 别拿「页面跳到 editSuccess」当成功信号 —— 实测存上了也可能不跳，
+    # 结果是两篇明明都保存成功却报「完成 0/2」。这和标签那个 bug 是同一类错误：
+    # 数动作不算数，要数结果。重新加载这篇，看改动在不在。
+    time.sleep(6)
+    api(f"/navigate?target={tid}&url=" + up.quote(EDIT_URL.format(nid=note["id"]), safe=""))
+    for _ in range(20):
+        time.sleep(1)
+        if ev(tid, '(()=>{const e=document.querySelector("[contenteditable=true]");'
+                   'return !!e&&e.innerText.length>50})()'):
+            break
+    real3, plain3 = tag_state(tid)
+    on2, sched2 = sched_locked(tid)
+    if plain3 or len(real3) < len(real2):
+        print(f"  ⛔ 保存没落库：重新读到真话题 {len(real3)}、纯文本 {len(plain3)}")
+        return False
+    print(f"  ✅ 已保存并复核：真话题 {len(real3)}、纯文本 0；{sched2}")
+    if sched2 != sched0:
+        print(f"  ⚠️ 定时文案变了：「{sched0}」→「{sched2}」，去后台确认一下")
     return True
 
 
