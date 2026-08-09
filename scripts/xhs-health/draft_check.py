@@ -25,6 +25,17 @@ SUCAI = Path(__file__).resolve().parents[2] / "xhs" / "素材库"
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 SIGNATURES = ["我面过300", "上周一个候选人", "笔都没动", "在表上打了叉", "45分钟"]
 CTA_HINTS = ["评论区", "你呢", "你遇到过", "你会怎么", "留言", "？\n", "?\n"]
+
+# CTA 选项标记：A/B/C、①②③、1./2./3.。要求正文尾部至少出现 2 个。
+# ⛔ 2026-08-08 换口径。原来只查「有没有 CTA」——18 篇稿全都通过，
+# 而真实评论率是 0.30%（1992 观看 / 6 条评论）。检查项通过 ≠ 目的达成：
+# 那些 CTA 全是「把他当时那句原话发评论区」这种最贵的形态，查得出「有」，
+# 查不出「贵」。现在改查**评论成本**：有没有给编号选项。
+CTA_OPTION = re.compile(r"(?:^|[\s，,、（(])(?:[ABCD][\s．.、:：]|[①②③④]|[1-4][\s．.、][^\d])")
+CTA_TAIL_CHARS = 260          # 只在正文尾部找，中段的「A 还是 B」是埋钩子不是收口
+# 「说说你的情况」型的特征词。命中即判贵 —— 这类要读者写一段、还要公开贴原话。
+CTA_EXPENSIVE = re.compile(r"(原话|那句话)[^。！？\n]{0,12}(发|贴|留|扔)[^。！？\n]{0,8}(评论|上来)"
+                           r"|说说你的|讲讲你的|聊聊你的")
 NOT_BUT = re.compile(r"不是[^，。；\n]{1,15}[，,]?[是而]")
 # 把读者归进第三方群体的表达。视角跳动整体上机械判不了（要判「他」指的是对方
 # 还是读者同类，那是语义），但这类泛指词是其中能机械抓的一半。
@@ -128,6 +139,17 @@ def check_one(d, f, all_drafts, lane_override=None):
 
     if not any(h in text for h in CTA_HINTS):
         issues.append("未检出 CTA/互动段（无问句结尾、无评论区引导）")
+
+    # 必须命中清单 第 3 条：CTA 得是「回一个字母/编号」型
+    tail = body[-CTA_TAIL_CHARS:]
+    if len(CTA_OPTION.findall(tail)) < 2:
+        issues.append(
+            f"CTA 没给编号选项（正文末 {CTA_TAIL_CHARS} 字内 A/B/C 或 ①②③ 少于 2 个）。"
+            "清单第 3 条：结尾要 2–4 个选项，让读者回一个字母就能参与")
+    m = CTA_EXPENSIVE.search(body)
+    if m:
+        issues.append(f"CTA 是「说说你的情况」型（命中「{m.group()}」）—— 清单第 3 条禁止："
+                      "要读者写一段、公开贴领导原话，是最贵的一种评论")
 
     nb = len(NOT_BUT.findall(body))
     if nb > 2:
