@@ -35,8 +35,23 @@ PENDING = SUCAI / "待激活素材库.csv"
 PROBE_DIR = SUCAI / "探测原始"
 CARDS_SCRIPT = SUCAI / "图文模板" / "make_cards.py"
 TITLE_SKILL = REPO / "skills" / "eric-xhs-title" / "SKILL.md"
+FRAME = SUCAI / "知识框架.md"
 HEALTH = REPO / "scripts" / "xhs-health"
 CLAUDE = Path.home() / ".local/bin/claude"
+
+# ── 料包预算（2026-08-08 加）────────────────────────────────────────────────
+# 改之前实测：单次写稿 prompt 95,656 字，其中
+#   评论区原话.csv 整库 56,053（58.6%）+ 案例库.csv 整库 21,832（22.8%）＝ 81.4%。
+# 一天 4 次 × 最多 12 次调用 × 近 10 万字 —— loop日志 里已有 8 份
+# "You've hit your session limit" 的留档，不是理论上会撞，是一直在撞。
+#
+# 改成按选题筛，而不是整库塞。⛔ 筛了就必须同步改 prompt 里
+# 「上面两个库是整库喂给你的」那句话 —— prompt 谎报自己的输入，
+# 比 prompt 大得多更糟：模型会以为「没有更合适的原话了」而将就用手上的。
+QUOTE_BUDGET = 60    # 评论区原话保留行数（整库 268 行）
+CASE_BUDGET = 30     # 案例库保留行数（整库 101 行）
+# 跨来源组合是 2026-08-05 Eric 定的口径，需要一定广度，所以不是只给命中那几条：
+# 命中的全留，剩下的名额用同场景域的补，还有空位再用其它场景域的补。
 
 PASS_SCORE = 85
 MAX_ROUNDS = 3
@@ -166,12 +181,139 @@ def pose_library() -> str:
 
 
 def recent_drafts(n=5) -> str:
-    """近 n 篇成稿全文——给模型看「别再用这些开头和签名句」。
+    """近 n 篇的**开头和结尾**——给模型看「别再用这些开头和签名句」。
 
     跨篇查重是机械检查项（清单第 5 条），事后拦不如事前给。
+
+    ⛔ 原来每篇喂 1500 字全文，5 篇 7,664 字。但这一块的用途只有两个：
+    别撞开头钩子、别撞签名句/CTA。中间那段讲什么跟查重无关，白花。
+    改成每篇只给前 320 字（开头钩子）+ 后 220 字（签名句与 CTA）。
     """
-    files = sorted(SUCAI.glob("成稿_*.md"))[-n:]
-    return "\n\n".join(f"【{f.name}】\n{f.read_text(encoding='utf-8')[:1500]}" for f in files)
+    out = []
+    for f in sorted(SUCAI.glob("成稿_*.md"))[-n:]:
+        t = f.read_text(encoding="utf-8")
+        body = t.split("## 话题标签")[0]
+        out.append(f"【{f.name}】\n开头：{body[:320]}\n…\n结尾：{body[-220:]}")
+    return "\n\n".join(out)
+
+
+def knowledge_frame() -> str:
+    """知识框架.md —— 内容生产的大脑，写稿时必须应用。
+
+    ⛔ 2026-08-08 之前**没有任何脚本读它**（只有 eric-xhs-audit/SKILL.md 引用）。
+    也就是说那段时间改知识框架对产出一个字的影响都没有 —— 08-08 改 CTA 口径时
+    才发现这件事。写手真正读的一直是 必须命中清单.md。现在两边都读。
+
+    砍掉三节再喂，理由各不相同：
+      §七 高热选题母题库  —— 选题在进这个函数之前就定死了，写稿时用不上
+      §十二 选题4维框架   —— 同上，而且它明写「来自 eric-xhs-topic」
+      §十三 标题12类触发器 —— **它是 eric-xhs-title/SKILL.md 的副本**，
+        而 title_rules() 已经把 SKILL.md 的实证规律那节单独喂进 prompt 了。
+        同一份规则喂两遍，迟早只更新其中一份 —— title_rules() 的 docstring
+        记着 08-05 就是这么出的事（副本停在旧措辞，模型照副本写，标题踩负信号）。
+    """
+    t = _read_or(FRAME, "")
+    if not t:
+        raise SystemExit(f"⛔ 取不到知识框架：{FRAME} 缺失")
+    for head in ("## 七、", "## 十二、", "## 十三、"):
+        t = re.sub(rf"^{re.escape(head)}.*?(?=^## )", "", t, flags=re.M | re.S)
+    return t.strip()
+
+
+def _csv_rows(path):
+    if not path.exists():
+        return []
+    with path.open(encoding="utf-8-sig") as f:
+        return list(csv.DictReader(f))
+
+
+def _kw_domain_map():
+    """关键词 → 场景域。评论区原话只记了「候选词」，场景域要靠词库查。"""
+    return {r["关键词"]: (r.get("场景域") or "").strip()
+            for r in _csv_rows(CIKU) if r.get("关键词")}
+
+
+def _pick(rows, hit, same, budget):
+    """命中的全留 → 同场景域补 → 其它补满预算。返回 (选中行, 命中数)。"""
+    out = [r for r in rows if hit(r)]
+    n_hit = len(out)
+    for pred in (same, lambda r: True):
+        if len(out) >= budget:
+            break
+        for r in rows:
+            if len(out) >= budget:
+                break
+            if r not in out and pred(r):
+                out.append(r)
+    return out[:budget], n_hit
+
+
+def _as_block(rows, cols):
+    if not rows:
+        return "（无）"
+    head = ",".join(cols)
+    body = "\n".join(",".join((r.get(c) or "").replace("\n", " ") for c in cols) for r in rows)
+    return f"{head}\n{body}"
+
+
+# 关键词切 2 字片段做字面匹配。中文没空格，整词匹配「谈薪预算就这么多」命不中，
+# 切片能把「谈薪」捞出来，够用且不引分词依赖。
+# STOP 里是搜索词里的通用连接片段 —— 不排掉的话「怎么」会命中大半个库，
+# 相关性筛选就退化成随机取。
+_FRAG_STOP = {"怎么", "么办", "怎办", "什么", "的时", "一个", "可以", "不是", "还是",
+              "应该", "要不", "是不", "能不", "如何", "为什", "么样", "我的", "自己"}
+
+
+def _frags(kw):
+    return {kw[i:i + 2] for i in range(len(kw) - 1)} - _FRAG_STOP
+
+
+def relevant_quotes(kw, domain):
+    """评论区原话：与本篇相关的那些，不是整库 268 行。
+
+    ⛔ 别只靠「候选词」列筛。2026-08-08 实测：268 行里 **216 行的候选词是空的**，
+    只有 46 行能查到场景域。只按候选词筛，等于 83% 的行看不出相关性、
+    按文件顺序凑数 —— 库是砍小了，留下的却不是对的行，而且从输出上看不出来。
+    所以主力信号是**正文文本匹配**（用户原话 + 暴露的处境），候选词只作最强命中。
+    """
+    rows = _csv_rows(SUCAI / "评论区原话.csv")
+    dm = _kw_domain_map()
+    fr = _frags(kw)
+
+    def textual(r):
+        blob = (r.get("用户原话") or "") + (r.get("暴露的处境") or "")
+        return any(f in blob for f in fr)
+
+    sel, n_hit = _pick(
+        rows,
+        hit=lambda r: (r.get("候选词") or "").strip() == kw,
+        same=lambda r: textual(r) or (domain and dm.get((r.get("候选词") or "").strip()) == domain),
+        budget=QUOTE_BUDGET)
+    n_rel = sum(1 for r in sel if textual(r)
+                or (r.get("候选词") or "").strip() == kw
+                or (domain and dm.get((r.get("候选词") or "").strip()) == domain))
+    cols = ["用户原话", "暴露的处境", "候选词"]
+    return _as_block(sel, cols), len(sel), len(rows), n_rel
+
+
+def relevant_cases(kw, row):
+    """案例库：本词关联的 + 场景/原话字面相关的 + 补满预算。"""
+    rows = _csv_rows(SUCAI / "案例库.csv")
+    linked = {x.strip() for x in re.split(r"[,，\s]+", row.get("关联案例ID") or "") if x.strip()}
+    fr = _frags(kw)
+
+    def textual(r):
+        blob = (r.get("场景") or "") + (r.get("对方原话") or "") + (r.get("可迁移的那一句") or "")
+        return any(f in blob for f in fr)
+
+    sel, n_hit = _pick(
+        rows,
+        hit=lambda r: (r.get("案例ID") or "").strip() in linked,
+        same=textual,
+        budget=CASE_BUDGET)
+    n_rel = sum(1 for r in sel if textual(r) or (r.get("案例ID") or "").strip() in linked)
+    cols = ["案例ID", "场景", "对方原话", "我的原话", "结果", "可迁移的那一句", "来源"]
+    return _as_block(sel, cols), len(sel), len(rows), n_rel
 
 
 def build_prompt(row: dict, feedback: str, round_no: int, lane: str = "搜索流",
@@ -192,6 +334,15 @@ def build_prompt(row: dict, feedback: str, round_no: int, lane: str = "搜索流
 备选标题仍出 2 个，但首选必须原样用上面这句。
 """
     benchmark = _read_or(SUCAI / "成稿_2026-08-02_空降前30天.md", "（无范例）")
+    domain = (row.get("场景域") or "").strip()
+    quote_block, n_quote, tot_quote, hit_q = relevant_quotes(kw, domain)
+    case_block, n_case, tot_case, hit_c = relevant_cases(kw, row)
+    # 打印相关行数而不只是总行数 —— 相关的只有个位数时，说明这个词的素材是真不够，
+    # 那时写出来的稿八成要靠硬凑，早点看见比事后在审核里看见强。
+    print(f"   料包：评论区原话 {n_quote}/{tot_quote}（其中相关 {hit_q}）· "
+          f"案例库 {n_case}/{tot_case}（其中相关 {hit_c}）")
+    if hit_q < 8:
+        print(f"   ⚠️ 只有 {hit_q} 条相关原话（阈值 8），这个词的素材偏薄，成稿备注里要说明")
     rework = ""
     if feedback:
         rework = f"""
@@ -212,14 +363,17 @@ draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，�
 【选题】关键词：{kw}
 场景域 {row.get('场景域','')} · 意图强度 {row.get('意图强度','')} · 竞争密度 {row.get('竞争密度','')} · 关联案例 {row.get('关联案例ID','')}
 
+【知识框架（内容生产的大脑，本篇必须落在它的定位、红线、骨架和质量标准之内）】
+{knowledge_frame()}
+
 【必须命中清单（逐条命中，机械项由代码核对，自报无效）】
 {_read_or(SUCAI / '必须命中清单.md', '（清单缺失）')}
 
-【案例库.csv（正文引用的原话必须能追溯到这里的某一行；注意「来源」列决定人称）】
-{_read_or(SUCAI / '案例库.csv', '（案例库缺失）')}
+【案例库（{n_case}/{tot_case} 行，按本篇选题筛过；正文引用的原话必须能追溯到这里的某一行；注意「来源」列决定人称）】
+{case_block}
 
-【评论区原话.csv（另一个合法原话来源，逐字引用不改写）】
-{_read_or(SUCAI / '评论区原话.csv', '（原话库缺失）')}
+【评论区原话（{n_quote}/{tot_quote} 行，按本篇选题筛过；另一个合法原话来源，逐字引用不改写）】
+{quote_block}
 
 【该词的探测数据】
 {probe_evidence(kw)}
@@ -247,10 +401,13 @@ draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，�
 要写成"有人在评论区说""看到有人分享"；只有「来源=自有」的才能用第一人称。
 
 ✅ 但**跨来源组合是允许的，而且是本篇希望你做的**（2026-08-05 Eric 定）：
-上面两个库是整库喂给你的（案例库全部 + 评论区原话全部），不是只给本关键词那几条。
+上面两个库给的**不是只有本关键词那几条** —— 直接命中的全给了，此外还补了同场景域
+和其它场景域的行，就是为了让你能跨来源组合（数量见各块标题里的 N/总数）。
 一个搜索位的答案本来就该由多个真实片段拼出来 —— 把 C012 的对方原话、C037 的结果、
 评论区三条不同用户的原话组织进同一篇，每条各自可追溯即合规，不算编造，不会被扣分。
 只用单一案例反而写不透，可信度那 15 分也拿不满。
+⚠️ 但这两块是**筛过的子集**，不是全库。手上这些拼不出可信的一篇时，说出来
+（在成稿备注里写「素材不足：缺 XXX 类原话」），不要为了凑数编一句。
 ⛔ 组合的四条边界（越过就是编造）：
 ① 引语逐字照抄，一个语气词都不许改；
 ② 不许把两个人的话合并成一个人说的；

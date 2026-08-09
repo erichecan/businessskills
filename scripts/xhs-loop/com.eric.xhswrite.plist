@@ -2,43 +2,42 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>Label</key>
-    <string>com.eric.xhswrite</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/bin/python3</string>
-        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/xhs-loop/refine_loop.py</string>
-        <string>--count</string>
-        <string>3</string>
-    </array>
-    <!-- 写稿是整条链里唯一没被自动化的一环（2026-08-05 前 100% 靠人在会话里手动跑），
-         采集/审核/发布都有定时任务，唯独产出成稿这一步没有，所以每天产量取决于人有没有空。
-
-         两个时点的选法都不是随便定的：
-         · 04:30 —— Claude 会话额度在 4am（America/Toronto）重置。08-05 凌晨那次 loop
-           就是 02:48–03:10 连撞六次 "You've hit your session limit" 全军覆没，
-           三篇稿里两篇没跑满轮次。卡在重置后半小时开跑，额度最充裕。
-         · 14:30 —— 与 04:30 拉开足够间隔，避开 21:00 brief 汇总的时点，
-           让 brief 能把当天两批的结果一起算进去。
-
-         --count 3：一篇最多 3 轮 × （写稿 + 独立审核）两次 claude -p 调用，
-         3 篇约 18 次调用。再往上加会在同一个额度周期里把后面的篇数饿死，
-         不如分两个时点各 3 篇。
-
-         ⚠️ 撞额度后 refine_loop 会每 30 分钟重试、最长熬 5 小时（额度窗口），
-         所以 04:30 那批理论上可能跑到 09:30 之后。launchd 对同一个 Label
-         不会并发启动第二个实例，14:30 撞上未结束的实例会自动跳过，不会打架。 -->
-    <key>StartCalendarInterval</key>
-    <array>
-        <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>30</integer></dict>
-        <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>30</integer></dict>
-    </array>
-    <!-- ⛔ 与其余 6 个任务同一个前提：本仓库在 USB 外置卷上，launchd 默认无该卷读权限（TCC）。
-         需在「系统设置 → 隐私与安全性 → 完全磁盘访问权限」加入
-         /Library/Developer/CommandLineTools/usr/bin/python3，否则退出码 2 静默失败。 -->
-    <key>StandardOutPath</key>
-    <string>/tmp/xhswrite.log</string>
-    <key>StandardErrorPath</key>
-    <string>/tmp/xhswrite.log</string>
+	<key>Label</key>
+	<string>com.eric.xhswrite</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/python3</string>
+		<string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/launchd_runner.py</string>
+		<string>xhs-loop/refine_loop.py</string>
+		<string>--rework</string>
+		<string>2</string>
+		<string>--count</string>
+		<string>2</string>
+	</array>
+	<key>StandardErrorPath</key>
+	<string>/tmp/xhswrite.log</string>
+	<key>StandardOutPath</key>
+	<string>/tmp/xhswrite.log</string>
+	<key>StartCalendarInterval</key>
+	<array>
+		<!-- 2026-08-08 由一天四次（04:30/09:30/14:30/19:30）改为两次。
+		     理由：「返工2篇＋新稿2篇」一次产 4 篇，四次 ＝ 理论 16 篇/天，
+		     而实际发布配额是 3 篇/天（auto_publish DAILY_QUOTA）—— 产能是消耗的 5 倍，
+		     多出来的全部变成 claude -p 调用和积压的待审稿。
+		     loop日志 里 8 份 "You've hit your session limit" 就是这么撞出来的。
+		     留 04:30（夜里额度最松）和 14:30（离 22:00 发布有足够返工时间）。 -->
+		<dict>
+			<key>Hour</key>
+			<integer>4</integer>
+			<key>Minute</key>
+			<integer>30</integer>
+		</dict>
+		<dict>
+			<key>Hour</key>
+			<integer>14</integer>
+			<key>Minute</key>
+			<integer>30</integer>
+		</dict>
+	</array>
 </dict>
 </plist>

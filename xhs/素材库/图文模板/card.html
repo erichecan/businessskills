@@ -48,8 +48,23 @@
   h1 { font-size:104px; line-height:1.35; font-weight:800; }
   h1 .hl { color:var(--accent); }
   .sub { font-size:52px; line-height:1.6; margin-top:64px; color:#444; }
+  /* ── 视觉锤：红竖条 + 「」引号块 ──────────────────────────────────────
+     2026-08-08 Eric 定：把它当作本账号的视觉锤来做，不是随便一个装饰。
+
+     为什么是它，不是右下角那个头像（原来一直当记忆点用的那个）：
+       · 差异性 —— 眼镜男线稿头像在小红书职场赛道是最常见的形态之一，
+         而「红条夹一句对方原话」这个组合在同赛道里少见
+       · 最小尺寸下要成立 —— 信息流三列缩略图约 120px 宽时，
+         1242px 画布上的 300px 头像只剩 29px，是个糊点；
+         一根贯穿的红竖条在同样尺寸下**仍然看得见**，这是视觉锤的硬门槛
+       · 承载定位 —— 账号叫「职场潜台词翻译」，核心动作就是把对方没说出口的
+         那句拎出来。红条夹引号，形状上就是「把这句话framed起来翻译」
+     头像同日降级为页脚署名条里的 104px 小圆（见 .ipimg 那段注释）。
+
+     14px → 22px：缩略图尺度下 14px 会掉到 1.4px，接近消失。22px 缩到 2.1px
+     才勉强留得住。要再粗就得动 padding，版面会挤，先到 22。 */
   .quote { font-size:72px; line-height:1.5; font-weight:700; margin:auto 0;
-           border-left:14px solid var(--accent); padding-left:48px; }
+           border-left:22px solid var(--accent); padding-left:44px; }
   .body { font-size:54px; line-height:1.75; margin-top:56px; white-space:pre-line; }
   .foot { margin-top:auto; font-size:36px; color:#8d876f; border-top:2px solid #ddd6c4;
           padding-top:32px; display:flex; align-items:center; gap:24px; }

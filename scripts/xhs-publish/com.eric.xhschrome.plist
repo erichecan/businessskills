@@ -7,7 +7,7 @@
 
     <!-- 自动化专用 Chrome 实例。为什么必须单独起一个：
 
-         Chrome 150 起，**没有用命令行显式指定 --remote-debugging-port 的实例**，
+         Chrome 150 起，**没有用命令行显式指定 ‑‑remote-debugging-port 的实例**，
          其调试端口只是在 LISTEN 而不应答 —— 要人去 chrome://inspect/#remote-debugging
          勾一次「Allow remote debugging」，而且那是**会话级授权，会过期**。
          2026-08-06 实测：授权失效后已建连接还能续一会儿、新连接一律被拒，
@@ -16,7 +16,7 @@
 
          命令行起的实例不需要那个开关，HTTP 端点（/json/list、/json/version）也正常应答。
 
-         用独立 --user-data-dir：不碰你日常那个 Chrome 的 profile、书签、登录态和窗口。
+         用独立 ‑‑user-data-dir：不碰你日常那个 Chrome 的 profile、书签、登录态和窗口。
          代价是小红书要在这个 profile 里**单独登录一次**，之后 cookie 就留在里面。
 
          端口用 9333 而不是 9222：9222 被日常 Chrome 占着（虽然它不应答）。 -->
@@ -28,7 +28,7 @@
         <string>--remote-allow-origins=http://127.0.0.1:9333</string>
         <string>--no-first-run</string>
         <string>--no-default-browser-check</string>
-        <!-- 不要加 --headless：小红书创作平台对无头浏览器有风控，且预填后的页面
+        <!-- 不要加 ‑‑headless：小红书创作平台对无头浏览器有风控，且预填后的页面
              还需要能被人看见（自动选时间失败时得有人接手）。 -->
     </array>
 
