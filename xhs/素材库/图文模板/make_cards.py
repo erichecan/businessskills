@@ -54,9 +54,12 @@ def render(cards, outdir: Path):
         qb = f'<div class="quote">「{html.escape(quote)}」</div>' if quote else ""
         ip = (f'<img class="ipimg" src="file://{IP_IMG}">'
               if c.get("type") == "cover" and IP_IMG.exists() else "")
-        # cover 卡右下角已经有圆形 IP 头像，再挂一张大姿势图就成了一张卡上两个人。
-        # 2026-08-04 Eric 定：封面保持右下角圆形图，不放第二张。
+        # cover 卡有圆形 IP 头像，再挂一张大姿势图就成了一张卡上两个人。
+        # 2026-08-04 Eric 定：封面保持圆形头像，不放第二张。
         # （成稿现在会给每张卡都指定 pose，所以这里必须显式挡掉 cover。）
+        # 2026-08-08：头像从「右下角 300px 绝对定位」挪到页脚署名条内的 104px 小圆。
+        # 原因见 card.html 里 .ipimg 那段注释 —— absolute 会盖住长文案，
+        # 且它当不了视觉锤（信息流缩略图里就是个糊点），当签名才是它的位置。
         ctype = c.get("type", "")
         pose_name = "" if ctype == "cover" else (c.get("pose") or POSE_MAP.get(ctype, ""))
         # 版面守恒：文字占满时人物会被 flex 压成一个点。

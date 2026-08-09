@@ -13,9 +13,20 @@
      调 flex-shrink / min-height 都治不了，因为那是参数，这是结构。 */
   .card { display:flex; flex-direction:column; padding:96px 88px; width:100%;
           height:100%; box-sizing:border-box; position:relative; }
-  .ipimg { position:absolute; right:88px; bottom:200px; width:300px; height:300px;
-           border-radius:50%; object-fit:cover; border:8px solid #fff;
-           box-shadow:0 12px 40px rgba(0,0,0,.18); }
+  /* ⛔ 头像原来是 position:absolute; right:88px; bottom:200px; width:300px。
+     absolute 脱离文档流，正文**不知道它存在** —— 文案一长就被它盖住。
+     2026-08-08 实测「空降后下属不服管」封面：
+       「你兑现的第一件小事，比你开的三[被头像盖掉]用。」
+     一句话读者读不完整。而且是**条件触发**：文案短的卡（如「绩效被打低分」）
+     完全正常，所以它一直没被发现 —— 又一个静默失败。
+     同一个文件里 .poseimg（flex 项）有 LINE_BUDGET 兜底，头像却没有，
+     这处不对称就是根因。
+
+     改法不是给它加保护，是把它挪进页脚署名条 —— 它本来就该是「签名」，
+     不是画面主体（见下方 .foot 与 §视觉锤的判断）。挪进 flex 流之后
+     无论文案多长都不可能再压到正文。 */
+  .ipimg { width:104px; height:104px; border-radius:50%; object-fit:cover;
+           border:4px solid #fff; box-shadow:0 4px 14px rgba(0,0,0,.16); flex:none; }
   /* height 而非 max-height：姿势图裁掉透明边距后只有 208-384px 高，
      max-height 是上限不是目标，图会按自身尺寸渲染，人物在 1660px 画布上只占一小块。
      设定 height 让所有姿势统一放大到同一视觉高度（原图 246×410 级别，放大约 1.5-2.2 倍；
@@ -40,7 +51,8 @@
   .quote { font-size:72px; line-height:1.5; font-weight:700; margin:auto 0;
            border-left:14px solid var(--accent); padding-left:48px; }
   .body { font-size:54px; line-height:1.75; margin-top:56px; white-space:pre-line; }
-  .foot { margin-top:auto; font-size:36px; color:#8d876f; border-top:2px solid #ddd6c4; padding-top:32px; }
+  .foot { margin-top:auto; font-size:36px; color:#8d876f; border-top:2px solid #ddd6c4;
+          padding-top:32px; display:flex; align-items:center; gap:24px; }
   /* 卡型微调 */
   .cover h1 { font-size:118px; }
   .cover .sub { font-size:56px; font-weight:600; color:var(--ink); }
@@ -70,8 +82,7 @@
     {{QUOTE_BLOCK}}
     <div class="body">{{BODY}}</div>
     {{POSE_BLOCK}}
-    {{IP_BLOCK}}
-    <div class="foot">只说你需要的，帮你看清楚职场</div>
+    <div class="foot">{{IP_BLOCK}}<span>只说你需要的，帮你看清楚职场</span></div>
   </div>
 </body>
 </html>
