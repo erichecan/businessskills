@@ -10,10 +10,12 @@ eric-xhs-audit 标准做第三方审核（只给成稿文本，不给写作过�
 import argparse
 import csv
 import io
+import json
 import re
 import subprocess
 import sys
 import time
+import unicodedata
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -161,6 +163,154 @@ def _read_or(path: Path, fallback: str) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else fallback
 
 
+# ── 料包筛选（2026-08-11 加）──────────────────────────────────────────────
+# 改之前实测：单次审核 prompt 148,159 字，其中
+#   评论区原话.csv 整库 70,805（48%）+ 词库.csv 整库 33,892（23%）
+#   + 案例库.csv 整库 26,612（18%）＝ 89%。
+# 而审核这一路的成本 84% 就是写缓存（＝prompt 本身）：它是单轮、无工具、
+# 纯文本进出的调用，读/写缓存比只有 0.02。08-07~08 两天光审核就烧了 $215。
+#
+# ⛔ 审核和写稿要的东西不一样，别照搬 refine_loop 的筛法。
+# 写稿是**选材**，要广度（跨来源组合，所以它按场景域补满预算）；
+# 审核是**核对** —— 只需回答「正文里这句原话，库里有没有、是不是照抄」。
+# 所以这里从成稿正文**反查**：库里哪些行被这篇稿引用了，就给哪些行。
+#
+# 判据是「最长公共子串长度」，用 n-gram 集合求交等价实现（朴素 DP 在
+# 451 行 × 2000 字上要跑几十秒，n-gram 是线性的）：
+#   ≥6 字连续相同 → 强命中，**照抄**，必须全留，超预算也要留
+#   4-5 字        → 弱命中，疑似改写，留着让审核员自己判
+# 归一化时去掉标点空白，只留字母数字汉字 —— 库里的「？」和稿里的「?」
+# 不该导致匹配失败。
+STRONG_N = 6
+WEAK_N = 4
+QUOTE_BUDGET = 40    # 评论区原话保留行数（整库 330 行）
+CASE_BUDGET = 25     # 案例库保留行数（整库 119 行）
+
+
+def _norm(s: str) -> str:
+    """只留字母/数字/汉字。标点、空白、换行都不参与匹配。"""
+    return "".join(ch for ch in (s or "") if unicodedata.category(ch)[0] in "LN")
+
+
+def _ngrams(s: str, n: int) -> set:
+    return {s[i:i + n] for i in range(len(s) - n + 1)} if len(s) >= n else set()
+
+
+def _csv_rows(path: Path):
+    if not path.exists():
+        return []
+    with path.open(encoding="utf-8-sig") as f:
+        return list(csv.DictReader(f))
+
+
+def _as_block(rows, cols):
+    if not rows:
+        return "（无相关行）"
+    head = ",".join(cols)
+    body = "\n".join(",".join((r.get(c) or "").replace("\n", " ") for c in cols) for r in rows)
+    return f"{head}\n{body}"
+
+
+def _pick_by_draft(rows, cols, draft_text, budget, extra_hit=None):
+    """按成稿反查：强命中全留（超预算也留）→ 弱命中补 → 补满预算。
+
+    返回 (选中行, 强命中数)。
+    """
+    nd = _norm(draft_text)
+    g_strong, g_weak = _ngrams(nd, STRONG_N), _ngrams(nd, WEAK_N)
+
+    def blob(r):
+        return _norm("".join(r.get(c) or "" for c in cols))
+
+    strong, weak, rest = [], [], []
+    for r in rows:
+        b = blob(r)
+        if (extra_hit and extra_hit(r)) or (_ngrams(b, STRONG_N) & g_strong):
+            strong.append(r)
+        elif _ngrams(b, WEAK_N) & g_weak:
+            weak.append(r)
+        else:
+            rest.append(r)
+
+    # ⛔ 强命中不受预算约束。漏掉一行「稿里照抄了、料包里没有」的原话，
+    # 审核员就会按「编造原话」判红线 —— 那是比多花几千 token 严重得多的错误。
+    out = list(strong)
+    for pool in (weak, rest):
+        for r in pool:
+            if len(out) >= max(budget, len(strong)):
+                break
+            out.append(r)
+    return out, len(strong)
+
+
+def relevant_quotes(draft_text: str, kw: str = ""):
+    """评论区原话：本稿引用/改写到的那些，不是整库 330 行。"""
+    rows = _csv_rows(SUCAI / "评论区原话.csv")
+    cols = ["用户原话", "暴露的处境", "候选词"]
+    sel, n_strong = _pick_by_draft(
+        rows, ["用户原话", "暴露的处境"], draft_text, QUOTE_BUDGET,
+        extra_hit=(lambda r: kw and (r.get("候选词") or "").strip() == kw))
+    return _as_block(sel, cols), len(sel), len(rows), n_strong
+
+
+def relevant_cases(draft_text: str, kw: str = ""):
+    """案例库：本稿引用到的案例 + 疑似改写的，不是整库 119 行。"""
+    rows = _csv_rows(SUCAI / "案例库.csv")
+    cols = ["案例ID", "场景", "对方原话", "我的原话", "结果", "可迁移的那一句", "来源"]
+    sel, n_strong = _pick_by_draft(
+        rows, ["场景", "对方原话", "我的原话", "可迁移的那一句"], draft_text, CASE_BUDGET)
+    return _as_block(sel, cols), len(sel), len(rows), n_strong
+
+
+def relevant_probe_quotes(draft_text: str):
+    """本稿引用的 probe 探测结果里的 quotes 块。
+
+    ⛔ 这一块以前根本没喂给审核员，是个真实的误判来源：成稿头部写着
+    「素材：`.result.json` 的 quotes 块 4 条」，正文里的原话其实来自探测结果，
+    **不在评论区原话.csv 里**。审核员在给定的库里查不到，只能按维度 6
+    「原话无法追溯」降级甚至判红线「编造原话」。
+    实测 成稿_2026-08-09_试用期没结果.md 对 评论区原话.csv 的强命中数是 0 ——
+    它的原话全部来自 probe。单个 result.json 只有约 4KB，喂进来几乎不花钱。
+    """
+    stems = set(re.findall(r"(probe_\d{8}_[^\s`）)]+?)\.(?:result\.)?json", draft_text))
+    blocks = []
+    for stem in sorted(stems):
+        p = SUCAI / "探测原始" / f"{stem}.result.json"
+        if not p.exists():
+            continue
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        quotes = data.get("quotes") or []
+        if not quotes:
+            continue
+        lines = [f"# {stem}（keyword={data.get('keyword','')}）"]
+        for q in quotes:
+            lines.append(f"- 用户原话：{(q.get('用户原话') or '').replace(chr(10), ' ')}"
+                         f" ｜ 处境：{(q.get('暴露的处境') or '').replace(chr(10), ' ')}")
+        blocks.append("\n".join(lines))
+    return ("\n\n".join(blocks) if blocks else "（本稿头部未引用任何 probe 探测结果）"), len(stems)
+
+
+def relevant_ciku(draft_text: str):
+    """词库：只给本篇那一行。整库 590 行 33.9k 字，审核只用得到「本词的密度/意图」。
+
+    关键词从成稿头部的「关键词来源：`词库.csv`「XXX」」取；取不到就退回
+    用正文反查（长关键词才可能匹配上，短的宁可给空也不要给整库）。
+    """
+    rows = _csv_rows(SUCAI / "词库.csv")
+    cols = ["关键词", "场景域", "场景类型", "意图强度", "竞争密度", "关联案例ID", "状态"]
+    m = re.search(r"词库\.csv[`\s]*[「\"']([^「」\"']+)[」\"']", draft_text)
+    kw = m.group(1).strip() if m else ""
+    hit = [r for r in rows if kw and (r.get("关键词") or "").strip() == kw]
+    if not hit:
+        nd = _norm(draft_text)
+        hit = [r for r in rows
+               if (r.get("关键词") or "").strip() and _norm(r["关键词"]) in nd][:3]
+    return _as_block(hit, cols), (hit[0].get("关键词") if hit else kw), len(rows)
+
+
 LANE_HINT = {
     "搜索流": "按 skill 正文的搜索流口径（默认）审核。",
     "推荐流": ("⚠️ 本次按 skill 文末「附录 · 推荐流口径」审核，报告开头须注明「本次按推荐流口径审核」。"
@@ -170,7 +320,11 @@ LANE_HINT = {
 }
 
 
-def audit_one(draft: Path, lane: str = None) -> bool:
+def build_audit_prompt(draft: Path, lane: str = None):
+    """拼审核 prompt。抽出来是为了能在不调模型的前提下测字数（--dry-run）。
+
+    返回 (prompt, lane, stats)。
+    """
     from draft_check import lane_of                    # 同一套口径识别，不重复实现
     text_for_lane = draft.read_text(encoding="utf-8")
     lane = lane or lane_of(text_for_lane)
@@ -180,9 +334,11 @@ def audit_one(draft: Path, lane: str = None) -> bool:
     benchmark = benchmark_file.read_text(encoding="utf-8") if benchmark_file.exists() else "（标杆样本库缺失）"
     # headless claude 只看得到 prompt 里的东西。skill 写「审核前先读 X」不够，必须喂进来，
     # 否则审核员只能标注「未提供故无法核验」并降级——2026-08-02 连续踩过两次。
-    ciku = _read_or(SUCAI / "词库.csv", "（词库缺失）")
-    cases = _read_or(SUCAI / "案例库.csv", "（案例库缺失）")
-    quotes_lib = _read_or(SUCAI / "评论区原话.csv", "（评论区原话库缺失）")
+    # 但「喂进来」≠「整库塞」：审核是核对不是选材，按成稿反查即可（见 _pick_by_draft）。
+    ciku, ciku_kw, ciku_total = relevant_ciku(text_for_lane)
+    cases, cases_kept, cases_total, cases_strong = relevant_cases(text_for_lane)
+    quotes_lib, q_kept, q_total, q_strong = relevant_quotes(text_for_lane)
+    probe_quotes, probe_n = relevant_probe_quotes(text_for_lane)
     # 首图/七卡内容在单独的 cards.json 里。不喂进来，审核员看不到首图，
     # 只能把「首图原句一致性」按未知降级给半分——2026-08-02 三篇稿都栽在这。
     stem = draft.name.removeprefix("成稿_").removesuffix(".md")
@@ -202,14 +358,28 @@ def audit_one(draft: Path, lane: str = None) -> bool:
 【标杆样本库（⚠️ 推荐流高热样本。搜索流选题不得因「此处无同类先例」扣分）】
 {benchmark}
 
-【词库.csv（维度 1 搜索意图匹配的判据：该词竞争密度是否已探测、意图强度）】
+⛔ 关于下面三个库：给你的**不是整库，是按本篇正文反查出来的子集**。
+筛法：把正文和库里每一行做最长公共子串比对，≥{STRONG_N} 字连续相同的（＝正文照抄了它）
+全部保留，4-5 字的（＝疑似改写）也保留，再补若干行凑够额度。所以：
+  · 正文里**照抄**的原话，一定在下面这些块里，查不到就是真的没有；
+  · 但「下面没有」**不等于「编造」** —— 原话也可能来自探测结果，
+    见后面【probe 探测结果 quotes】那一块，核对可信度时两块都要看。
+  · 别因为「只给了子集所以无法核验」而降级 —— 核验所需的行已经在里面了。
+
+【词库.csv（维度 1 的判据：本词的竞争密度/意图强度。整库 {ciku_total} 行，只给本篇这行）】
 {ciku}
 
-【案例库.csv（维度 6 的核对依据：正文引用的原话能否追溯到某个案例 ID）】
+【案例库.csv（维度 6 的核对依据：正文引用的原话能否追溯到某个案例 ID。
+整库 {cases_total} 行 → 给 {cases_kept} 行，其中 {cases_strong} 行是正文照抄命中）】
 {cases}
 
-【评论区原话.csv（维度 6 的另一来源：原话是否照抄不改写）】
+【评论区原话.csv（维度 6 的另一来源：原话是否照抄不改写。
+整库 {q_total} 行 → 给 {q_kept} 行，其中 {q_strong} 行是正文照抄命中）】
 {quotes_lib}
+
+【probe 探测结果 quotes（维度 6 的第三来源，本稿头部引用了 {probe_n} 份探测结果。
+⚠️ 正文原话很多来自这里而**不在**评论区原话.csv 里，判「编造」前必须先查这一块）】
+{probe_quotes}
 
 【机械检查结果（代码硬核对，以此为准）】
 {mechanical_result(draft.name)}
@@ -233,6 +403,17 @@ def audit_one(draft: Path, lane: str = None) -> bool:
 备注以「独立审核」开头并给一句关键结论（备注内不得含逗号，用分号代替）。
 第 2 行起输出完整审核报告（7 维逐项+最高优先级改一句）。"""
 
+    stats = {"关键词": ciku_kw, "词库": f"1/{ciku_total}",
+             "案例库": f"{cases_kept}/{cases_total}（强命中 {cases_strong}）",
+             "评论区原话": f"{q_kept}/{q_total}（强命中 {q_strong}）",
+             "probe": probe_n, "prompt字数": len(prompt)}
+    return prompt, lane, stats
+
+
+def audit_one(draft: Path, lane: str = None) -> bool:
+    prompt, lane, stats = build_audit_prompt(draft, lane)
+    print(f"   料包：词库 {stats['词库']} · 案例库 {stats['案例库']} · "
+          f"原话 {stats['评论区原话']} · probe {stats['probe']} 份 → prompt {stats['prompt字数']:,} 字")
     out = run_claude_waiting_out_limits(prompt)
     first = next((l for l in out.splitlines() if draft.name in l and l.count(",") >= 14), None)
     if not first:
@@ -265,7 +446,22 @@ def main() -> int:
                     help="强制重审指定成稿（返工后复审用；会追加一行新的独立审核记录）")
     ap.add_argument("--lane", choices=["搜索流", "推荐流"],
                     help="覆盖稿内口径标记（默认读成稿头部的「口径：X」，读不到按搜索流）")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="只拼 prompt 报字数与料包命中，不调模型、不写审核记录")
     args = ap.parse_args()
+
+    if args.dry_run:
+        targets = ([SUCAI / args.force] if args.force
+                   else unaudited_drafts() or sorted(SUCAI.glob("成稿_*.md"), reverse=True)[:3])
+        for t in targets:
+            if not t.exists():
+                print(f"找不到 {t}", file=sys.stderr)
+                return 1
+            _, lane, stats = build_audit_prompt(t, args.lane)
+            print(f"\n{t.name}（{lane}）")
+            for k, v in stats.items():
+                print(f"  {k}: {v}")
+        return 0
 
     if args.force:
         target = SUCAI / args.force
