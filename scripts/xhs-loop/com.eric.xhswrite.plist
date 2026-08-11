@@ -10,9 +10,9 @@
 		<string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/launchd_runner.py</string>
 		<string>xhs-loop/refine_loop.py</string>
 		<string>--rework</string>
-		<string>2</string>
+		<string>1</string>
 		<string>--count</string>
-		<string>2</string>
+		<string>1</string>
 	</array>
 	<key>StandardErrorPath</key>
 	<string>/tmp/xhswrite.log</string>
@@ -20,21 +20,35 @@
 	<string>/tmp/xhswrite.log</string>
 	<key>StartCalendarInterval</key>
 	<array>
-		<!-- 2026-08-08 由一天四次（04:30/09:30/14:30/19:30）改为两次。
-		     理由：「返工2篇＋新稿2篇」一次产 4 篇，四次 ＝ 理论 16 篇/天，
-		     而实际发布配额是 3 篇/天（auto_publish DAILY_QUOTA）—— 产能是消耗的 5 倍，
+		<!-- 2026-08-11 两处改动，都有实测依据。
+
+		     ① 时段：全部收进 10:00–19:00（Eric 定）。
+		     原来是 04:30 / 14:30。夜里跑的问题不是费钱，是**没人看得见** ——
+		     08-10 全天 112 次调用撞周额度空转，直到第二天查账才发现。
+		     白天跑的话，refine_loop 撞 weekly 时会立刻停手并打出醒目提示，
+		     人在电脑前就能当场处理，不会白白损失一整天产能。
+
+		     ② 产能：rework 2 + count 2（4 篇/次）改成 rework 1 + count 1（2 篇/次）。
+		     ⛔ 注意本行不要写成命令行参数的双横杠形式 —— XML 注释里不允许出现
+		     连续两个减号，plutil -lint 查不出来，但 plistlib/launchd 会解析失败。
+		     两次共 4 篇/天，对齐 auto_publish.DAILY_QUOTA=3 —— 留 1 篇冗余给
+		     机械检查/审核不过线的损耗。改之前是 8 篇/天，是配额的 2.7 倍，
 		     多出来的全部变成 claude -p 调用和积压的待审稿。
-		     loop日志 里 8 份 "You've hit your session limit" 就是这么撞出来的。
-		     留 04:30（夜里额度最松）和 14:30（离 22:00 发布有足够返工时间）。 -->
+
+		     排期顺序（依赖：probe 备料 → write 写稿 → audit 审核 → 22:00 发布）：
+		       10:00 probe   11:00 write   13:00 audit
+		       14:30 probe   15:30 write   17:30 audit   18:30 probe(备明天)
+		     11:00 这批的返工料来自昨天 17:30 的审核；
+		     15:30 这批用当天 13:00 的审核结果，当天就能闭环一轮。 -->
 		<dict>
 			<key>Hour</key>
-			<integer>4</integer>
+			<integer>11</integer>
 			<key>Minute</key>
-			<integer>30</integer>
+			<integer>0</integer>
 		</dict>
 		<dict>
 			<key>Hour</key>
-			<integer>14</integer>
+			<integer>15</integer>
 			<key>Minute</key>
 			<integer>30</integer>
 		</dict>

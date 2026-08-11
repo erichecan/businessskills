@@ -4,20 +4,28 @@
 <dict>
     <key>Label</key>
     <string>com.eric.xhsprobe</string>
-    <!-- 2026-08-03：从只跑 probe.py 改成跑整条链（probe → auto_analyze → backfill）。
-         原来第 2 层要在对话里手动跑 skill，探测数据攒着没人分析，词库的「已验证」
-         全靠人工标。limit 也从 5 提到 10 —— 探测队列有 267 个词待探。 -->
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
-        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/xhs-probe/daily_probe.sh</string>
+        <string>/opt/homebrew/bin/python3</string>
+        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/launchd_runner.py</string>
+        <string>xhs-probe/daily_probe.sh</string>
     </array>
+    <!-- 2026-08-11：02:30 / 08:30 / 14:30 / 20:30 → 10:00 / 14:30 / 18:30（Eric 定）。
+         这条链里的 auto_analyze.py 会调 claude -p，属于消耗 usage 的任务，
+         所以三个触发点全部收进 10:00–19:00；14:30 是原有时段，保留不动。
+
+         从 4 次减到 3 次：probe.py 有反封控硬上限 MAX_KEYWORDS_PER_RUN=5，
+         一次最多 5 个词，3 次 = 15 个词/天，远够喂 4 篇/天的写稿产能。
+         夜里那两次（02:30 / 20:30）本来就是撞额度空转的重灾区 ——
+         08-10 这一路 40 次调用全部 0 产出。
+
+         10:00 这次为当天 11:00 的写稿备料；18:30 这次为明天备料
+         （19:00 之后不再有消耗 usage 的任务）。 -->
     <key>StartCalendarInterval</key>
     <array>
-        <dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>30</integer></dict>
-        <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
         <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>30</integer></dict>
-        <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>30</integer></dict>
+        <dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
     </array>
     <key>StandardOutPath</key>
     <string>/tmp/xhsprobe.log</string>

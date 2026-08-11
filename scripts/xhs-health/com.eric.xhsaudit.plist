@@ -6,12 +6,23 @@
     <string>com.eric.xhsaudit</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
-        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/xhs-health/independent_audit.py</string>
+        <string>/opt/homebrew/bin/python3</string>
+        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/launchd_runner.py</string>
+        <string>xhs-health/independent_audit.py</string>
     </array>
+    <!-- 2026-08-11：09:05 一次 → 13:00 / 17:30 两次，全部落在 10:00–19:00（Eric 定）。
+
+         为什么是两次而不是一次：写稿改成 11:00 和 15:30 两批，审核紧跟在各批
+         之后，当天就能把「写 → 审 → 返工」闭环一轮。原先 09:05 审的是**前一天**
+         积压的稿，返工要隔夜，一篇稿走完三轮要三天。
+
+         为什么不放更晚：18:30 还有一次 probe 备明天的料，19:00 之后不再有
+         任何消耗 usage 的任务；21:00 的 brief 统计当天数据时，这一天的审核
+         记录已经全部落库。 -->
     <key>StartCalendarInterval</key>
     <array>
-        <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>5</integer></dict>
+        <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>30</integer></dict>
     </array>
     <key>StandardOutPath</key>
     <string>/tmp/xhsaudit.log</string>
