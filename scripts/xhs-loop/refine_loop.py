@@ -27,6 +27,9 @@ import time
 from datetime import date, datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from claude_limits import WEEKLY, classify_limit, is_limit, limit_banner  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[2]
 SUCAI = REPO / "xhs" / "素材库"
 CIKU = SUCAI / "词库.csv"
@@ -465,9 +468,6 @@ def parse_output(out: str):
     return slug, md, cards
 
 
-LIMIT_RE = re.compile(r"session limit|usage limit|rate.?limit|429|resets? \d+\s*(am|pm)", re.I)
-
-
 def run_claude(prompt: str, tag: str) -> str:
     """调 headless claude，失败重试并把原始输出留档。
 
@@ -482,6 +482,11 @@ def run_claude(prompt: str, tag: str) -> str:
     "You've hit your session limit · resets 4am"，三篇稿两篇没跑满轮次直接归档，
     而只要再等 50 分钟额度就回来了。所以额度错误单独一条路径：
     每 30 分钟试一次，最多熬 5 小时（额度窗口就是 5 小时），期间不消耗普通重试次数。
+
+    ⛔ 但「熬 5 小时」只对 **session limit** 成立（2026-08-11 修）。
+    周额度耗尽时要等到重置日才回来，熬 5 小时是纯空转：08-10 全天 112 次调用、
+    0 token、0 产出，日志里 112 份留档全是同一句 "hit your weekly limit"。
+    所以现在按 claude_limits.classify_limit() 分类，weekly 直接停手。
     """
     limit_waited = 0
     attempt = 0
@@ -491,7 +496,7 @@ def run_claude(prompt: str, tag: str) -> str:
             r = subprocess.run([str(CLAUDE), "-p", prompt],
                                capture_output=True, text=True, timeout=WRITE_TIMEOUT)
             out = (r.stdout or "").strip()
-            if r.returncode == 0 and out and not LIMIT_RE.search(out):
+            if r.returncode == 0 and out and not is_limit(out):
                 return out
             err = (r.stderr or "")[:2000]
         except subprocess.TimeoutExpired:
@@ -503,13 +508,17 @@ def run_claude(prompt: str, tag: str) -> str:
 
         # 额度限制：出现在 stdout（claude CLI 把它当正常输出打印，returncode 仍是 0），
         # 所以上面必须连 returncode==0 的分支一起查，不然会把这句提示当成稿子存下来。
-        if LIMIT_RE.search(out) or LIMIT_RE.search(err):
+        kind = classify_limit(out, err)
+        if kind == WEEKLY:
+            print(limit_banner(kind, tag), flush=True)
+            return ""
+        if kind:
             if limit_waited + LIMIT_WAIT > LIMIT_MAX_WAIT:
                 print(f"   ⛔ {tag} 撞额度已累计等待 {limit_waited//60} 分钟，"
                       f"超过上限 {LIMIT_MAX_WAIT//3600} 小时，停手")
                 return ""
             limit_waited += LIMIT_WAIT
-            print(f"   ⏳ {tag} 撞额度限制，等 {LIMIT_WAIT//60} 分钟后重试"
+            print(f"   ⏳ {tag} 撞额度限制（{kind}），等 {LIMIT_WAIT//60} 分钟后重试"
                   f"（已累计 {limit_waited//60}/{LIMIT_MAX_WAIT//60} 分钟）", flush=True)
             time.sleep(LIMIT_WAIT)
             attempt -= 1        # 等额度不算失败，不消耗普通重试次数

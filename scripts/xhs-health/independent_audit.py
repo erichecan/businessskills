@@ -17,6 +17,9 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from claude_limits import WEEKLY, classify_limit, limit_banner  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[2]
 SUCAI = REPO / "xhs" / "素材库"
 AUDIT_LOG = SUCAI / "审核记录.csv"
@@ -84,9 +87,8 @@ def decide_disposition(score, redline):
     return "待人工" if s >= 55 else "归档"
 
 
-LIMIT_RE = re.compile(r"session limit|usage limit|rate.?limit|429|resets? \d+\s*(am|pm)", re.I)
 LIMIT_WAIT = 30 * 60         # 与 refine_loop 同一策略：撞额度每 30 分钟试一次
-LIMIT_MAX_WAIT = 5 * 3600    # 额度窗口 5 小时
+LIMIT_MAX_WAIT = 5 * 3600    # 5 小时窗口的额度才值得熬这么久
 
 
 def run_claude_waiting_out_limits(prompt):
@@ -94,19 +96,27 @@ def run_claude_waiting_out_limits(prompt):
 
     审核和写稿在同一个额度池里，写稿那边熬过了额度、轮到审核又立刻撞上并放弃，
     等于前面白等。所以两边必须用同一套退避策略，否则 loop 仍然会在审核这一步断掉。
+
+    ⛔ 「等」只适用于 session limit（2026-08-11 修）。周额度耗尽要等到重置日，
+    熬 5 小时是空转 —— 08-10 审核这一路空转了 32 次。判定逻辑与 refine_loop
+    共用 claude_limits，避免两边再次跑偏。
     """
     waited = 0
     while True:
         r = subprocess.run([str(CLAUDE), "-p", prompt],
                            capture_output=True, text=True, timeout=600)
         out = (r.stdout or "").strip()
-        if not LIMIT_RE.search(out) and not LIMIT_RE.search(r.stderr or ""):
+        kind = classify_limit(out, r.stderr or "")
+        if not kind:
             return out
+        if kind == WEEKLY:
+            print(limit_banner(kind, "审核"), flush=True)
+            return ""
         if waited + LIMIT_WAIT > LIMIT_MAX_WAIT:
             print(f"   ⛔ 审核撞额度累计等待 {waited//60} 分钟，超过 {LIMIT_MAX_WAIT//3600} 小时上限，停手")
             return ""
         waited += LIMIT_WAIT
-        print(f"   ⏳ 审核撞额度，等 {LIMIT_WAIT//60} 分钟后重试"
+        print(f"   ⏳ 审核撞额度（{kind}），等 {LIMIT_WAIT//60} 分钟后重试"
               f"（已累计 {waited//60}/{LIMIT_MAX_WAIT//60} 分钟）", flush=True)
         time.sleep(LIMIT_WAIT)
 

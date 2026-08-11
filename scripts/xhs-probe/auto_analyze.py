@@ -22,8 +22,12 @@ import json
 import re
 import subprocess
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from claude_limits import WEEKLY, classify_limit, limit_banner  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 SUCAI = REPO / "xhs" / "素材库"
@@ -35,6 +39,8 @@ CLAUDE = Path.home() / ".local/bin/claude"
 TIMEOUT = 600
 RETRIES = 1
 RETRY_WAIT = 45
+LIMIT_WAIT = 30 * 60         # 与写稿/审核同一策略：撞 5 小时窗口额度时每 30 分钟试一次
+LIMIT_MAX_WAIT = 5 * 3600    # 周额度不走这条路径（立刻停手），所以上限仍按 5 小时窗口算
 
 # disposition 直接决定词库状态（backfill.DISPOSITION_TO_STATUS），
 # 所以判据必须写死在 prompt 里，不能让模型每次自由发挥。
@@ -107,41 +113,81 @@ def parse_json(out: str):
     return None
 
 
-def analyze(probe_path: Path) -> bool:
-    prompt = build_prompt(probe_path)
-    for attempt in range(1, RETRIES + 2):
+def run_claude(prompt: str, tag: str) -> str:
+    """调 headless claude，区分「额度不够」和「答得不对」。
+
+    ⛔ 2026-08-11 之前这里**完全没有额度处理**：撞额度时 claude 打印的是
+    "You've hit your weekly limit …"，parse_json 拿不到 JSON，于是被当成
+    「分析失败」重试 1 次后丢弃 —— 那条 probe 任务就此消失，且日志里只写
+    「第 N 次分析失败」，看不出根因是额度。08-10 这一路 40 次全是这么没的。
+
+    现在与写稿/审核共用 claude_limits 的判定：weekly 立刻停手，
+    session/瞬时限流才等，普通失败仍按 RETRIES 重试。
+    """
+    limit_waited = 0
+    attempt = 0
+    while True:
+        attempt += 1
         try:
             r = subprocess.run([str(CLAUDE), "-p", prompt],
                                capture_output=True, text=True, timeout=TIMEOUT)
-            data = parse_json(r.stdout or "")
+            out = (r.stdout or "").strip()
+            err = (r.stderr or "")[:2000]
         except subprocess.TimeoutExpired:
-            r, data = None, None
-        if data and data.get("disposition") in ("做", "缓", "放弃"):
-            src = json.loads(probe_path.read_text(encoding="utf-8"))
-            # 复述必须与脚本一致。模型改了就以脚本为准——density 是确定性规则的产物，
-            # 让模型的复述覆盖它，等于把判断权交回给模型。
-            truth = (src.get("density") or {}).get("verdict", "")
-            if truth and data.get("density_echo") != truth:
-                print(f"   ⚠️ density_echo「{data.get('density_echo')}」≠ 脚本 verdict「{truth}」，以脚本为准")
-                data["density_echo"] = truth
-            data["keyword"] = src.get("keyword", data.get("keyword", ""))
-            data["_analyzed_at"] = datetime.now().isoformat(timespec="seconds")
-            data["_analyzer"] = "auto_analyze.py"
-            (OUT_DIR / f"{probe_path.stem}.result.json").write_text(
-                json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
-            gap = (data.get("gap") or {}).get("missing", "")
-            print(f"✅ {data['keyword']} → {data['disposition']}（密度 {data['density_echo']}）")
-            print(f"   空缺：{gap[:70]}")
-            return True
+            out, err = "", f"超时 {TIMEOUT}s"
+
+        kind = classify_limit(out, err)
+        if not kind and out:
+            return out
+
         LOG_DIR.mkdir(exist_ok=True)
         stamp = datetime.now().strftime("%H%M%S")
-        (LOG_DIR / f"{date.today().isoformat()}_analyze_{probe_path.stem}_try{attempt}_{stamp}.txt").write_text(
-            (r.stdout if r else "（超时）")[:5000], encoding="utf-8")
-        print(f"   ⚠️ {probe_path.name} 第 {attempt} 次分析失败（原始输出已存 loop日志/）")
-        if attempt <= RETRIES:
-            import time
-            time.sleep(RETRY_WAIT)
-    return False
+        (LOG_DIR / f"{date.today().isoformat()}_analyze_{tag}_try{attempt}_{stamp}.txt").write_text(
+            f"=== stderr ===\n{err}\n\n=== stdout ===\n{out[:5000]}", encoding="utf-8")
+
+        if kind == WEEKLY:
+            print(limit_banner(kind, tag), flush=True)
+            return ""
+        if kind:
+            if limit_waited + LIMIT_WAIT > LIMIT_MAX_WAIT:
+                print(f"   ⛔ {tag} 撞额度累计等待 {limit_waited//60} 分钟，超上限，停手")
+                return ""
+            limit_waited += LIMIT_WAIT
+            print(f"   ⏳ {tag} 撞额度（{kind}），等 {LIMIT_WAIT//60} 分钟后重试"
+                  f"（已累计 {limit_waited//60}/{LIMIT_MAX_WAIT//60} 分钟）", flush=True)
+            time.sleep(LIMIT_WAIT)
+            attempt -= 1        # 等额度不算失败，不消耗普通重试次数
+            continue
+
+        print(f"   ⚠️ {tag} 第 {attempt} 次分析失败（原始输出已存 loop日志/）")
+        if attempt > RETRIES:
+            return ""
+        time.sleep(RETRY_WAIT)
+
+
+def analyze(probe_path: Path) -> bool:
+    """跑一条 probe 的空缺分析。失败/撞额度都返回 False，原始输出已由 run_claude 留档。"""
+    out = run_claude(build_prompt(probe_path), probe_path.stem)
+    data = parse_json(out) if out else None
+    if not data or data.get("disposition") not in ("做", "缓", "放弃"):
+        return False
+
+    src = json.loads(probe_path.read_text(encoding="utf-8"))
+    # 复述必须与脚本一致。模型改了就以脚本为准——density 是确定性规则的产物，
+    # 让模型的复述覆盖它，等于把判断权交回给模型。
+    truth = (src.get("density") or {}).get("verdict", "")
+    if truth and data.get("density_echo") != truth:
+        print(f"   ⚠️ density_echo「{data.get('density_echo')}」≠ 脚本 verdict「{truth}」，以脚本为准")
+        data["density_echo"] = truth
+    data["keyword"] = src.get("keyword", data.get("keyword", ""))
+    data["_analyzed_at"] = datetime.now().isoformat(timespec="seconds")
+    data["_analyzer"] = "auto_analyze.py"
+    (OUT_DIR / f"{probe_path.stem}.result.json").write_text(
+        json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    gap = (data.get("gap") or {}).get("missing", "")
+    print(f"✅ {data['keyword']} → {data['disposition']}（密度 {data['density_echo']}）")
+    print(f"   空缺：{gap[:70]}")
+    return True
 
 
 def main() -> int:
