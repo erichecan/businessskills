@@ -28,6 +28,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from claude_limits import WEEKLY, classify_limit, limit_banner  # noqa: E402
+from headless_cli import HEADLESS_FLAGS, ensure_cwd  # noqa: E402
+
+BARE_CWD = ensure_cwd()
 
 REPO = Path(__file__).resolve().parents[2]
 SUCAI = REPO / "xhs" / "素材库"
@@ -129,8 +132,9 @@ def run_claude(prompt: str, tag: str) -> str:
     while True:
         attempt += 1
         try:
-            r = subprocess.run([str(CLAUDE), "-p", prompt],
-                               capture_output=True, text=True, timeout=TIMEOUT)
+            r = subprocess.run([str(CLAUDE), *HEADLESS_FLAGS, "-p", prompt],
+                               cwd=str(BARE_CWD), capture_output=True, text=True,
+                               timeout=TIMEOUT)
             out = (r.stdout or "").strip()
             err = (r.stderr or "")[:2000]
         except subprocess.TimeoutExpired:

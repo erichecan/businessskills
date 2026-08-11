@@ -29,6 +29,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from claude_limits import WEEKLY, classify_limit, is_limit, limit_banner  # noqa: E402
+from headless_cli import HEADLESS_FLAGS, ensure_cwd  # noqa: E402
+
+BARE_CWD = ensure_cwd()
 
 REPO = Path(__file__).resolve().parents[2]
 SUCAI = REPO / "xhs" / "素材库"
@@ -73,7 +76,18 @@ KEEP_PASSED = """⚠️ 改的是被指出的问题，别把已经达标的地�
 正文字数守住本篇口径的规格 · 平均句长≤30 · 引语密度≥0.8/百字 ·
 具体名词（数字/时间/金额/职位）≥2.0/百字 · 排比≤1 处 · 「不是X是Y」≤2 处 ·
 泛指群体词（很多人/有些人/大多数人）≤2 处 · 全篇只对读者说话不换视角 ·
-结尾保留具体问句。改完自己数一遍再输出。"""
+结尾保留具体问句。改完在心里核一遍这几项再输出。"""
+
+# ⛔ 别在 prompt 里让模型「自己数一遍」而不说清怎么数（2026-08-11 实测教训）。
+# 原文是「改完自己数一遍再输出」，模型把它理解成「去把机械检查跑一遍」，于是
+# 999 次 Bash 命令里出现 85 次 cd scripts/xhs-health、31 次 ls 同一个目录、
+# 7 次 head -60 draft_check.py（读检查脚本源码）、6 次 cat > /tmp/body.txt 数字数。
+# 机械检查其实早就由脚本在会话外跑（见下方 mechanical_check），结果通过 feedback
+# 回灌，模型完全不必碰它。现在工具已由 HEADLESS_FLAGS 全禁，这句话也改成
+# 「在心里核一遍」，两头堵住。
+NO_TOOLS_NOTE = """\n\n⛔ 本次调用没有任何工具可用，也不需要：写稿要的素材、规格、
+反馈已全部在上面给全了，成稿文件由脚本负责落盘。不要尝试读文件、列目录、
+跑脚本或写临时文件 —— 直接按下面的格式把结果输出出来即可。"""
 
 # 两条流**共用一套流程和一个正文规格**，只在标题/首图/开头三处切口径。
 # Eric 2026-08-03 两条决定：①推荐流不做视频、按同一条成稿路线做图文，账号丰富度才起得来
@@ -449,7 +463,7 @@ draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，�
   讲被追问答不上来就用 pose8_被追问冒汗，讲复盘记录就用 pose30_记三行笔记。
 - ⛔ 7 张卡不许出现重复姿势 —— 每篇笔记的图现在长得都一样，就是因为以前按卡型
   固定映射（scene 永远是面试对坐、contrast 永远是摊手），30 个姿势只用到 9 个。
-- 实在没有贴切的，选情绪对得上的（叹气/沉思/如释重负），别硬凑动作。"""
+- 实在没有贴切的，选情绪对得上的（叹气/沉思/如释重负），别硬凑动作。{NO_TOOLS_NOTE}"""
 
 
 def parse_output(out: str):
@@ -493,8 +507,9 @@ def run_claude(prompt: str, tag: str) -> str:
     while True:
         attempt += 1
         try:
-            r = subprocess.run([str(CLAUDE), "-p", prompt],
-                               capture_output=True, text=True, timeout=WRITE_TIMEOUT)
+            r = subprocess.run([str(CLAUDE), *HEADLESS_FLAGS, "-p", prompt],
+                               cwd=str(BARE_CWD), capture_output=True, text=True,
+                               timeout=WRITE_TIMEOUT)
             out = (r.stdout or "").strip()
             if r.returncode == 0 and out and not is_limit(out):
                 return out
