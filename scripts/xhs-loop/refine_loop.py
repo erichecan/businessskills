@@ -204,13 +204,42 @@ def _all_keywords() -> list:
     return [(r.get("关键词") or "").strip() for r in csv.DictReader(CIKU.open(encoding="utf-8-sig"))]
 
 
+# 搜索位前排日均赞中位的下限。低于它 = 这个位上排第一也没人看。
+# 依据 docs/20260811-五项爆款规律.md §二：不同词的前排强度差 360 倍
+# （职场万用术 36.18 vs 说完方案领导没反应怎么办 0.10），而本账号已发 12 篇里
+# **8 篇的词前排日均赞中位 <2**，「汇报被领导打断怎么接」= 0.14，还在这个词上写了 3 篇。
+# 「词的前排强度」vs「我们的日均观看」相关 +0.335（n=12，样本小，方向性参考）。
+MIN_SLOT_STRENGTH = 1.0
+
+
+def slot_strength(keyword: str) -> float | None:
+    """该词搜索位的前排日均赞中位。None = 没有 probe 数据，算不出。
+
+    ⛔ 口径是**日均**赞（点赞 ÷ 发布至采集的天数），不是 probe 里存的
+    density.median_likes（那是绝对赞数，量级 8-1069）。两者差着「笔记活了多少天」。
+    实现复用 draft_check.search_slot_evidence，别在这里写第二份。
+    """
+    sys.path.insert(0, str(HEALTH))
+    from draft_check import search_slot_evidence
+    return search_slot_evidence(f"关键词来源：`词库.csv`「{keyword}」")["日均赞中位"]
+
+
 def pick_topic() -> dict | None:
-    """选一个搜索位已验证、且没写过的词，密度已探测的优先。
+    """选一个搜索位已验证、没写过、且**前排确实有人互动**的词。
 
     状态=已验证 是硬条件——它代表人工核过这个词的搜索位确实有空缺，没验过就写容易撞饱和赛道。
     密度「待探测」不是硬条件：必须命中清单第 8 条允许「两者皆无时在备注说明为什么值得赌」，
     只排后面。初版把它也当硬条件，结果 9 个已验证词里 7 个已写过、剩 2 个全是待探测，
     loop 直接无题可做 —— 比清单本身还严，把自己饿死了。
+
+    ⚡ 2026-08-12 加前排强度过滤（清单第 8 条的第二个判据）。在此之前这个函数
+    **只看「已验证」和「竞争密度」**，而 probe 早就把 top_notes 的 likes+published_at
+    采下来了，从没用于选词 —— 于是一直在优化「如何在一个没人看的搜索位上排第一」。
+    这是整条链路上最贵的一个问题：稿子写得再好，那个位上本来就没人。
+
+    过滤是**软的**：达标词优先，全都不达标时仍返回最强的那个并告警，不让 loop 饿死
+    （同上，把自己饿死过一次了）。算不出强度的（无 probe 数据）排在达标词之后、
+    已知弱词之前 —— 未知不等于差，但也不该优先于已证明有人看的。
     """
     if not CIKU.exists():
         return None
@@ -219,8 +248,47 @@ def pick_topic() -> dict | None:
             if (r.get("关键词") or "").strip()
             and (r.get("关键词") or "").strip() not in used
             and (r.get("状态") or "").strip() == "已验证"]
-    pool.sort(key=lambda r: (r.get("竞争密度") or "").strip() in ("", "待探测"))
-    return pool[0] if pool else None
+    if not pool:
+        return None
+
+    for r in pool:
+        r["_strength"] = slot_strength((r["关键词"]).strip())
+
+    def rank(r):
+        # ⛔ 不是「强度越高越好」。判据分四档（五项爆款规律 §二）：
+        #   5-20 甜区（有人看，前排又没强到碰不动）> 1-5（能写，天花板低）
+        #   > 未知（无 probe） > >20 红海（要明确角度差异才进） > <1（没人互动）
+        # 初版写成 -strength 排序，选出来的第一个词是 28.8 —— 正好是要谨慎进的红海。
+        s = r["_strength"]
+        if s is None:
+            tier = 2
+        elif 5 <= s <= 20:
+            tier = 0
+        elif MIN_SLOT_STRENGTH <= s < 5:
+            tier = 1
+        elif s > 20:
+            tier = 3
+        else:
+            tier = 4
+        # 同档内：密度已探测的优先；甜区内再按越接近 20 越靠前（有量的一侧）
+        return (tier, (r.get("竞争密度") or "").strip() in ("", "待探测"), -(s or 0))
+
+    pool.sort(key=rank)
+    best = pool[0]
+    s = best["_strength"]
+    if s is None:
+        print(f"   ⚠️ 选题「{best['关键词']}」无 probe 数据，搜索位强度未知（清单第 8 条第②判据无法核）")
+    elif s < MIN_SLOT_STRENGTH:
+        print(f"   ⛔ {len(pool)} 个候选词**没有一个**搜索位上有人互动。"
+              f"仍选最强的「{best['关键词']}」= {s} 日均赞，但这个位上排第一也没多少人看 —— "
+              f"**真正该做的是补选词，不是写这篇**")
+    elif s > 20:
+        print(f"   ⚠️ 选题「{best['关键词']}」= {s} 日均赞，>20 属红海（无甜区词可选）。"
+              f"前排已被高赞占满，没有明确的角度差异就别硬进")
+    else:
+        tag = "甜区" if s >= 5 else "可写但天花板低"
+        print(f"   选题「{best['关键词']}」搜索位日均赞中位 {s}（{tag}）")
+    return best
 
 
 def probe_evidence(keyword: str) -> str:
