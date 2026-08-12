@@ -333,8 +333,17 @@ def build_audit_prompt(draft: Path, lane: str = None):
     lane = lane or lane_of(text_for_lane)
     skill = (REPO / "skills/eric-xhs-audit/SKILL.md").read_text(encoding="utf-8")
     checklist = (SUCAI / "必须命中清单.md").read_text(encoding="utf-8")
-    benchmark_file = SUCAI / "标杆样本库.md"
-    benchmark = benchmark_file.read_text(encoding="utf-8") if benchmark_file.exists() else "（标杆样本库缺失）"
+    # ⛔ 标杆样本库.md 不再喂入（2026-08-11）。
+    # 它取自**推荐流热榜**，而 audit skill 明确规定「搜索流选题不得因『标杆库无同类先例』扣分」。
+    # 一边告诉审核员"这份不能用来扣分"、一边把它整篇喂进去，是在赌模型忍得住不用它 ——
+    # 而且它的内容只是一张「标题 + 热度」表（2.1KB），对搜索流成稿没有可比性。
+    # 但**不能什么都不说**：08-02 踩过的坑是审核员一旦发现某份资产没给，
+    # 就在报告里标注「未提供故无法核验」并整体降级。所以这里显式说明为什么不给。
+    benchmark_note = (
+        "（⛔ 本次**有意不提供**标杆样本库：它取自推荐流热榜，是「标题+热度」表，"
+        "与搜索流成稿没有可比性。审核标准已规定不得因「无同类先例」扣分，"
+        "故这里不提供也**不构成任何降级理由** —— 维度 1 请改用下方词库与 probe 数据核对。）"
+    )
     # headless claude 只看得到 prompt 里的东西。skill 写「审核前先读 X」不够，必须喂进来，
     # 否则审核员只能标注「未提供故无法核验」并降级——2026-08-02 连续踩过两次。
     # 但「喂进来」≠「整库塞」：审核是核对不是选材，按成稿反查即可（见 _pick_by_draft）。
@@ -358,8 +367,8 @@ def build_audit_prompt(draft: Path, lane: str = None):
 【必须命中清单】
 {checklist}
 
-【标杆样本库（⚠️ 推荐流高热样本。搜索流选题不得因「此处无同类先例」扣分）】
-{benchmark}
+【关于标杆/先例参照】
+{benchmark_note}
 
 ⛔ 关于下面三个库：给你的**不是整库，是按本篇正文反查出来的子集**。
 筛法：把正文和库里每一行做最长公共子串比对，≥{STRONG_N} 字连续相同的（＝正文照抄了它）
