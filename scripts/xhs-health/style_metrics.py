@@ -63,6 +63,69 @@ def find_parallel(body):
     return hits
 
 
+# ── 可追溯率（2026-08-11 加，T13 基准测试的产出）────────────────────────────
+# 起因：拿外部真爆款反测时发现「具体名词密度 ≥2.0」在**奖励编造**。
+#   我们按新标准自产的对标稿：密度 1.92（⛔ 未过），可追溯率 21.3%
+#   外部爆款（日均 500 赞）：密度 2.39（✅ 通过），可追溯率 **0.0%**
+# 那篇爆款全篇零引语，密度靠「10 道题」「覆盖 90% 以上」「背了三天」撑起来 ——
+# 而「90% 以上」正是审核员点名的**无来源自我承诺**。
+# 也就是说：这个指标分不清「真实的具体细节」和「编出来的数字」，
+# 而后者更容易堆。它惩罚了我们最想要的（可追溯原话），奖励了明令禁止的（编造）。
+#
+# 可追溯率直接数「正文里有多少字能在素材库逐字查到」，编的字符串查不到，刷不了。
+# 口径与 independent_audit._pick_by_draft 的强命中一致：6 字连续相同 = 照抄。
+#
+# ⚠️ 本脚本只测量不判定（见模块 docstring）。是否拿它替换密度做拦截项，
+# 属于闸门变更，需 Eric 定 —— 见 docs/20260811-基准测试-外部爆款反测.md 待办 H。
+TRACE_N = 6
+_LIB_CACHE = None
+
+
+def _norm_ln(s):
+    import unicodedata
+    return "".join(ch for ch in (s or "") if unicodedata.category(ch)[0] in "LN")
+
+
+def _source_ngrams():
+    """素材库（评论区原话 + 案例库 + probe quotes）的 6-gram 集合，进程内缓存。"""
+    global _LIB_CACHE
+    if _LIB_CACHE is not None:
+        return _LIB_CACHE
+    import csv as _csv, json as _json
+    lib = set()
+
+    def add(text):
+        b = _norm_ln(text)
+        lib.update(b[i:i + TRACE_N] for i in range(len(b) - TRACE_N + 1))
+
+    def rows(p):
+        return list(_csv.DictReader(p.open(encoding="utf-8-sig"))) if p.exists() else []
+
+    for r in rows(SUCAI / "评论区原话.csv"):
+        add((r.get("用户原话") or "") + (r.get("暴露的处境") or ""))
+    for r in rows(SUCAI / "案例库.csv"):
+        add("".join(r.get(c) or "" for c in ("场景", "对方原话", "我的原话", "可迁移的那一句")))
+    for f in (SUCAI / "探测原始").glob("*.result.json"):
+        try:
+            d = _json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for q in (d.get("quotes") or []):
+            add((q.get("用户原话") or "") + (q.get("暴露的处境") or ""))
+    _LIB_CACHE = lib
+    return lib
+
+
+def traceable_rate(body):
+    """正文里能在素材库逐字查到的字占比（%）。编造的内容查不到，刷不了这个数。"""
+    b = _norm_ln(body)
+    if len(b) < TRACE_N:
+        return 0.0
+    lib = _source_ngrams()
+    grams = [b[i:i + TRACE_N] for i in range(len(b) - TRACE_N + 1)]
+    return round(sum(1 for g in grams if g in lib) / len(grams) * 100, 1)
+
+
 def measure(text):
     body = body_of(text)
     clean = re.sub(r"\s", "", body)
@@ -84,6 +147,7 @@ def measure(text):
         "具体名词/百字": round(concrete / n * 100, 2),
         "引语数": len(QUOTE_RE.findall(body)),
         "引语/百字": round(len(QUOTE_RE.findall(body)) / n * 100, 2),
+        "可追溯率%": traceable_rate(body),
         "排比处数": len(parallel),
         "_排比实例": parallel,
     }
@@ -102,8 +166,8 @@ def hook_signals(text):
 
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 # 书面连词在全部 21 篇实测均为 0，对这批稿无区分度，已从主表移除（函数仍计算，留待新稿观察）
-COLS = ["字数", "平均句长", "句长标准差", "口语词/百字",
-        "具体名词/百字", "引语/百字", "排比处数"]
+COLS = ["字数", "平均句长", "口语词/百字",
+        "具体名词/百字", "引语/百字", "可追溯率%", "排比处数"]
 
 
 def main():
