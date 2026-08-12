@@ -89,9 +89,14 @@ def load_samples():
             likes = parse_num(s.get("like_raw")) or s.get("likes_from_card")
             comments = parse_num(s.get("comment_raw"))
             collects = parse_num(s.get("collect_raw"))
+            # 计数为 0 时小红书显示的是「评论」「收藏」这类中文标签而不是数字，
+            # parse_num 返回 None。互动栏确实渲染了就按 0 算，别当采集失败丢掉。
             bar_rendered = bool((s.get("engage_bar_raw") or "").strip())
-            if comments is None and bar_rendered:
-                comments = 0
+            if bar_rendered:
+                if comments is None:
+                    comments = 0
+                if collects is None:
+                    collects = 0
             if not likes or comments is None:
                 dropped += 1
                 continue
