@@ -162,6 +162,41 @@ def mechanical_result(fname):
     return "\n".join(lines) or "机械检查通过"
 
 
+def code_evidence(draft_text: str) -> str:
+    """代码先算好、模型不必再算的两块事实（2026-08-12）。
+
+    目的是把「审核员自己去数、去查」换成「代码给结果，审核员只做判断」：
+    检索和取数是确定性的，交给代码；类型判断和打分是语义的，留给模型。
+    ⚠️ 两块都是**证据不是判决** —— 见 draft_check 里各自的注释，
+    尤其第 15 条：查不到 ≠ 编造，正文里的话术模板本来就无从追溯。
+    """
+    from draft_check import search_slot_evidence, untraceable_quotes
+
+    ev = search_slot_evidence(draft_text)
+    if ev["日均赞中位"] is None:
+        slot = (f"关键词「{ev['关键词']}」· 词库竞争密度 {ev['竞争密度'] or '未收录'}"
+                f" · ⚠️ 该词无 probe 数据，前排强度算不出 —— "
+                f"维度 1 的第⑤项（这个搜索位有没有人互动）本篇**无法核验**，"
+                f"如实写「无数据」，不要因此扣分也不要假设它没问题")
+    else:
+        slot = (f"关键词「{ev['关键词']}」· 词库竞争密度 {ev['竞争密度'] or '未收录'}\n"
+                f"前排 {ev['样本']} 条笔记的**日均赞中位 = {ev['日均赞中位']}** → {ev['判定']}\n"
+                f"（口径：日均赞＝点赞÷发布至采集的天数。⛔ 别和 probe 里 density.median_likes "
+                f"那个绝对赞数中位混用，两者差着「笔记活了多少天」）")
+
+    bad = untraceable_quotes(draft_text)
+    if not bad:
+        quotes = "正文里 ≥8 字的引语**全部**在案例库/评论区原话/probe 中逐字查到。"
+    else:
+        rows = "\n".join(f"  · {why}：「{q[:50]}」" for q, why in bad)
+        quotes = (f"以下 {len(bad)} 句引语在三个库里查不到：\n{rows}\n"
+                  f"⛔ **查不到 ≠ 编造，先判它属于哪一类**：\n"
+                  f"  ① 转述型（他说／领导说／有人在评论区说）→ 查不到就是红线「编造或冒充」；\n"
+                  f"  ② 话术模板（教读者照着说的那种）→ 作者原创，**无从追溯，不构成编造，不要扣分**。\n"
+                  f"  这两类正文里都有，代码分不了，所以留给你判。")
+    return f"【搜索位强度（维度 1 第⑤项的判据）】\n{slot}\n\n【引语可追溯性检索结果】\n{quotes}"
+
+
 def _read_or(path: Path, fallback: str) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else fallback
 
@@ -396,6 +431,8 @@ def build_audit_prompt(draft: Path, lane: str = None):
 
 【机械检查结果（代码硬核对，以此为准）】
 {mechanical_result(draft.name)}
+
+{code_evidence(text)}
 
 【图文卡片 JSON（维度 3「第 3 秒停不停」的核对依据；第 1 张即首图）】
 {cards}

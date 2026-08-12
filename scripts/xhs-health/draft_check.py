@@ -45,6 +45,179 @@ GENERIC_READER = re.compile(r"很多人|有些人|有的人|大部分人|大多�
 MAX_GENERIC = 2
 _EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿️]")
 
+# ---------- 清单第 15 条：引语可追溯性（⛔ 证据，不是闸门） ----------
+#
+# 检索本身是纯字符串操作，不该每次花一次模型调用去做。但**结果不能当红线用**：
+#
+# 2026-08-12 全量回归（15 篇历史稿）暴露：按「每句引语都必须逐字查得到」判，
+# 8 篇被判违规，而它们多数是过了审的。看被判的内容就知道口径错在哪 ——
+#   「我确认一下，这个加班是阶段性冲刺，还是长期常态？」
+#   「这版取自 BI 日报，口径是当月新客、剔除退款，我发您核对。」
+# 这些不是转述别人的话，是**教读者照着说的话术模板**，本账号的核心产出。
+# 它们本来就不该在素材库里。
+#
+# 也就是说正文里的引语有两类，而清单第 15 条与 audit 红线的判定方法只写了一类：
+#   ① 转述型（他说／领导说／有人在评论区说）→ 必须逐字可追溯
+#   ② 话术模板（你可以这样回／换成这句）→ 作者原创，无从追溯也不该追溯
+# 审核员一直在自动区分这两类，所以规则文本与实际执行的偏差从没暴露过；
+# 机械化把它逼了出来。
+#
+# 结论：代码只负责「查得到查不到」这个事实，**由审核员判它属于哪一类**。
+# 这是分工，不是妥协 —— 检索交给代码，类型判断交给模型。
+# ⚠️ 想把它升级成硬拦截，得先让规则区分这两类引语，并拿全量历史稿回归到零误判。
+BODY_SECTION_RE = re.compile(r"^#{1,3}\s*\*{0,2}正文[^\n]*\n(.*?)(?=\n#{1,3}\s|\Z)", re.M | re.S)
+
+
+def _body_section(text):
+    """只取「## 正文」那一节。引语检索必须限定在这里 —— 头部引言区里本来就会
+    出现素材原话（「关键词来源」「素材」那几行），拿它们当正文引语查是自证。"""
+    m = BODY_SECTION_RE.search(text)
+    return m.group(1) if m else ""
+
+
+QUOTE_RE = re.compile(r"[「“\"']([^「」“”\"'\n]{6,60})[」”\"']")
+QUOTE_MIN = 8          # 短于这个字数的引语不查：6-8 字的口语短句在任何库里都容易撞上
+FUZZY_N = 8            # 整句查不到时，用 8 字连续相同判「疑似改写」——比 STRONG_N(6) 严
+LIBS = ("案例库.csv", "评论区原话.csv")
+
+
+def _norm(s):
+    """比对前抹掉标点空白：引语落到正文里常被改标点，那不算改内容。"""
+    return re.sub(r"[\s，。！？、；：,.!?;:…—－\-~～\"'「」“”‘’（）()【】]", "", s)
+
+
+def _library_text():
+    """三个合法原话来源拼成一锅字符串。probe 的正文与评论也算 —— 清单第 15 条
+    明写「不要求来自同一行、同一次采集」，逐字检索的范围就是这三处。"""
+    import csv as _csv
+    import json as _json
+    buf = []
+    for name in LIBS:
+        p = SUCAI / name
+        if not p.exists():
+            continue
+        with p.open(encoding="utf-8-sig") as f:
+            for row in _csv.DictReader(f):
+                buf.extend(str(v) for v in row.values() if v)
+    probe_dir = SUCAI / "探测原始"
+    if probe_dir.is_dir():
+        for p in probe_dir.glob("probe_*.json"):
+            try:
+                d = _json.loads(p.read_text(encoding="utf-8"))
+            except (ValueError, OSError):
+                continue
+            buf.extend(c.get("text", "") for c in (d.get("comments") or []))
+            buf.extend(b.get("body", "") for b in (d.get("note_bodies") or []))
+    return _norm("\n".join(buf))
+
+
+def _shared_ngram(a, lib_norm, n):
+    """a 里有没有任一 n 字连续片段出现在库中。命中即返回那片段，否则 None。
+
+    ⛔ 别改回「找最长公共子串」：那要 O(len² × len(lib)) 次子串搜索，
+    库有几十万字，一篇稿几条查不到的引语就能跑掉几十秒。
+    判「疑似改写」只需要知道**有没有** n 字连续相同，不需要知道最长是多少。
+    """
+    for i in range(len(a) - n + 1):
+        frag = a[i:i + n]
+        if frag in lib_norm:
+            return frag
+    return None
+
+
+def untraceable_quotes(text):
+    """返回在三个库里查不到的引语列表：[(引语, 判定)]。空 = 全部可追溯。"""
+    body = _body_section(text)
+    if not body:
+        return []
+    lib = _library_text()
+    if not lib:
+        return []                       # 库读不到时不报违规，免得把好稿冤枉了
+    out = []
+    seen = set()
+    for q in QUOTE_RE.findall(body):
+        if len(q) < QUOTE_MIN or q in seen:
+            continue
+        seen.add(q)
+        nq = _norm(q)
+        if not nq or nq in lib:
+            continue                    # 整句逐字查得到 = 通过
+        frag = _shared_ngram(nq, lib, FUZZY_N)
+        out.append((q, f"疑似改写（库里只对上「{frag}」）" if frag else "库里完全查不到"))
+    return out
+
+
+# ---------- 清单第 8 条：搜索位有据可依 + 前排得有人看（证据，非闸门） ----------
+#
+# ⛔ 这条**不进 issues、不打回**。关键词在选题阶段就定死了，写手改不动 ——
+# 稿子写完才说「这个词没人看」，打回去也只能原地重写一遍同一个词。
+# 它的正确位置是选题闸门（pick_topic 的前置过滤），这里只负责把数算出来，
+# 交给审核员当维度 1 的判据，并让这个缺口显性化。
+#
+# 判据口径来自 docs/20260811-五项爆款规律.md：前 20 条笔记的**日均赞中位**
+# <1 不写 ／ 1-5 天花板低 ／ 5-20 甜区 ／ >20 红海。
+# ⚠️ 注意不是 probe 里存的 density.median_likes —— 那是**绝对赞数**中位（量级 8-1069），
+# 两个数差着一个「笔记活了多少天」，别拿来互相印证。
+KW_RE = re.compile(r"词库\.csv[`\s]*[「\"']([^「」\"']+)[」\"']")
+DAILY_LIKE_TIERS = ((1, "⛔ <1：这个搜索位几乎没人互动，排第一也没用"),
+                    (5, "⚠️ 1-5：可写，但天花板不高，别指望量"),
+                    (20, "✅ 5-20：甜区"),
+                    (float("inf"), "⚠️ >20：红海，需要明确的角度差异"))
+
+
+def _slug(kw):
+    return re.sub(r"[^\w一-龥]+", "", kw)[:20]
+
+
+def search_slot_evidence(text):
+    """算本篇关键词的搜索位强度。返回 dict，取不到数时如实说取不到。"""
+    import csv as _csv
+    import json as _json
+    from datetime import datetime
+    from statistics import median
+
+    m = KW_RE.search(text)
+    kw = m.group(1).strip() if m else ""
+    ev = {"关键词": kw or "（成稿头部未标注关键词来源）", "竞争密度": None,
+          "日均赞中位": None, "判定": None, "样本": 0}
+    if not kw:
+        return ev
+
+    ciku = SUCAI / "词库.csv"
+    if ciku.exists():
+        with ciku.open(encoding="utf-8-sig") as f:
+            for row in _csv.DictReader(f):
+                if (row.get("关键词") or "").strip() == kw:
+                    ev["竞争密度"] = (row.get("竞争密度") or "").strip() or "（空）"
+                    break
+
+    dailies = []
+    for p in sorted((SUCAI / "探测原始").glob(f"probe_*_{_slug(kw)}.json")):
+        try:
+            d = _json.loads(p.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            continue
+        probed = (d.get("probed_at") or "")[:10]
+        try:
+            probed_d = datetime.strptime(probed, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        for n in d.get("top_notes") or []:
+            likes, pub = n.get("likes"), n.get("published_at")
+            if likes is None or not pub:
+                continue
+            try:
+                days = (probed_d - datetime.strptime(pub, "%Y-%m-%d").date()).days
+            except ValueError:
+                continue
+            dailies.append(likes / max(days, 1))
+    if dailies:
+        med = median(dailies)
+        ev["日均赞中位"] = round(med, 2)
+        ev["样本"] = len(dailies)
+        ev["判定"] = next(label for ceiling, label in DAILY_LIKE_TIERS if med < ceiling)
+    return ev
+
 
 def extract(text):
     m = re.search(r"^#+\s*(?:首选)?标题[:：]?\s*(.+)$", text, re.M)
@@ -145,9 +318,9 @@ def check_one(d, f, all_drafts, lane_override=None):
 
     lane = lane_of(text, lane_override)
     lo, hi = BODY_RANGE[lane]
-    bm = re.search(r"^#{1,3}\s*\*{0,2}正文[^\n]*\n(.*?)(?=\n#{1,3}\s|\Z)", text, re.M | re.S)
-    if bm:
-        blen = len(re.sub(r"\s|（正文总字数[^）]*）", "", bm.group(1)))
+    body_sec = _body_section(text)
+    if body_sec:
+        blen = len(re.sub(r"\s|（正文总字数[^）]*）", "", body_sec))
         if not lo <= blen <= hi:
             issues.append(f"正文节 {blen} 字（{lane}规格 100-500，实判 {lo}-{hi}）")
     else:
