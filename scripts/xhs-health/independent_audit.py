@@ -352,7 +352,8 @@ def build_audit_prompt(draft: Path, lane: str = None):
     quotes_lib, q_kept, q_total, q_strong = relevant_quotes(text_for_lane)
     probe_quotes, probe_n = relevant_probe_quotes(text_for_lane)
     # 首图/七卡内容在单独的 cards.json 里。不喂进来，审核员看不到首图，
-    # 只能把「首图原句一致性」按未知降级给半分——2026-08-02 三篇稿都栽在这。
+    # 只能把维度 3 按未知降级给半分——2026-08-02 三篇稿都栽在这。
+    # 2026-08-12 T7 后该维度问的是「第 3 秒手指停不停」，更依赖看到首图本身。
     stem = draft.name.removeprefix("成稿_").removesuffix(".md")
     cards = _read_or(SUCAI / f"图文_{stem}_cards.json", "（本稿无卡片 JSON，首图无法核验）")
     text = draft.read_text(encoding="utf-8")
@@ -396,7 +397,7 @@ def build_audit_prompt(draft: Path, lane: str = None):
 【机械检查结果（代码硬核对，以此为准）】
 {mechanical_result(draft.name)}
 
-【图文卡片 JSON（维度 3 首图原句一致性的核对依据；第 1 张即首图）】
+【图文卡片 JSON（维度 3「第 3 秒停不停」的核对依据；第 1 张即首图）】
 {cards}
 
 【待审成稿 {draft.name}】
