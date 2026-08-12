@@ -16,6 +16,7 @@
 import argparse
 import csv
 import json
+import os
 import re
 import sys
 import time
@@ -129,6 +130,65 @@ def fetch():
             pass
 
 
+PUB_LOG = SUCAI / "发布日志.csv"
+NOTE_URL = "https://www.xiaohongshu.com/explore/{}"
+
+
+def backfill_note_links(ids: dict) -> None:
+    """把创作后台抓到的 noteId 补成「笔记链接」，回填发布日志与词库。
+
+    ⛔ 这一步必须在这里做，auto_publish 做不了：**定时发布的时候笔记还没出去**，
+    那时拿不到 noteId，所以它只能在日志里留一句「笔记链接请到创作后台复制后填进词库」。
+    结果就是没人填 —— 实测 19 个「已发布」的词里只有 3 个有链接。
+
+    而链接空着不是少一列数据，是**整条预测闭环断在这里**：
+    review_prediction 的对账链路是 预测记录 → 关键词 → 词库.笔记链接 → noteId
+    → 发布数据，链接一空，40 条预测**一条都对不上账**，
+    「为什么没预测准」从建好到现在没产出过一次。
+
+    ids 是本次从后台列表拿到的 {标题: noteId}，标题与发布日志的「标题」列可直接对上
+    （实测 16/23 命中；对不上的多是发布前改过标题，留给人工）。
+    """
+    if not ids or not PUB_LOG.exists():
+        return
+    rows = read_csv(PUB_LOG)
+    if not rows:
+        return
+    cols = list(rows[0].keys())
+    if "笔记链接" not in cols:
+        return
+
+    filled = []
+    for r in rows:
+        title = (r.get("标题") or "").strip()
+        if (r.get("笔记链接") or "").strip() or not title:
+            continue
+        if "✅" not in (r.get("发布") or ""):       # 只补真的发出去了的
+            continue
+        nid = ids.get(title)
+        if not nid:
+            continue
+        r["笔记链接"] = NOTE_URL.format(nid)
+        filled.append((title, r["笔记链接"], (r.get("成稿文件") or "").strip()))
+
+    if not filled:
+        return
+
+    tmp = PUB_LOG.with_suffix(".csv.tmp")       # 原子替换，同 auto_publish.backfill_ciku
+    with tmp.open("w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        for r in rows:
+            w.writerow({c: r.get(c, "") for c in cols})
+    os.replace(tmp, PUB_LOG)
+    print(f"\n已补笔记链接 {len(filled)} 条 → 发布日志.csv")
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from auto_publish import backfill_ciku          # 复用，别写第二份词库写回
+    for title, link, name in filled:
+        print(f"   {backfill_ciku(title, link, name)}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -190,6 +250,9 @@ def main():
         print(f"\n已写入 发布数据.csv：{len(new)} 行")
     else:
         print("\n今天已抓过，无新增")
+
+    backfill_note_links(ids)
+
     print("⚠️ 搜索来源占比取不到（详情数据页只认原生手势），需人工填进 词库.csv")
     return 0
 
