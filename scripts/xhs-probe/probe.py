@@ -32,6 +32,7 @@ SUCAI = REPO / "xhs" / "素材库"
 CIKU = SUCAI / "词库.csv"
 OUT_DIR = SUCAI / "探测原始"
 STATE_FILE = OUT_DIR / ".probe_state.json"
+REJECT_DIR = OUT_DIR / ".rejected"   # 被拒绝覆盖的降级结果，留档但不进流水线
 
 PROXY = "http://localhost:3456"
 SEARCH_URL = "https://www.xiaohongshu.com/search_result?keyword={kw}&source=web_search_result_notes"
@@ -441,12 +442,63 @@ def slug(keyword):
     return re.sub(r"[^\w一-龥]+", "", keyword)[:20]
 
 
-def load_pending(limit):
+def probed_slugs():
+    """已落过盘的词（按 slug）。用文件名比对，不读 JSON 内容。"""
+    out = set()
+    for p in OUT_DIR.glob("probe_*.json"):
+        if p.name.endswith(".result.json"):
+            continue
+        m = re.match(r"probe_\d{8}_(.+)\.json$", p.name)
+        if m:
+            out.add(m.group(1))
+    return out
+
+
+COMPLETENESS_RANK = {"failed": 0, "partial": 1, "full": 2}
+
+
+def write_result(path, result):
+    """落盘，但**不允许用更差的结果覆盖更好的结果**。返回 (实际路径, 是否保护了旧文件)。
+
+    2026-08-12 的事故：同一天连采三轮同一批词，第三轮被风控返回
+    `no_results_or_blocked`（partial，笔记=0），同名文件直接覆盖了第一轮的 full 数据，
+    14 条互动样本无声消失（分析脚本的样本数 29 → 15 才发现）。
+    采集失败是常态，失败结果**吞掉已采好的数据**不是。
+    """
+    rank = COMPLETENESS_RANK.get(result.get("completeness"), 0)
+    if path.exists():
+        try:
+            old_rank = COMPLETENESS_RANK.get(
+                json.loads(path.read_text(encoding="utf-8")).get("completeness"), 0)
+        except (json.JSONDecodeError, OSError):
+            old_rank = -1
+        if rank < old_rank:
+            # 落到隐藏子目录：留档可排查，但躲开 auto_analyze / backfill 的
+            # `probe_*.json` glob —— 否则这份空数据会被当成独立结果，
+            # auto_analyze 还会为它花钱调一次模型。
+            stamp = datetime.now().strftime("%H%M%S")
+            REJECT_DIR.mkdir(parents=True, exist_ok=True)
+            alt = REJECT_DIR / f"{path.stem}.{result.get('completeness', 'x')}-{stamp}.json"
+            alt.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+            return alt, True
+    path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path, False
+
+
+def load_pending(limit, skip_probed=False):
     """从词库取待探测词：竞争密度=待探测，优先意图强度高。
 
     状态用 startswith("候选") 而非精确匹配：历史数据里有 26 行写成
     「候选-源自记忆库(热度10000)」，精确匹配挑不中，这些词就永远排不进探测队列。
     「待验证」保留只为兼容老数据——2026-08-03 起不再产生该状态（Eric 定：不要这个中间态）。
+
+    skip_probed（2026-08-12 加）：排除已有 probe JSON 的词。
+    存在的理由：词库的「竞争密度」由**第 3 层** backfill.py 回写，而 backfill 要等
+    第 2 层的 .result.json。只跑本脚本时词库状态永远停在「待探测」，
+    于是每轮 --from-cikuku 都取到同一批前 N 个词 —— 08-11 与 08-12 连采三轮
+    全是同 5 个词，同名文件还互相覆盖，样本量原地踏步（队列里另有 345 个词从没采过）。
+    ⚠️ 默认关：定时任务 daily_probe.sh 依赖原有行为，且复采同一词做时间对照是正当用法。
+    要扩样本覆盖面时显式加这个开关。
     """
     rows = list(csv.DictReader(CIKU.open(encoding="utf-8-sig")))
     pending = [r for r in rows
@@ -454,7 +506,11 @@ def load_pending(limit):
                and (r.get("状态", "").strip().startswith("候选")
                     or r.get("状态", "").strip() in ("待验证", "排队"))]
     pending.sort(key=lambda r: {"高": 0, "中": 1, "低": 2}.get(r.get("意图强度", "").strip(), 3))
-    return [r["关键词"].strip() for r in pending[:limit]]
+    words = [r["关键词"].strip() for r in pending]
+    if skip_probed:
+        done = probed_slugs()
+        words = [w for w in words if slug(w) not in done]
+    return words[:limit]
 
 
 def recompute(day):
@@ -484,6 +540,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--keyword", action="append", default=[])
     ap.add_argument("--from-cikuku", action="store_true")
+    ap.add_argument("--skip-probed", action="store_true",
+                    help="跳过已有 probe JSON 的词（词库状态未回写时防止每轮取到同一批）")
     ap.add_argument("--limit", type=int, default=MAX_KEYWORDS_PER_RUN)
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--recompute", metavar="YYYYMMDD",
@@ -503,7 +561,7 @@ def main():
             return 1
         keywords = json.loads(STATE_FILE.read_text(encoding="utf-8"))["remaining"]
     elif args.from_cikuku:
-        keywords = load_pending(args.limit)
+        keywords = load_pending(args.limit, skip_probed=args.skip_probed)
     else:
         keywords = args.keyword
 
@@ -517,7 +575,7 @@ def main():
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     today = date.today().isoformat().replace("-", "")
-    done, aborted = [], False
+    done, aborted, blank = [], False, 0
 
     for i, kw in enumerate(keywords):
         print(f"[{i+1}/{len(keywords)}] {kw}", flush=True)
@@ -528,8 +586,11 @@ def main():
                  "probed_at": datetime.now().isoformat(timespec="seconds")}
 
         path = OUT_DIR / f"probe_{today}_{slug(kw)}.json"
-        path.write_text(json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
+        path, kept = write_result(path, r)
         d = r.get("density", {})
+        if kept:
+            print(f"    ⚠️ 已有 full 结果，本次{r['completeness']}不覆盖 → 另存 {path.name}",
+                  file=sys.stderr, flush=True)
         print(f"    → {r['completeness']} | 密度={d.get('verdict','—')} | "
               f"笔记={len(r.get('top_notes',[]))} 正文={len(r.get('note_bodies',[]))} "
               f"评论={len(r.get('comments',[]))} "
@@ -540,6 +601,15 @@ def main():
 
         if r.get("_error") == "captcha_triggered":
             print("!! 触发安全验证，本轮立即终止（不重试、不换词硬撑）", file=sys.stderr)
+            aborted = True
+            break
+
+        # 单次空结果可能是这个词真没内容；连续两次基本是被限流了。
+        # 08-12 实测：被限流后仍硬跑完剩余 3 个词，全部返回空 —— 白采还加重风控。
+        blank = blank + 1 if r.get("_error") == "no_results_or_blocked" else 0
+        if blank >= 2:
+            print("!! 连续 2 个词返回空结果，判定被限流，本轮终止（换个时间再跑）",
+                  file=sys.stderr)
             aborted = True
             break
 
