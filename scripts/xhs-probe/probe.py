@@ -40,7 +40,9 @@ MAX_KEYWORDS_PER_RUN = 5
 DELAY_BETWEEN_KEYWORDS = (45, 90)
 DELAY_IN_PAGE = (2, 5)
 PAGE_LOAD_WAIT = 4
-COMMENT_NOTES = 3  # 每个词点开几篇笔记取评论
+COMMENT_NOTES = 3      # 每个词点开几篇**高赞**笔记（取评论 + 正文）
+LOW_LIKE_NOTES = 2     # 2026-08-12 加：再点开几篇**低赞**笔记做对照组。
+                       # 每篇多约 10-15s（click + 加载 + back），5 篇/词约 90s。
 
 RULE_VERSION = "v3"
 
@@ -245,16 +247,27 @@ JS_PAGE_STATE = """(()=>{const t=document.body.innerText||"";return JSON.stringi
  empty:/没找到相关内容|暂无相关|换个关键词/.test(t),
  len:t.length})})()"""
 
+# 2026-08-12 加 cover：封面图 URL。
+# 起因：审核评分卡里「首图」占 20 分，而采集库**一个图片字段都没有** ——
+# 那 20 分的判据（「搜索原句大字 + 结论前置」）来自 07-31 决策 3 的拍板，至今零验证。
+# 取封面 URL 是零成本的（同一次 eval，不多点一次页面），拿到后才谈得上分析首图规律。
+# 多候选 + 兜底：小红书的懒加载会让 src 暂时为空，data-src / srcset 里仍有值。
 JS_CARDS = """(()=>JSON.stringify([...document.querySelectorAll("section.note-item")].map((s,i)=>{
  const a=s.querySelector("a.cover")||s.querySelector("a[href*='/explore/']");
  const href=a?a.getAttribute("href"):null;
  const m=href?href.match(/\\/(?:explore|search_result|discovery\\/item)\\/([0-9a-zA-Z]+)/):null;
  const lines=(s.innerText||"").split("\\n").map(x=>x.trim()).filter(Boolean);
  const dl=lines.find(x=>/^\\d{2}-\\d{2}$/.test(x)||/^\\d{4}-\\d{2}-\\d{2}$/.test(x));
+ const im=s.querySelector("a.cover img")||s.querySelector("img");
+ let cov=im?(im.getAttribute("src")||im.getAttribute("data-src")||null):null;
+ if(!cov&&im&&im.getAttribute("srcset")) cov=im.getAttribute("srcset").split(" ")[0];
+ if(!cov&&a){const bg=getComputedStyle(a).backgroundImage;
+   if(bg&&bg!=="none") cov=(bg.match(/url\\(["']?(.*?)["']?\\)/)||[])[1]||null;}
  return {rank:i+1,note_id:m?m[1]:null,href:href,
   title:s.querySelector(".title")?.innerText||null,
   author:s.querySelector(".author .name")?.innerText||null,
   likes_raw:s.querySelector(".count")?.innerText||null,
+  cover:cov,
   date_raw:dl||null}})))()"""
 
 # 正文和评论一起取：详情页已经打开了，多跑一个 querySelector 是零成本，
@@ -274,10 +287,31 @@ JS_COMMENTS = """(()=>{const out=[];
  const tt=document.querySelector("#detail-title")||document.querySelector(".note-content .title");
  const tags=[...document.querySelectorAll("#detail-desc a[href*='/search_result'], .note-content a.tag")]
    .map(a=>(a.innerText||"").trim()).filter(Boolean);
+ // ── 互动数据（2026-08-12 加）─────────────────────────────────────────
+ // 起因：我们一直在优化评论率（自己账号 0.30%），却**从没采过别人的评论数** ——
+ // 等于在没有任何参照系的情况下调 CTA。搜索卡片只给点赞，评论/收藏只有详情页有。
+ // 详情页已经打开了，多跑几个 querySelector 是零成本。
+ // ⛔ 选择器一律多候选 + 保留 raw：小红书 class 名常带 hash 且会变，
+ // 写死一个必然某天静默失效（返回 null 而不报错，最难发现）。
+ // raw 存下整条互动栏的文本，即使选择器全错，事后也能从 raw 里正则解析出来。
+ const eb=document.querySelector(".engage-bar")||document.querySelector("[class*=engage-bar]")
+   ||document.querySelector("[class*=interact-container]")||document.querySelector("[class*=engage]");
+ const pick=(...sels)=>{for(const q of sels){const e=eb?eb.querySelector(q):null;
+   const v=e?(e.innerText||"").trim():"";if(v)return v;}return null;};
+ const bodyTxt=document.body.innerText||"";
+ const cmTotal=(bodyTxt.match(/共\\s*([\\d.]+\\s*[万千]?)\\s*条评论/)||[])[1]
+   ||(bodyTxt.match(/评论\\s*[（(]\\s*([\\d.]+\\s*[万千]?)\\s*[）)]/)||[])[1]||null;
  return JSON.stringify({url:location.href,comments:out.slice(0,30),
   note_title:tt?(tt.innerText||"").trim():null,
   note_body:de?(de.innerText||"").trim():null,
-  note_tags:tags.slice(0,20)})})()"""
+  note_tags:tags.slice(0,20),
+  engage:{
+   like_raw:pick("[class*=like] .count","[class*=like-wrapper]","[class*=like]"),
+   collect_raw:pick("[class*=collect] .count","[class*=collect-wrapper]","[class*=collect]"),
+   comment_raw:pick("[class*=chat] .count","[class*=chat-wrapper]","[class*=comment] .count"),
+   comment_total_raw:cmTotal,
+   dom_comments:out.length,
+   raw:eb?(eb.innerText||"").replace(/\\s+/g," ").trim():null}})})()"""
 
 JS_BACK = """(()=>{history.back();return "back"})()"""
 
@@ -295,6 +329,10 @@ def probe_keyword(keyword):
         "autocomplete": [],          # v1 不采集，见文件头实测修正
         "top_notes": [],
         "note_bodies": [],           # 2026-08-05 加：点开的那几篇的正文全文
+        # 2026-08-12 加：所有点开过的笔记的**互动数据**（赞/藏/评），含正文为空的。
+        # note_bodies 要求 body 非空（下游按正文用），但正文为空的笔记互动数据同样有价值 ——
+        # 实测 32 篇里 10 篇正文是纯签名档，那 10 篇的赞藏评正是「正文没内容也能爆」的证据。
+        "engage_samples": [],
         "comments": [],
         "density": {"verdict": "待探测", "rule_version": RULE_VERSION},
     }
@@ -325,10 +363,18 @@ def probe_keyword(keyword):
 
         # 评论：必须在搜索 tab 内 click a.cover 打开（详情页直连返回空壳）
         # 按点赞降序挑，不按 rank——低赞笔记通常没有评论，原话库会颗粒无收
-        picked = sorted(
+        by_likes = sorted(
             [c for c in cards if c.get("note_id")],
             key=lambda c: (c.get("likes") is None, -(c.get("likes") or 0)),
-        )[:COMMENT_NOTES]
+        )
+        picked = by_likes[:COMMENT_NOTES]
+        # ⛔ 2026-08-12 加低赞对照组。
+        # 原来只取高赞前 N，后果是采了 3 个月、32 篇有正文的笔记**全部是高赞**，
+        # 想做「高赞 vs 低赞在正文/开头/CTA 上差在哪」的对照时才发现没有对照组 ——
+        # 只能得出「爆款长什么样」，得不出「爆款和非爆款差在哪」，而后者才是规律。
+        # 低赞笔记评论少，对原话库贡献小，但它是**分析的分母**，不能省。
+        low = [c for c in by_likes if c.get("likes") is not None][-LOW_LIKE_NOTES:]
+        picked += [c for c in low if c["note_id"] not in {p["note_id"] for p in picked}]
         for c in picked:
             pause(DELAY_IN_PAGE)
             try:
@@ -339,6 +385,20 @@ def probe_keyword(keyword):
                     continue
                 # 正文：2026-08-05 加。此前只存标题，而标题只能告诉你「别人写了这个角度」，
                 # 告诉不了你「他是怎么答的」——判答案空缺、找可迁移的说法都得看正文。
+                eng = data.get("engage") or {}
+                result["engage_samples"].append({
+                    "note_id": c["note_id"],
+                    "rank": c.get("rank"),
+                    "title": (data.get("note_title") or c.get("title") or "").strip(),
+                    "likes_from_card": c.get("likes"),
+                    "like_raw": eng.get("like_raw"),
+                    "collect_raw": eng.get("collect_raw"),
+                    "comment_raw": eng.get("comment_raw"),
+                    "comment_total_raw": eng.get("comment_total_raw"),
+                    "dom_comments": eng.get("dom_comments"),
+                    "body_len": len((data.get("note_body") or "").strip()),
+                    "engage_bar_raw": eng.get("raw"),
+                })
                 body = (data.get("note_body") or "").strip()
                 if body:
                     result["note_bodies"].append({
