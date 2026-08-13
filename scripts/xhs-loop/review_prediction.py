@@ -17,12 +17,20 @@ Eric 2026-08-03 的要求原话：「拿到数据回填后的审查，你要自�
 """
 import argparse
 import csv
+import os
 import re
 import subprocess
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import gemini_cli  # noqa: E402
+from claude_limits import WEEKLY, classify_limit, limit_banner  # noqa: E402
+from headless_cli import HEADLESS_FLAGS, ensure_cwd  # noqa: E402
+
+BARE_CWD = ensure_cwd()
 REPO = Path(__file__).resolve().parents[2]
 SUCAI = REPO / "xhs" / "素材库"
 PRED = SUCAI / "预测记录.csv"
@@ -100,11 +108,50 @@ def render_table(rows):
     return "\n".join(out)
 
 
+def _run_attribution(prompt: str, tag: str) -> str:
+    """跑归因：先 Gemini（免费），拿不到再退 claude -p。
+
+    ⛔ 2026-08-13 之前这里是**裸** `subprocess.run([CLAUDE, "-p", prompt])`：
+      · 没有 HEADLESS_FLAGS —— 每次都把全套工具定义注进去，白背约 7k token，
+        而这个任务给的是算好的偏差表，模型一个工具都不需要
+      · 没有 claude_limits —— 撞额度时 claude 把提示打到 stdout 且 returncode=0，
+        于是那句「You've hit your weekly limit」会被当成归因结论**原样写进 预测复盘.md**
+    一次运行要跑十几篇，这两条叠起来很贵也很脏。
+    """
+    if os.environ.get("XHS_ENGINE", "gemini").lower() != "claude" and gemini_cli.available():
+        try:
+            out = gemini_cli.run(prompt, temperature=0.3)
+            if out:
+                print(f"   · {tag} 由 Gemini 归因（未消耗 Claude 额度）", flush=True)
+                return out
+        except gemini_cli.QuotaExhausted as e:
+            print(f"   ⏬ Gemini 额度已满，回退 Claude：{e}", flush=True)
+        except Exception as e:                        # noqa: BLE001
+            print(f"   ⏬ Gemini 归因失败，回退 Claude：{e}", flush=True)
+
+    waited = 0
+    while True:
+        r = subprocess.run([str(CLAUDE), *HEADLESS_FLAGS, "-p", prompt],
+                           cwd=str(BARE_CWD), capture_output=True, text=True, timeout=600)
+        out = (r.stdout or "").strip()
+        kind = classify_limit(out, (r.stderr or "")[:2000])
+        if not kind:
+            return out
+        if kind == WEEKLY:
+            print(limit_banner(kind, tag), flush=True)
+            return ""            # 宁可留空，也不要把额度提示当成归因结论写进复盘
+        if waited >= 2 * 3600:
+            print(f"   ⛔ {tag} 撞额度累计等待 {waited//60} 分钟，停手", flush=True)
+            return ""
+        waited += 30 * 60
+        print(f"   ⏳ {tag} 撞额度（{kind}），等 30 分钟重试", flush=True)
+        time.sleep(30 * 60)
+
+
 def attribute(pred_row, days, table, prior_reviews):
     """偏差归因交独立进程。喂算好的偏差表 + 模型假设文档，让它说清哪条假设被证伪了。"""
     doc = DOC.read_text(encoding="utf-8") if DOC.exists() else "（调研文档缺失）"
-    return subprocess.run(
-        [str(CLAUDE), "-p", f"""你在复盘一次小红书笔记数据预测。偏差表是代码算好的，你不要重算。
+    prompt = f"""你在复盘一次小红书笔记数据预测。偏差表是代码算好的，你不要重算。
 
 【预测模型的假设与系数】
 {doc}
@@ -126,8 +173,8 @@ def attribute(pred_row, days, table, prior_reviews):
 3. **具体怎么改** —— 给出要改的系数名和新取值，例如「VIEWS_BASE['低'] 从 250-600 改为 120-400」。
    样本不足以支撑改系数时就明说「本次不改，需再攒 N 篇」。
 
-输出 markdown，不要标题，直接三段。"""],
-        capture_output=True, text=True, timeout=600).stdout.strip()
+输出 markdown，不要标题，直接三段。"""
+    return _run_attribution(prompt, pred_row.get("成稿文件", "?"))
 
 
 def main() -> int:
@@ -161,7 +208,23 @@ def main() -> int:
             print(f"  [等待] {p['成稿文件']} — {why}")
         return 0
 
-    todo = [(p, nid, hit) for p, nid, hit in ready if p["成稿文件"] not in done]
+    # ⛔ 2026-08-13 修重复复盘。同一篇稿在 预测记录.csv 里会有**多条**预测
+    # （每次返工过线都写一条，审核分不同），而 done 只反映**文件里已有的**记录，
+    # 同一次运行内拦不住。实测 14 条复盘里 5 条是重复的：
+    # 08-08_汇报被打断 ×4、08-11_汇报被打断 ×3，每条都真调了一次模型。
+    #
+    # 危害不止是浪费额度：复盘自己立的规矩是「累计 ≥5 篇有 7 天数据才允许改系数」，
+    # 重复记录会让样本数虚高，可能拿着 1 篇的证据去改本该等 5 篇的系数。
+    #
+    # 同一篇取**最后一条**预测：实际数据对应的是最终发布出去的那一版。
+    seen, todo = set(), []
+    for p, nid, hit in reversed(ready):
+        f = p["成稿文件"]
+        if f in done or f in seen:
+            continue
+        seen.add(f)
+        todo.append((p, nid, hit))
+    todo.reverse()
     if not todo:
         print(f"没有待复盘的（可复盘 {len(ready)} 篇均已复盘，{len(waiting)} 篇还在等 {MIN_DAYS} 天数据）")
         return 0
