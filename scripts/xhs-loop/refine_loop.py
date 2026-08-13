@@ -892,6 +892,40 @@ def rework_queue() -> list:
     return sorted(out, key=lambda x: -x["score"])
 
 
+BODY_SECTION_RE = re.compile(r"^#{1,3}\s*\*{0,2}正文[^\n]*\n(.*?)(?=\n#{1,3}\s|\Z)", re.M | re.S)
+
+
+def body_budget_hint(draft: Path, lane: str) -> str:
+    """告诉模型「你离正文字数上限还有多远」。
+
+    ⛔ 2026-08-12 加。返工最常见的失败不是改错方向，是**改着改着把字数改超了**：
+    那篇 HR 谈薪稿 3 轮返工，第 1 轮 76→82 分红线清零，第 2、3 轮却全栽在
+    正文 571 / 568 字（上限 560），白跑两轮还得回滚到第 1 轮的版本。
+
+    根因是模型看不见自己离上限有多近。而审核意见常常是「关键词只出现 2 次，要求 3-5 次」
+    这类**要求补内容**的条目 —— 当时正文 539 字、余量仅 21 字，照着补必然超。
+    正确解法是等量替换（把「这件事」换成完整关键词），不是净增。这一点必须明说。
+
+    口径与 draft_check.BODY_RANGE 保持一致：那里是判据，这里只是把判据翻译给模型。
+    """
+    m = BODY_SECTION_RE.search(_read_or(draft, ""))
+    if not m:
+        return ""
+    n = len(re.sub(r"\s|（正文总字数[^）]*）", "", m.group(1)))
+    # 上限从 draft_check 直接取，不在这里抄第二份 —— 判据只能有一处。
+    # （LANE_SPEC 里的 words="100-500" 是给模型看的口径，实判上限是 560，两者不是一回事。）
+    sys.path.insert(0, str(HEALTH))
+    from draft_check import BODY_RANGE  # noqa: E402  延迟导入，避免脚本启动就拉起检查器依赖
+    hi = BODY_RANGE.get(lane, (100, 560))[1]
+    left = hi - n
+    if left > 80:
+        return f"\n【字数余量】当前正文 {n} 字，上限 {hi} 字，还有 {left} 字余量。"
+    return (f"\n【⛔ 字数红线】当前正文 {n} 字，上限 {hi} 字，**只剩 {left} 字余量**。\n"
+            f"审核意见里凡是要求「补」的（补关键词、补案例、补细节），一律**先删等量的字再加**，"
+            f"净增就会撞上限、整轮作废。优先用等量替换：把「这件事」「上面说的」这类指代，"
+            f"直接换成完整关键词 —— 字数几乎不变，关键词次数就上去了。")
+
+
 def rework_one(item, args, lane="搜索流"):
     """对一篇已有的稿做定向返工：喂上一次的审核报告，改完重审，过线就渲染图交闸门。
 
@@ -913,7 +947,7 @@ def rework_one(item, args, lane="搜索流"):
     slug = fname.removeprefix("成稿_").removesuffix(".md").split("_", 1)[-1]
     feedback = (f"【上一次独立审核 {item['score']} 分，未过线（需 ≥{args.threshold}）。"
                 f"这是定向返工：只改下面点到的问题，其余保持原样，不要重写。】\n"
-                f"{report[:4000]}\n{KEEP_PASSED}")
+                f"{report[:4000]}\n{body_budget_hint(draft, lane)}\n{KEEP_PASSED}")
     best = {"score": item["score"], "md": draft.read_text(encoding="utf-8"), "cards": None}
     for rnd in range(1, args.rounds + 1):
         print(f"\n--- 返工第 {rnd}/{args.rounds} 轮 ---")
