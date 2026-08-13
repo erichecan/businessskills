@@ -47,8 +47,9 @@ LOW_LIKE_NOTES = 2     # 2026-08-12 加：再点开几篇**低赞**笔记做对�
 
 RULE_VERSION = "v3"
 
-CAPTCHA_RE = re.compile(r"安全验证|验证码|滑动验证|captcha", re.I)
-EMPTY_RE = re.compile(r"没找到相关内容|暂无相关|换个关键词")
+# ⛔ 这里原本有 CAPTCHA_RE / EMPTY_RE 两个 Python 常量，但**没有任何代码用它们** ——
+# 真正的判定一直在 JS_PAGE_STATE 里。两处各写一份正则、只有一处生效，
+# 是 08-12 那次误判能活这么久的原因之一。已删，判定口径只留 JS 那一处。
 
 
 # ---------- CDP Proxy ----------
@@ -242,9 +243,21 @@ def judge_density(notes, keyword):
 
 # ---------- JS ----------
 
-JS_PAGE_STATE = """(()=>{const t=document.body.innerText||"";return JSON.stringify({
+# 页面状态判定的唯一真相。三种失败长得像但处置完全不同，必须分开：
+#   login   —— 没登录。搜索页整页是登录墙，重试多少次都一样，要人去登录。
+#   captcha —— 真被风控拦了。要停手换时间，继续跑只会加重。
+#   empty   —— 这个词真没内容。属正常结果，不是故障。
+#
+# ⛔ 2026-08-12：captcha 的正则原本含「验证码」，而登录墙里手机号登录框写着
+# 「输入验证码 / 获取验证码」—— 于是**没登录被报成触发安全验证**，日志把排查
+# 方向带偏了一整天（真因是那个 Chrome profile 的 www 域没有 web_session cookie）。
+# 现在：先判 login，captcha 显式排除登录场景，且不再拿「验证码」当风控特征。
+JS_PAGE_STATE = """(()=>{const t=document.body.innerText||"";
+ const login=/登录后查看|扫码登录|手机号登录|新用户可直接登录/.test(t);
+ return JSON.stringify({
  n:document.querySelectorAll("section.note-item").length,
- captcha:/安全验证|验证码|滑动验证/.test(t),
+ login:login,
+ captcha:!login&&/安全验证|滑动验证|请完成验证|captcha/i.test(t),
  empty:/没找到相关内容|暂无相关|换个关键词/.test(t),
  len:t.length})})()"""
 
@@ -345,6 +358,11 @@ def probe_keyword(keyword):
         time.sleep(PAGE_LOAD_WAIT)
         state = proxy_eval(target, JS_PAGE_STATE)
 
+        # 顺序不能反：登录墙也会渲染出「验证码」字样，先判 login 才不会误报成风控。
+        if state.get("login"):
+            result["_error"] = "login_required"
+            result["completeness"] = "failed"
+            return result
         if state.get("captcha"):
             result["_error"] = "captcha_triggered"
             result["completeness"] = "failed"
@@ -598,6 +616,16 @@ def main():
         if d.get("reason"):
             print(f"      {d['reason']}", flush=True)
         done.append(kw)
+
+        if r.get("_error") == "login_required":
+            print("!! 未登录：搜索页是登录墙，不是被风控。本轮终止（重试多少次都一样）\n"
+                  "   CDP 连的是采集专用 profile（9333, ~/.xhs-chrome-profile），"
+                  "它的 www.xiaohongshu.com 可能没有 web_session cookie；\n"
+                  "   注意 creator 域和 www 域的登录态是各自独立的，能进创作后台不代表能搜。\n"
+                  "   → 首选改跑 opencli 版（附着日常 Chrome）：python3 probe_opencli.py --resume",
+                  file=sys.stderr)
+            aborted = True
+            break
 
         if r.get("_error") == "captcha_triggered":
             print("!! 触发安全验证，本轮立即终止（不重试、不换词硬撑）", file=sys.stderr)
