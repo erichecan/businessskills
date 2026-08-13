@@ -72,6 +72,9 @@ LOG_DIR = REPO / "xhs" / "素材库" / "loop日志"
 
 SEP_SLUG, SEP_MD, SEP_JSON, SEP_END = "===SLUG===", "===MARKDOWN===", "===CARDS_JSON===", "===END==="
 
+# 短名字符上限。prompt 要 6-12 个汉字，这里按字符算要给英文缩写留余量（见 parse_output）。
+SLUG_MAX_CHARS = 20
+
 # ── 把机械阈值翻成写作动作（2026-08-11 Eric 定）────────────────────────────
 # 起因：08-11 手动跑两篇全部卡在「具体名词密度」和「CTA 编号选项」，而且来回震荡
 # ——修好 CTA 掉密度，修好密度丢 CTA。其中一篇原本独立审核 85 分（正好到线），
@@ -627,7 +630,18 @@ def parse_output(out: str):
         cards = json.loads(raw)
     except json.JSONDecodeError:
         cards = None
-    slug = re.sub(r"[^\w一-鿿]", "", slug)[:12]
+    slug = re.sub(r"[^\w一-鿿]", "", slug)
+    # ⛔ 2026-08-12 修：原来是 [:12] 静默硬截断。prompt 要的是「6-12 个**汉字**」，
+    # 而这里按**字符**数截 —— 关键词带英文缩写（HR / AI / KPI / OKR）时必然踩中：
+    # 「HR面试薪酬谈判别再套模板」汉字只有 11 个是合规的，但 HR 占 2 字符、共 13 字符，
+    # 被砍成「HR面试薪酬谈判别再套模」，短名当场不通顺。
+    # 之前没暴露是因为那几篇的短名恰好是纯中文；这与用哪个模型无关，Claude 一样会中。
+    # 现在：上限按字符放宽到 20（中文文件名再长也无妨），且截断必须打出来 ——
+    # 静默截断出来的坏短名会一路带进文件名、cards.json、发布日志，事后很难追。
+    if len(slug) > SLUG_MAX_CHARS:
+        print(f"   ⚠️ 短名 {len(slug)} 字符超上限 {SLUG_MAX_CHARS}，截断："
+              f"「{slug}」→「{slug[:SLUG_MAX_CHARS]}」", flush=True)
+        slug = slug[:SLUG_MAX_CHARS]
     return slug, md, cards
 
 
