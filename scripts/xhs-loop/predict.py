@@ -88,6 +88,52 @@ def audit_score_of(fname: str):
         return None
 
 
+CALIB = SUCAI / "预测校准.csv"
+CALIB_MIN_SAMPLE = 5      # 与 预测复盘.md 头部那句「累计 ≥5 篇才允许改系数」同一口径
+
+
+def calibration_hint(density: str, med) -> str:
+    """把历史实测偏差摆出来。**只报数字，不自动改系数。**
+
+    ⛔ 2026-08-13 加，这是「复盘结论 → 预测模型」这条通道的第一段。
+    此前复盘写出的结论（例如「VIEWS_BASE['低'] 应按 median_likes 拆两档」）
+    只进 预测复盘.md，而全仓库没有第二个脚本读那个 md —— 数据跑到复盘就断了。
+
+    为什么只提示不自动改：复盘自己立的规矩是「累计 ≥5 篇有 7 天数据才允许改系数」，
+    而现在只有 1 篇。自动拟合会拿单篇噪声当规律，比不校准更糟。
+    样本够了以后要不要改、改成多少，仍然是人拍板 —— 这里只保证他手上有数。
+    """
+    rows = read_rows(CALIB)
+    if not rows:
+        return ""
+    same = [r for r in rows if r.get("指标") == "观看" and (r.get("密度") or "") == density]
+    if not same:
+        return ""
+    # ⛔ 按**关键词**去重，不是按行数。同一个关键词写过好几篇稿，只有一篇真发布，
+    # 那几篇会对账到同一份实际数据、给出同一个倍数 —— 按行数算等于把 1 个样本
+    # 当成 6 个，「≥5 篇才改系数」这条闸门就形同虚设（实测 9 行只有 2 个独立值）。
+    by_kw = {}
+    for r in same:
+        try:
+            m = float(r.get("倍数") or 0)
+        except ValueError:
+            continue
+        if m > 0:
+            by_kw[(r.get("关键词") or r.get("成稿文件") or "")] = m
+    mults = sorted(by_kw.values())
+    if not mults:
+        return ""
+    mults.sort()
+    mid = mults[len(mults) // 2]
+    tail = (f"（样本 {len(mults)} 篇 < {CALIB_MIN_SAMPLE}，仅供参考，不足以改系数）"
+            if len(mults) < CALIB_MIN_SAMPLE
+            else f"（样本已达 {len(mults)} 篇，**可以考虑校准 VIEWS_BASE 了**）")
+    lows = [r.get("前排中位赞") for r in same if r.get("前排中位赞")]
+    extra = f"，这些样本的前排中位赞：{'/'.join(lows[:5])}" if lows else ""
+    return (f"📉 历史实测：密度「{density}」的观看预测，实际/预测中位 = {mid:.2f}×{extra}\n"
+            f"   {tail}")
+
+
 def median_likes_of(keyword: str):
     for f in sorted(PROBE_DIR.glob("probe_*.json")) if PROBE_DIR.exists() else []:
         if f.name.endswith(".result.json"):
@@ -165,6 +211,7 @@ def main() -> int:
         print(f"{k:6}{p[k][0]:>8}{p[k][1]:>8}")
     if p["评论"][1] < 1:
         print("⚠️ 评论预测不足 1 条 —— CES 里评论权重 ×4，这是最该争的项")
+    print(calibration_hint(density, med))
 
     if args.dry_run:
         return 0

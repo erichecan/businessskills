@@ -37,6 +37,13 @@ PRED = SUCAI / "预测记录.csv"
 CIKU = SUCAI / "词库.csv"
 STATS = SUCAI / "发布数据.csv"
 REVIEW = SUCAI / "预测复盘.md"
+# 复盘的结构化副本。md 是给人读的（归因写成三段散文），这份是给 predict.py 读的。
+# ⛔ 2026-08-13 加。在此之前复盘结论**只**进 md，而全仓库没有第二个脚本读那个 md ——
+# 数据跑到复盘就是死路：模型明确写出「VIEWS_BASE['低'] 该按 median_likes 拆两档」，
+# 却没有任何通道把这句话送回 predict.py，只能靠人读了再手改。
+CALIB = SUCAI / "预测校准.csv"
+CALIB_COLS = ["复盘日", "成稿文件", "关键词", "密度", "前排中位赞", "审核分",
+              "指标", "预测低", "预测高", "实际", "判定", "倍数"]
 DOC = REPO / "docs" / "20260803-小红书数据预测调研.md"
 CLAUDE = Path.home() / ".local/bin/claude"
 
@@ -106,6 +113,36 @@ def render_table(rows):
         extra = "" if r["判定"] == "命中" else f"（{r['倍数']}×）"
         out.append(f"| {r['指标']} | {r['预测低']}–{r['预测高']} | {r['实际']} | {mark} {r['判定']}{extra} |")
     return "\n".join(out)
+
+
+_BASIS_MED = re.compile(r"前排中位\s*([\d.]+)\s*赞")
+_BASIS_DENSITY = re.compile(r"密度(\S?)\(")
+
+
+def append_calibration(pred_row, rows):
+    """把这次对账的每个指标写一行进 预测校准.csv，供 predict.py 读。
+
+    为什么要单独存一份而不是让 predict 去 parse md：归因是三段自然语言，
+    parse 它等于把「模型写了什么」当判据；而校准要的是**代码算出来的偏差数字**，
+    这两者必须分开 —— 前者会变，后者是事实。
+    """
+    basis = pred_row.get("依据", "") or ""
+    med = (_BASIS_MED.search(basis) or [None, ""])[1]
+    density = (_BASIS_DENSITY.search(basis) or [None, ""])[1]
+    today = date.today().isoformat()
+    new = not CALIB.exists()
+    with CALIB.open("a", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=CALIB_COLS)
+        if new:
+            w.writeheader()
+        for r in rows:
+            w.writerow({
+                "复盘日": today, "成稿文件": pred_row.get("成稿文件", ""),
+                "关键词": pred_row.get("关键词", ""), "密度": density,
+                "前排中位赞": med, "审核分": pred_row.get("审核分", ""),
+                "指标": r["指标"], "预测低": r["预测低"], "预测高": r["预测高"],
+                "实际": r["实际"], "判定": r["判定"], "倍数": r["倍数"],
+            })
 
 
 def _run_attribution(prompt: str, tag: str) -> str:
@@ -217,12 +254,19 @@ def main() -> int:
     # 重复记录会让样本数虚高，可能拿着 1 篇的证据去改本该等 5 篇的系数。
     #
     # 同一篇取**最后一条**预测：实际数据对应的是最终发布出去的那一版。
+    #
+    # ⛔ 去重键是 **noteId 不是成稿文件名**。同一个关键词常有好几篇稿
+    # （反复重写「汇报被领导打断怎么接」写了 6 篇），但只有一篇真发布出去，
+    # 于是这 6 篇会全部对账到**同一份实际数据**、给出同一个偏差倍数。
+    # 按文件名去重的话，1 个真实样本会被记成 6 个 —— 「累计 ≥5 篇才改系数」
+    # 这条闸门当场失守：看着够 5 篇了，其实只有 1 个笔记的证据。
+    # 实测回填 9 篇复盘，观看指标只有 2 个独立值（0.24× 与 0.45×）。
     seen, todo = set(), []
     for p, nid, hit in reversed(ready):
-        f = p["成稿文件"]
-        if f in done or f in seen:
+        key = nid or p["成稿文件"]          # 没有 noteId 时退回文件名，至少别漏
+        if p["成稿文件"] in done or key in seen:
             continue
-        seen.add(f)
+        seen.add(key)
         todo.append((p, nid, hit))
     todo.reverse()
     if not todo:
@@ -237,6 +281,7 @@ def main() -> int:
         hits = sum(1 for r in rows if r["判定"] == "命中")
         print(f"\n【{p['成稿文件']}】发布 {days} 天 · {hits}/{len(METRICS)} 命中")
         print(table)
+        append_calibration(p, rows)
         note = "" if args.no_llm else attribute(p, days, table, prior)
         blocks.append(f"""
 ## {date.today().isoformat()} · {p['成稿文件']}
