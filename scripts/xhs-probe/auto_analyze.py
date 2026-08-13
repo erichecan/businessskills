@@ -19,6 +19,7 @@ probe_*.result.json —— 这个脚本用独立 claude -p 进程补上，链路
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -27,6 +28,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import gemini_cli  # noqa: E402
 from claude_limits import WEEKLY, classify_limit, limit_banner  # noqa: E402
 from headless_cli import HEADLESS_FLAGS, ensure_cwd  # noqa: E402
 
@@ -116,6 +118,29 @@ def parse_json(out: str):
     return None
 
 
+def run_model(prompt: str, tag: str) -> str:
+    """先 Gemini（免费），拿不到再退 claude -p（吃订阅额度）。
+
+    2026-08-12 接入。这一层的判据全部写死在 prompt 里（DISPOSITION_RULE、
+    density_echo 以脚本 verdict 为准），模型只做「读懂前排 + 找空缺」，
+    实测 Gemini Flash 与 Claude 在同一条词上判断完全一致 —— 详见 gemini_cli 的注释。
+
+    ⚠️ 回退是**静默降级**，不是失败：Gemini 撞额度时照样要把词分析完，
+    只是这次花订阅额度。真正的失败仍由下面的 run_claude 按原逻辑处理。
+    """
+    if os.environ.get("XHS_ENGINE", "gemini").lower() != "claude" and gemini_cli.available():
+        try:
+            out = gemini_cli.run(prompt)
+            if out:
+                print(f"   · {tag} 由 Gemini 分析（未消耗 Claude 额度）", flush=True)
+                return out
+        except gemini_cli.QuotaExhausted as e:
+            print(f"   ⏬ Gemini 免费额度已满，回退 Claude：{e}", flush=True)
+        except Exception as e:                        # noqa: BLE001
+            print(f"   ⏬ Gemini 调用失败，回退 Claude：{e}", flush=True)
+    return run_claude(prompt, tag)
+
+
 def run_claude(prompt: str, tag: str) -> str:
     """调 headless claude，区分「额度不够」和「答得不对」。
 
@@ -171,7 +196,7 @@ def run_claude(prompt: str, tag: str) -> str:
 
 def analyze(probe_path: Path) -> bool:
     """跑一条 probe 的空缺分析。失败/撞额度都返回 False，原始输出已由 run_claude 留档。"""
-    out = run_claude(build_prompt(probe_path), probe_path.stem)
+    out = run_model(build_prompt(probe_path), probe_path.stem)
     data = parse_json(out) if out else None
     if not data or data.get("disposition") not in ("做", "缓", "放弃"):
         return False
