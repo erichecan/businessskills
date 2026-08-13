@@ -20,6 +20,7 @@
 import argparse
 import csv
 import json
+import os
 import re
 import subprocess
 import sys
@@ -28,6 +29,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import gemini_cli  # noqa: E402
 from claude_limits import WEEKLY, classify_limit, is_limit, limit_banner  # noqa: E402
 from headless_cli import HEADLESS_FLAGS, ensure_cwd  # noqa: E402
 
@@ -692,12 +694,41 @@ def run_claude(prompt: str, tag: str) -> str:
         time.sleep(RETRY_WAIT * attempt)
 
 
+def run_model(prompt: str, tag: str, first_pass: bool) -> str:
+    """首轮初稿走 Gemini（免费），返工走 Claude。
+
+    分工是 Eric 定的（2026-08-12）：「写稿、探词、搜索评估用 Gemini 做初步，
+    返工和评审再用 Claude」。这里的判据是 **feedback 是否为空**：
+      · feedback 空  = 从零写第一稿，没有审核意见要吃透 → Gemini
+      · feedback 非空 = 带着审核报告做定向修改，要准确理解扣分点并只改那几处 → Claude
+
+    这不只是省额度的取舍，也是能力匹配：Gemini 免费层只有 Flash（Pro 全系额度为 0，
+    实测连一句 hi 都 429），而定向返工恰恰是最吃理解力的一环 —— 改错地方比不改更糟。
+
+    每轮 claude -p 有 38.7k 固定开销 + 33.8k 内容 ≈ 72.5k；首轮换掉即省这一整块。
+    撞额度静默回退 Claude，不让稿子因为 Gemini 不可用就写不出来。
+    """
+    if (first_pass and os.environ.get("XHS_ENGINE", "gemini").lower() != "claude"
+            and gemini_cli.available()):
+        try:
+            # 温度比探词分析高：那边要的是稳定判据，这边要的是可读的稿子。
+            out = gemini_cli.run(prompt, temperature=0.7)
+            if out:
+                print(f"   · {tag} 由 Gemini 出稿（未消耗 Claude 额度）", flush=True)
+                return out
+        except gemini_cli.QuotaExhausted as e:
+            print(f"   ⏬ Gemini 免费额度已满，回退 Claude：{e}", flush=True)
+        except Exception as e:                        # noqa: BLE001
+            print(f"   ⏬ Gemini 出稿失败，回退 Claude：{e}", flush=True)
+    return run_claude(prompt, tag)
+
+
 def write_draft(row, feedback, round_no, dry_run=False, lane="搜索流", fixed_title=""):
     prompt = build_prompt(row, feedback, round_no, lane, fixed_title)
     if dry_run:
         print(f"--- [dry-run] 第 {round_no} 轮 prompt 共 {len(prompt)} 字，前 600 字：\n{prompt[:600]}\n---")
         return None, None, None
-    return parse_output(run_claude(prompt, f"write_r{round_no}"))
+    return parse_output(run_model(prompt, f"write_r{round_no}", first_pass=not feedback))
 
 
 def save(slug, md, cards):
