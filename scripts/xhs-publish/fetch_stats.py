@@ -18,6 +18,7 @@ import csv
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.request
@@ -130,6 +131,119 @@ def fetch():
             pass
 
 
+def fetch_note_detail(tid, nid):
+    """单篇详情页取完整指标 + 观看来源。走 opencli 的 creator-note-detail 适配器。
+
+    ⛔ 2026-08-12 改。原实现（JS_DETAIL_METRICS，「找标签行再往后几行捞数字」）当天写完
+    没在真机验过就上了 launchd，21:15 第一次真跑就炸：CDP Proxy 返回 HTTP 400，
+    整个 daily_data.sh 的数据回流断在这里。
+
+    换 opencli 而不是修那段 JS 的理由：
+      1. CLAUDE.md「联网抓取规则」已把 opencli 定为第 0 优先级
+      2. 适配器直接给结构化 section/metric/value，不用猜 DOM 文本顺序，
+         站点改版由适配器兜底 —— 这正是那段 JS 反复出错的根源
+      3. 自己的笔记不需要 xsec_token，裸 note_id 即可（与 note/comments 不同）
+
+    tid 参数保留只为兼容调用方签名，opencli 路径下不再使用。
+    """
+    r = subprocess.run(["opencli", "xiaohongshu", "creator-note-detail", nid, "-f", "json"],
+                       capture_output=True, text=True, timeout=180)
+    try:
+        rows = json.loads((r.stdout or "").strip())
+    except json.JSONDecodeError:
+        return {"ok": False, "why": f"opencli 无有效输出：{(r.stderr or r.stdout or '')[:120]}"}, {}
+    if isinstance(rows, dict) and rows.get("ok") is False:
+        return {"ok": False, "why": str(rows.get("error"))[:160]}, {}
+
+    # 「观看数」→「观看」：CSV 列名不带「数」，这里对齐 fetch_aged_stats 用的 key。
+    want = {"观看数": "观看", "点赞数": "点赞", "评论数": "评论",
+            "收藏数": "收藏", "分享数": "分享"}
+    metrics, ratio = {}, ""
+    for row in rows:
+        sec, met, val = row.get("section"), row.get("metric"), row.get("value")
+        if sec in ("基础数据", "互动数据") and met in want:
+            metrics[want[met]] = val
+        elif sec == "观看来源" and met == "搜索":
+            ratio = val or ""
+    src = ({"ok": True, "ratio": ratio} if ratio
+           else {"ok": False, "why": "该笔记无搜索来源占比（平台未生成或占比为 0）"})
+    return src, metrics
+
+
+def aged_candidates(max_notes=5):
+    """挑发布满 7 天、但 发布数据.csv 里还没有 ≥7 天那一行的笔记，按发布天数从大到小排。
+
+    数据来源词库.csv 的 发布日 + 笔记链接——列表页（fetch() 里的 ANALYSIS_URL）抓不到
+    这么老的笔记，只能单篇补，这是预测复盘一直没数据可对账的根因。
+    """
+    today = date.today()
+    covered = set()
+    for r in read_csv(STATS):
+        try:
+            if int((r.get("发布天数") or "0").strip()) >= 7 and (r.get("笔记ID") or "").strip():
+                covered.add(r["笔记ID"].strip())
+        except ValueError:
+            continue
+
+    out = []
+    for r in read_csv(CIKU):
+        link = (r.get("笔记链接") or "").strip()
+        pub = (r.get("发布日") or "").strip()
+        if not link or not pub:
+            continue
+        m = re.search(r"/(?:explore|discovery/item)/([0-9a-zA-Z]+)", link)
+        if not m:
+            continue
+        nid = m.group(1)
+        if nid in covered:
+            continue
+        try:
+            days = (today - date.fromisoformat(pub)).days
+        except ValueError:
+            continue
+        if days < 7:
+            continue
+        out.append((days, nid, (r.get("关键词") or "").strip(), pub))
+
+    out.sort(key=lambda x: -x[0])          # 最老的优先——再不补，窗口更窄
+    return out[:max_notes]
+
+
+def fetch_aged_stats(max_notes=5):
+    """给满 7 天但发布数据.csv 里没有对应行的笔记单篇补抓。返回新增的行列表（未落盘）。"""
+    cands = aged_candidates(max_notes)
+    if not cands:
+        return []
+    tid = api(f"/new?url={ANALYSIS_URL}")["targetId"]
+    today = date.today()
+    new_rows = []
+    try:
+        for days, nid, kw, pub in cands:
+            src, metrics = fetch_note_detail(tid, nid)
+            ratio = src.get("ratio", "") if src.get("ok") else ""
+            got = {k: v for k, v in metrics.items() if k != "_debug" and v}
+            print(f"   补抓「{kw}」（发布 {days} 天）：{got or '未取到任何指标'}"
+                  + ("" if src.get("ok") else f"｜来源：{src.get('why','')}"))
+            if not got and not ratio:
+                if metrics.get("_debug"):
+                    print(f"      页面前若干行（用于核对标签文本）：{metrics['_debug'][:12]}")
+                continue     # 一个字段都没取到，不写半行假数据
+            new_rows.append({"抓取日": today.isoformat(), "笔记ID": nid, "标题": "",
+                              "发布时间": pub, "发布天数": days,
+                              "观看": to_int(metrics.get("观看")), "点赞": to_int(metrics.get("点赞")),
+                              "评论": to_int(metrics.get("评论")), "收藏": to_int(metrics.get("收藏")),
+                              "分享": to_int(metrics.get("分享")), "搜索来源占比": ratio,
+                              # 下划线前缀 = 只在进程内传递，写 CSV 时被 STATS_COLS 过滤掉。
+                              # 用来把 ratio 回写词库（health_check 查的是词库那一列，不是这张表）。
+                              "_关键词": kw})
+    finally:
+        try:
+            api(f"/close?target={tid}")
+        except Exception:
+            pass
+    return new_rows
+
+
 PUB_LOG = SUCAI / "发布日志.csv"
 NOTE_URL = "https://www.xiaohongshu.com/explore/{}"
 
@@ -187,6 +301,48 @@ def backfill_note_links(ids: dict) -> None:
     from auto_publish import backfill_ciku          # 复用，别写第二份词库写回
     for title, link, name in filled:
         print(f"   {backfill_ciku(title, link, name)}")
+
+
+def backfill_ciku_ratio(aged_rows):
+    """把补抓到的搜索来源占比回写 词库.csv 的同名列。
+
+    ⛔ 2026-08-12 补的链路断点。此前 fetch_aged_stats 抓到 ratio 只写 发布数据.csv，
+    而 health_check 的「发布满 7 天未回填搜索来源占比」查的是 **词库.csv** 那一列
+    （health_check.py:138）。两张表从来没打通，所以这条告警从存在起就不可能消除 ——
+    数据一直抓得到，只是没送到被检查的那张表里。
+
+    只写非空 ratio：平台对低曝光笔记不生成观看来源，那种情况留空是事实，
+    用空值覆盖已有数据反而是倒退。
+    """
+    have = {r["_关键词"]: r["搜索来源占比"] for r in aged_rows
+            if r.get("_关键词") and (r.get("搜索来源占比") or "").strip()}
+    if not have:
+        return
+    rows = read_csv(CIKU)
+    if not rows:
+        return
+    cols = list(rows[0].keys())
+    if "搜索来源占比" not in cols:
+        print("   ⚠️ 词库.csv 无「搜索来源占比」列，跳过回写")
+        return
+
+    hit = 0
+    for r in rows:
+        kw = (r.get("关键词") or "").strip()
+        if kw in have and not (r.get("搜索来源占比") or "").strip():
+            r["搜索来源占比"] = have[kw]
+            hit += 1
+    if not hit:
+        return
+    tmp = CIKU.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        for r in rows:
+            w.writerow({c: r.get(c, "") for c in cols})
+    os.replace(tmp, CIKU)
+    print(f"   已回写词库搜索来源占比 {hit} 条：" +
+          "、".join(f"{k}={v}" for k, v in have.items()))
 
 
 def main():
@@ -253,7 +409,27 @@ def main():
 
     backfill_note_links(ids)
 
-    print("⚠️ 搜索来源占比取不到（详情数据页只认原生手势），需人工填进 词库.csv")
+    # 2026-08-12：补满 7 天数据的老笔记，单篇详情页取——列表页只显示最近几天，
+    # 这是预测复盘一直没数据可对账的根因。见 fetch_aged_stats() 顶部注释：
+    # 首次真机运行前未验证过 DOM，出问题看 print 里的原始行去改标签文本。
+    if args.dry_run:
+        preview = aged_candidates()
+        print(f"\n[dry-run] {len(preview)} 篇满 7 天缺数据，未实抓")
+    else:
+        aged = fetch_aged_stats()
+        if aged:
+            exists = STATS.exists()
+            with STATS.open("a", encoding="utf-8", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=STATS_COLS)
+                if not exists:
+                    w.writeheader()
+                for r in aged:
+                    w.writerow({c: r.get(c, "") for c in STATS_COLS})
+            print(f"已补抓满 7 天数据 {len(aged)} 条 → 发布数据.csv")
+            backfill_ciku_ratio(aged)
+        else:
+            print("\n没有满 7 天且缺数据的笔记需要补抓（或本轮一条都没取到，见上面的排查提示）")
+
     return 0
 
 
