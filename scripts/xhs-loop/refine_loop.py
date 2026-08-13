@@ -888,8 +888,31 @@ def rework_queue() -> list:
             score = int((r.get("总分") or "0").strip())
         except ValueError:
             score = 0
-        out.append({"file": fname, "path": path, "score": score, "row": r})
+        out.append({"file": fname, "path": path, "score": score, "row": r,
+                    "stale": is_stale_score(r)})
     return sorted(out, key=lambda x: -x["score"])
+
+
+def is_stale_score(audit_row) -> bool:
+    """这条审核记录是不是**旧评分卡**打的分 —— 旧分不能和新分比大小。
+
+    ⛔ 2026-08-13 查出的真 bug，代价是 11 篇返工被全部误判成失败。
+
+    2026-08-11 评分卡撤销了「原话可信度」15 分（降为红线是/否）。于是审核记录里
+    出现两种分：带可信度分的（旧卡）和不带的（新卡）。而 rework_queue 取的是
+    同名文件的**最新一条**记录 —— 对 08-11 之前审过、之后没再审的稿，那条就是旧卡分。
+
+    实测「成稿_2026-08-02_领导不回消息.md」：
+        旧卡 08-04 → 84 分（可信度 8）
+        新卡 08-13 → **47 分**（同一份内容，指纹 5ab81cc5）
+        返工产出 08-13 → **81 分**（新卡）
+    真相是返工把 47 分提到了 81 分、涨了 34 分；系统却拿 81 去和旧卡的 84 比，
+    判定「越改越差」，回滚到那份实际只值 47 分的原稿。
+
+    差距远大于被撤销的 15 分（标题 20→6、正文 11→4），说明 08-11 那次不只是删了一项，
+    是整体收紧了标准。所以跨卡的分数**一分都不能比**，不是减 15 分就能对齐。
+    """
+    return bool((audit_row.get("可信度") or "").strip() not in ("", "-"))
 
 
 BODY_SECTION_RE = re.compile(r"^#{1,3}\s*\*{0,2}正文[^\n]*\n(.*?)(?=\n#{1,3}\s|\Z)", re.M | re.S)
@@ -918,12 +941,27 @@ def body_budget_hint(draft: Path, lane: str) -> str:
     from draft_check import BODY_RANGE  # noqa: E402  延迟导入，避免脚本启动就拉起检查器依赖
     hi = BODY_RANGE.get(lane, (100, 560))[1]
     left = hi - n
-    if left > 80:
-        return f"\n【字数余量】当前正文 {n} 字，上限 {hi} 字，还有 {left} 字余量。"
-    return (f"\n【⛔ 字数红线】当前正文 {n} 字，上限 {hi} 字，**只剩 {left} 字余量**。\n"
-            f"审核意见里凡是要求「补」的（补关键词、补案例、补细节），一律**先删等量的字再加**，"
-            f"净增就会撞上限、整轮作废。优先用等量替换：把「这件事」「上面说的」这类指代，"
-            f"直接换成完整关键词 —— 字数几乎不变，关键词次数就上去了。")
+    # ⛔ 2026-08-13 重写这段。08-12 首版按余量分档：>80 字只报数字，≤80 才给约束。
+    # 结果 8 篇返工全军覆没，实测返工时正文**净增 90-159 字**（占原文 19-34%）：
+    #   汇报被打断 464→623(+159) · 未必怪你 469→602(+133) · 分三种 475→565(+90)
+    # 这几篇返工前余量都是 85-96 字，**刚好越过 80 的阈值**，于是一条约束都没给。
+    #
+    # 但真正的教训不是阈值调多少 —— 是**模型在返工时根本没做定向修改，而是重写**。
+    # prompt 早就写着「只改点到的问题，其余保持原样，不要重写」，它照样重写；
+    # 重写又把原稿里本来得分的东西一起换掉，于是分数不升反降（84→71、84→78、83→80）。
+    # 所以字数守恒必须变成**每次都给的硬约束**，而不是余量紧张时才提醒。
+    cap = min(hi, n + 30)
+    base = (f"\n【⛔ 字数守恒（这是返工，不是重写）】当前正文 {n} 字，硬上限 {hi} 字。\n"
+            f"改完之后正文应当在 **{max(100, n - 60)}–{cap} 字**之间 —— "
+            f"即相对现在**最多只准多 30 字**。\n"
+            f"实测教训：8 篇返工稿平均净增 120 字，全部撞上限作废，而且分数不升反降 —— "
+            f"多写的那些字换掉了原稿里本来得分的部分。\n"
+            f"审核意见里凡是要求「补」的（补关键词、补案例、补细节），一律**先删等量的字再加**。"
+            f"优先用等量替换：把「这件事」「上面说的」这类指代直接换成完整关键词，"
+            f"字数几乎不变，关键词次数就上去了。")
+    if left <= 80:
+        base += f"\n⚠️ 现在离上限只剩 {left} 字，几乎没有腾挪空间，务必先删后加。"
+    return base
 
 
 def rework_one(item, args, lane="搜索流"):
@@ -948,7 +986,14 @@ def rework_one(item, args, lane="搜索流"):
     feedback = (f"【上一次独立审核 {item['score']} 分，未过线（需 ≥{args.threshold}）。"
                 f"这是定向返工：只改下面点到的问题，其余保持原样，不要重写。】\n"
                 f"{report[:4000]}\n{body_budget_hint(draft, lane)}\n{KEEP_PASSED}")
-    best = {"score": item["score"], "md": draft.read_text(encoding="utf-8"), "cards": None}
+    # 旧评分卡的分数不能当门槛（见 is_stale_score）：拿它比会把真正的改进判成倒退，
+    # 然后回滚到那份按现行标准根本不合格的原稿。基线置 -1 = 本轮任何过了机械检查的
+    # 新版本都优于它，之后的轮次再正常择优（都是新卡分，可比）。
+    if item.get("stale"):
+        print(f"   ⚠️ 上次 {item['score']} 分是**旧评分卡**（08-11 前，含已撤销的可信度项）打的，"
+              f"与本轮新卡分数不可比 —— 不拿它当门槛，本轮以新卡结果为准")
+    base_score = -1 if item.get("stale") else item["score"]
+    best = {"score": base_score, "md": draft.read_text(encoding="utf-8"), "cards": None}
     for rnd in range(1, args.rounds + 1):
         print(f"\n--- 返工第 {rnd}/{args.rounds} 轮 ---")
         new_slug, md, cards = write_draft(row, feedback, rnd, lane=lane)
