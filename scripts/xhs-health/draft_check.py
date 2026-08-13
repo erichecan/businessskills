@@ -338,12 +338,22 @@ def check_one(d, f, all_drafts, lane_override=None):
         issues.append("未检出 CTA/互动段（无问句结尾、无评论区引导）")
 
     # 必须命中清单 第 3 条：CTA 得是「回一个字母/编号」型
-    tail = body[-CTA_TAIL_CHARS:]
+    #
+    # ⛔ 2026-08-12 修：这里原本取 body[-260:]，而 body 是**去掉代码块的全文**
+    # （正文节是 body_sec，见上面几行）—— 变量名骗了人，报错文案也一直写着
+    # 「正文末 260 字」，实际量的是文件末 260 字。而成稿正文后面还有
+    # 「## 图文卡片」「## 话题标签」「## 处置」三节元信息，稳定占掉 200+ 字，
+    # 于是真正的 CTA 每次都被挤出窗口。
+    # 实测这篇：正文节里有 10 个 A/B/C 标记、正文节尾窗口命中 8 个，
+    # 按全文尾窗口只命中 1 个 → 判违规。今天三篇稿（2 篇 Claude + 1 篇 Gemini）全中此坑。
+    # 判据没变（仍是「结尾要 2–4 个选项」），只是把窗口挪到该量的地方。
+    cta_src = body_sec or body
+    tail = cta_src[-CTA_TAIL_CHARS:]
     if len(CTA_OPTION.findall(tail)) < 2:
         issues.append(
             f"CTA 没给编号选项（正文末 {CTA_TAIL_CHARS} 字内 A/B/C 或 ①②③ 少于 2 个）。"
             "清单第 3 条：结尾要 2–4 个选项，让读者回一个字母就能参与")
-    m = CTA_EXPENSIVE.search(body)
+    m = CTA_EXPENSIVE.search(cta_src)
     if m:
         issues.append(f"CTA 是「说说你的情况」型（命中「{m.group()}」）—— 清单第 3 条禁止："
                       "要读者写一段、公开贴领导原话，是最贵的一种评论")
