@@ -239,7 +239,14 @@ def backfill_ciku(title, link, name=""):
         hint = f"；成稿声明的词「{declared}」不在词库里" if declared else ""
         return f"词库无匹配关键词（标题「{title}」{hint}），发布日未回填"
     hit["状态"] = "已发布"
-    hit["发布日"] = date.today().isoformat()
+    # ⛔ 2026-08-12 修复：这里曾经无条件 hit["发布日"]=today，导致 fetch_stats.py 事后
+    # 补链接（backfill_note_links，常常晚于实际发布好几天——16/23 命中率，剩下靠人工）
+    # 每次都把发布日重写成「今天」，把发布满 7 天的笔记又打回 0 天。预测复盘对账要求
+    # 发布天数>=7，这个 bug 导致词库.csv 里几乎没有笔记能真正攒到 7 天——
+    # 这是 review_prediction.py 一直没数据可对账的根因之一（另一根因见 fetch_aged_stats）。
+    # 改为只在首次转已发布（发布日为空）时才盖时间戳，之后任何回填都不再覆盖。
+    if not (hit.get("发布日") or "").strip():
+        hit["发布日"] = date.today().isoformat()
     if link:
         hit["笔记链接"] = link
     # 原子替换：refine_loop 可能正并发读词库选题，直接 open("w") 会有一段
