@@ -39,6 +39,43 @@ PRED_COLS = ["预测日", "成稿文件", "关键词", "口径", "竞争密度",
 # 7 天观看基线。低密度词竞争小排得上但盘子小；高密度词盘子大但前排被高赞占满，方差最大。
 VIEWS_BASE = {"低": (250, 600), "中": (350, 900), "高": (200, 700)}
 
+# ⛔ 2026-08-14：低密度档按 median_likes 拆两层。**这是复盘早就写出来的结论，
+# 一直没人执行** —— 预测复盘.md 原话：
+#   「把低密度档按 median_likes 拆成两层：<20 → 60-250、≥20 → 250-600。
+#     这是量级级别的明显错误，符合 T5『累计 5 篇前只调明显错的量级』的口子」
+#
+# 依据（预测校准.csv，2026-08-14）：低密度 3 篇独立样本，实际/预测倍数
+# 0.06 / 0.24 / 0.42，中位 0.24 —— **高估 4.2 倍**，不是系数偏了，是量级错了。
+# 逐条看更清楚：前排中位赞 8.0 的词实际只有 61 观看，66.5 的只有 19，
+# 而 125.5 的有 104。文档里「低密度 250-600」的锚定理由写的是「前排中位 ≤200 赞」，
+# 可真正探到的低密度词前排常常只有个位数赞 —— 盘子比锚定假设小一个数量级。
+#
+# 为什么不等满 5 篇：那条规矩防的是「拿单篇噪声当规律去微调系数」，
+# 而这里是三篇同向、差一个数量级。继续按 250-600 押数，等于明知道错还接着错 2 个月。
+#
+# ⚠️ **改完只修好三分之一，这一条别当成已解决**。拿三篇实测回测（审核分按 80 算）：
+#     med 8.0   实际 61  →  旧 (175,420) 新 (42,175)   ✅ 落进区间
+#     med 66.5  实际 19  →  旧 (175,420) 新 (175,420)  仍高估 9 倍
+#     med 125.5 实际 104 →  旧 (175,420) 新 (175,420)  仍偏
+# 后两篇都在 ≥20 那一档、维持原区间，所以没变好也没变坏。
+# 但它们本身在说一件更麻烦的事：**median_likes 和实际观看之间看不出单调关系**
+# —— 前排中位赞 66.5 的词只拿到 19 次观看，比 8.0 那个词还少。
+# 「前排赞高＝这个位盘子大」这个假设可能根本不成立，而 VIEWS_BASE 整张表都建在它上面。
+# 3 个点拟合不出任何东西，先照复盘的结论改掉已证实错的那一档，
+# 剩下的等样本。别在这里加第二个拆分点去凑那两篇 —— 那就是拿噪声当规律。
+LOW_SPLIT_LIKES = 20
+VIEWS_BASE_LOW = {"稀": (60, 250), "常": (250, 600)}
+
+
+def views_base(density, med=None):
+    """取观看基线。低密度要看前排中位赞再细分，其余档直接查表。"""
+    if density == "低" and med is not None:
+        try:
+            return VIEWS_BASE_LOW["常" if float(med) >= LOW_SPLIT_LIKES else "稀"]
+        except (TypeError, ValueError):
+            pass
+    return VIEWS_BASE.get(density, VIEWS_BASE["中"])
+
 # 内容质量在搜索排名里占 40%，是单项权重最高的
 def quality_factor(score):
     if score is None:
@@ -147,8 +184,8 @@ def median_likes_of(keyword: str):
     return None
 
 
-def predict(density, intent, score, lane):
-    vlo, vhi = VIEWS_BASE.get(density, VIEWS_BASE["中"])
+def predict(density, intent, score, lane, med=None):
+    vlo, vhi = views_base(density, med)
     q = quality_factor(score)
     views = (round(vlo * q), round(vhi * q))
 
@@ -190,7 +227,7 @@ def main() -> int:
     score = audit_score_of(draft.name)
     med = median_likes_of(kw)
 
-    p = predict(density, intent, score, args.lane)
+    p = predict(density, intent, score, args.lane, med)
     # fallback 要写进依据里。复盘时「这条是按中档估的」和「这条真的是中密度」
     # 是两种完全不同的偏差原因，混在一起就找不出模型错在哪。
     fb = []

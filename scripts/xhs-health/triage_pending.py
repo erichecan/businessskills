@@ -80,6 +80,27 @@ def pending_drafts():
             if (r.get("处置") or "").strip() == "待人工" and n]
 
 
+def stuck_reworks():
+    """返工队列里「改不动了」的：审过 ≥3 轮且分数没有净增长。
+
+    2026-08-14 加。待人工那一档疏通之后，堵点整个移到了返工队列（51 篇，
+    而写稿任务每天只消化 2 篇 —— 按这速度要一个月）。队列里真正有救的稿
+    排在这些改了十几轮还在原地的稿后面，这才是要清的。
+    """
+    rows = read_csv(AUDIT_LOG)
+    latest = {}
+    for r in rows:
+        if (r.get("审核方") or "").strip() in ("独立审核", "人工放行", AUDITOR):
+            latest[(r.get("成稿文件") or "").strip()] = r
+    out = []
+    for n, r in sorted(latest.items()):
+        if not n or (r.get("处置") or "").strip() != "返工":
+            continue
+        if stalled(score_track(n)):
+            out.append((n, r))
+    return out
+
+
 def draft_path(name):
     """成稿可能已经被挪进 归档稿/。两处都找，找不到返回 None。"""
     for p in (SUCAI / name, ARCHIVE_DIR / name):
@@ -95,6 +116,32 @@ def rework_rounds(name):
                and (r.get("处置") or "").strip() == "返工")
 
 
+def score_track(name):
+    """历次独立审核的分数序列。判「再投入还有没有用」靠的是它，不是单点分数。
+
+    2026-08-14 统计：返工队列 51 篇里 25 篇被审过 ≥2 轮，其中 11 篇末次分数
+    ≤ 首次。最极端的《2026-08-07_汇报被打断》审了 **12 轮**（84→…→83，
+    中途到过 86 就是上不去 85）。这类稿继续返工是纯消耗 ——
+    模型光看当前这一版是看不出来的，必须把轨迹摆给它。
+    """
+    out = []
+    for r in read_csv(AUDIT_LOG):
+        if (r.get("成稿文件") or "").strip() != name:
+            continue
+        if (r.get("审核方") or "").strip() != "独立审核":
+            continue
+        try:
+            out.append(int((r.get("总分") or "0").strip()))
+        except ValueError:
+            pass
+    return out
+
+
+def stalled(track):
+    """审了 ≥3 轮且没有净增长 = 投入已经被证明无效。"""
+    return len(track) >= 3 and track[-1] <= track[0]
+
+
 def latest_report(name):
     """最近一次审核报告全文。分诊要看的是「扣在哪」，不是分数本身。"""
     stem = name.removeprefix("成稿_").removesuffix(".md")
@@ -108,11 +155,21 @@ PROMPT = """你在给一批卡住的小红书成稿做分诊。账号定位＝**
 值不值得再投入需要判断。现在由你判断。
 
 【判据】
-- 返工：短板是**可定点修复**的（标题落点、首图原句、关键词密度、CTA 形式、开头切入）。
-        改动集中在一两处，改完有机会上 85 分。
-- 归档：短板是**结构性**的（选题本身没有搜索价值、答的不是读者搜的那个问题、
-        通篇没有可用素材、或该词的搜索位本身没人互动而稿子也无差异化角度）。
-        已返工多轮仍在同一档，也算结构性 —— 再投入是浪费。
+- 返工：短板是**可定点修复**的（标题落点、首图原句、关键词密度、CTA 形式、开头切入），
+        改动集中在一两处，改完有机会上 85 分，**且这个改法还没被试过**。
+- 归档：短板是**结构性**的，或投入已被证明无效。
+
+⛔ **命中下面任一条硬信号，默认判归档**，除非你能指出一个具体的、
+   前几轮明确没试过的改法，并在 reason 里写清「前几轮试的是什么、这次要改什么」：
+   A. 已审 ≥3 轮且分数没有净增长 —— 投入已经被证明无效，再改是纯消耗。
+   B. 该词搜索位前排日均赞中位 < 1（审核报告里会写）—— 那个位没人互动，
+      稿子改到 90 分也没人看得到，问题不在稿子。
+   C. 反复被扣同一处（比如连续几轮都是「标题落点在读者自己」）——
+      说明这个题材下写不出那个角度，不是改一句的事。
+
+⛔ **拿不准时判归档，不要判返工。** 返工队列已经 51 篇，而写稿任务每天只消化 2 篇。
+   把没把握的稿塞进返工，等于让真正有救的那几篇再多排一个月。
+   归档不销毁任何东西 —— 素材照样提炼入库，题材以后想重做随时可以重写。
 
 ⛔ 不要重新打分。分数与红线沿用下面给出的独立审核结论。
 ⛔ 不得因为「搜索位上的人群不是职场人」而判归档 —— 账号只服务职场读者，
@@ -128,6 +185,7 @@ PROMPT = """你在给一批卡住的小红书成稿做分诊。账号定位＝**
 【成稿文件】{name}
 【独立审核】总分 {score} · 评级 {grade} · 红线 {redline}
 【已返工轮数】{rounds}
+【历次独立审核分数】{track}{stall}
 【审核报告摘录】
 {report}
 
@@ -214,13 +272,18 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=5)
     ap.add_argument("--engine", default="gemini", choices=["gemini", "claude"])
+    ap.add_argument("--recheck-stuck", action="store_true",
+                    help="改判返工队列里审了 ≥3 轮还没进展的稿（默认只处理待人工）")
     args = ap.parse_args()
 
-    pend = pending_drafts()
+    if args.recheck_stuck:
+        pend, what = stuck_reworks(), "返工队列里改不动的稿"
+    else:
+        pend, what = pending_drafts(), "待人工"
     if not pend:
-        print("待人工队列为空。")
+        print(f"{what}队列为空。")
         return 0
-    print(f"待人工 {len(pend)} 篇，本次处理 {min(len(pend), args.limit)} 篇"
+    print(f"{what} {len(pend)} 篇，本次处理 {min(len(pend), args.limit)} 篇"
           f"（引擎：{args.engine}）\n")
 
     done = collected = 0
@@ -230,9 +293,12 @@ def main():
             print(f"⚠️ {name}：文件不在素材库也不在归档稿，跳过")
             continue
         kw = keyword_of(p)
+        track = score_track(name)
         prompt = PROMPT.format(
             name=name, score=base.get("总分"), grade=base.get("评级"),
             redline=base.get("红线") or "无", rounds=rework_rounds(name),
+            track=track or "（无）",
+            stall="　⛔ 命中硬信号 A：已审 ≥3 轮且分数没有净增长" if stalled(track) else "",
             report=latest_report(name) or "（无审核报告文件）",
             draft=p.read_text(encoding="utf-8")[:8000])
         d = parse(ask(prompt, args.engine))

@@ -137,21 +137,18 @@ def check_publish_backfill(alerts):
         link = (r.get("笔记链接") or "").strip()
         ratio = (r.get("搜索来源占比") or "").strip()
         if status == "已发布" and not link:
-            # ⛔ 2026-08-13（Eric 定）：只对**发布满 7 天**仍没链接的报。
-            # 刚发的、以及定时还没到点的笔记本来就没有链接 ——「定时发布」那一刻笔记
-            # 还没出去，noteId 得等 fetch_stats 事后从创作后台列表里捞回来。
-            # 不设门槛的话每天新发的稿都会立刻进名单，名单长期挂着一串「其实没问题」的词，
-            # 真正补不上的那几个反而被淹掉（2026-08-13 的告警里 6 条正是这样）。
-            #
-            # ⚠️ 只推迟「报」，没有推迟「补」—— backfill_note_links 仍旧每天跑，是故意的：
-            # 创作后台列表页只显示最近几天，等满 7 天再去捞就永远捞不到了；
-            # 而 aged_candidates 反过来又要靠笔记链接才能开单篇详情页（fetch_stats.py:173），
-            # 补晚了整条预测闭环就断死。补要趁早，报要延后，两件事的时点本就不该相同。
+            # ⛔ 门槛 = **发布后第二天**（2026-08-14 Eric 定，推翻前一天定的 7 天）。
+            # 当天不报：「定时发布」那一刻笔记还没出去，noteId 要等 fetch_stats
+            # 事后从创作后台列表里捞，当天必然是空的，报了全是噪音。
+            # 但第二天笔记确实已经发出去、列表页也抓得到了，这时还没有链接就是异常。
+            # 压到 7 天等于让问题多藏 6 天 —— 而列表页只显示最近几天，
+            # 拖过那个窗口链接就再也捞不回来（aged_candidates 又要靠链接才能开详情页，
+            # 见 fetch_stats.py:173），整条预测闭环断死。所以要早报，不是晚报。
             try:
-                aged = pub and (today - date.fromisoformat(pub)).days >= 7
+                overdue = pub and (today - date.fromisoformat(pub)).days >= 1
             except ValueError:
-                aged = True          # 发布日格式非法，下面那条分支会单独点名
-            if aged or not pub:      # 没有发布日却标着已发布，本身就是记录不实
+                overdue = True       # 发布日格式非法，下面那条分支会单独点名
+            if overdue or not pub:   # 没有发布日却标着已发布，本身就是记录不实
                 unlinked.append(kw if pub else f"{kw}（标已发布却没有发布日）")
         if pub and not ratio:
             try:

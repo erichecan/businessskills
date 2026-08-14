@@ -182,6 +182,78 @@ def section_calibrate():
     return lines, True
 
 
+def section_outcome():
+    """数据回填与预测复盘跑完之后 —— **该做什么决定**。
+
+    ⛔ 2026-08-14 加。Eric 问「数据回填后、预测复盘归因后，有什么实际的行动？」
+    查下来两条链路都断在「打印出来」这一步，实际行动是零：
+
+      ① 复盘 → predict：结论写进 预测校准.csv，predict.py 预测时把偏差打印到
+         refine_loop 的日志里 —— 而那个日志没人看。复盘自己又立了「≥5 篇才准改系数」
+         的规矩，样本永远差几篇，于是永远停在提示。
+      ② 搜索来源占比 → **完全没有下游**。健康检查只管催「满 7 天还没回填」，
+         回填之后没有任何脚本读它 —— 而它是 L3 唯一主指标，
+         整条搜索流策略成不成立就在这几个数字里。
+
+    所以这一节不报「跑了没有」，只报**数字本身和它逼出来的那个决定**。
+    数据的用处是改变行为；只要没有任何行为因它而变，采集和复盘就是在空转。
+    """
+    lines, ok = ["📊 **数据说了什么**"], True
+
+    # ── 搜索来源占比：账号策略的成败就在这一列
+    rows = read_csv(SUCAI / "词库.csv")
+    pub = [r for r in rows if (r.get("发布日") or "").strip()]
+    got = [r for r in pub if (r.get("搜索来源占比") or "").strip()]
+    if not got:
+        lines.append(f"　　· 搜索来源占比：{len(pub)} 篇已发布，**一篇都还没回填** —— 主指标全空")
+    else:
+        vals = []
+        for r in got:
+            try:
+                vals.append(float((r.get("搜索来源占比") or "").strip().rstrip("%")))
+            except ValueError:
+                pass
+        avg = sum(vals) / len(vals) if vals else 0
+        lines.append(f"　　· 搜索来源占比：{len(got)}/{len(pub)} 篇有数 · 均值 **{avg:.1f}%**"
+                     f"（{'/'.join(f'{v:g}%' for v in sorted(vals, reverse=True)[:5])}）")
+        # 判据写死在这里而不是让人自己看：搜索流的全部理由就是「靠搜索被找到」。
+        # 占比常年个位数，说明流量不是搜来的，那么按搜索位强度选词这套打法就该重估。
+        if vals and avg < 10:
+            lines.append(f"　　  ⚠️ 均值 {avg:.1f}% —— 流量基本不是搜来的。"
+                         f"搜索流这套打法（按搜索位强度选词、标题塞关键词）"
+                         f"要不要继续，该拿这组数字重估一次了")
+
+    # ── 预测校准：样本够没够，够了就该动手
+    calib = read_csv(SUCAI / "预测校准.csv")
+    views = [r for r in calib if (r.get("指标") or "").strip() == "观看"]
+    if views:
+        by_density = {}
+        for r in views:
+            d = (r.get("密度") or "?").strip()
+            try:
+                m = float(r.get("倍数") or 0)
+            except ValueError:
+                continue
+            if m > 0:
+                by_density.setdefault(d, {})[(r.get("关键词") or "")] = m
+        for d, kws in sorted(by_density.items()):
+            ms = sorted(kws.values())
+            mid = ms[len(ms) // 2]
+            enough = len(ms) >= 5
+            lines.append(
+                f"　　· 预测校准「{d}密度」：{len(ms)} 篇独立样本 · 实际/预测中位 **{mid:.2f}×**"
+                + ("　✅ 样本已够，可以改 VIEWS_BASE 了" if enough
+                   else f"（差 {5 - len(ms)} 篇够 5）"))
+            # 量级级别的错误不必等样本 —— 复盘自己写过这个口子。
+            if mid < 0.5 and not enough:
+                lines.append(f"　　  ⚠️ 高估 {1 / mid:.1f} 倍，已是量级错误。"
+                             f"复盘定过「累计 5 篇前只调明显错的量级」，这一档符合那个口子")
+    else:
+        lines.append("　　· 预测校准：还没有观看指标的对账样本")
+
+    return lines, ok
+
+
 def section_launchd():
     lines, healthy = [], True
     for label, desc in LAUNCHD_JOBS.items():
@@ -303,7 +375,8 @@ def main():
 
     today = date.today().isoformat()
     blocks = [section_collect(today), section_keywords(today), section_drafts(today),
-              section_publish(), section_calibrate(), section_launchd()]
+              section_publish(), section_outcome(), section_calibrate(),
+              section_launchd()]
     body = [f"# 每日 brief · {today}", ""]
     for lines, _ in blocks:
         body += lines + [""]
