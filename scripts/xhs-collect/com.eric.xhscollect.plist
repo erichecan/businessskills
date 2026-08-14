@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.eric.xhscollect</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/python3</string>
+		<string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/launchd_runner.py</string>
+		<string>xhs-collect/daily_collect.py</string>
+	</array>
+	<key>StandardErrorPath</key>
+	<string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhscollect.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhscollect.log</string>
+	<key>StartCalendarInterval</key>
+	<array>
+		<dict>
+			<key>Hour</key>
+			<integer>8</integer>
+			<key>Minute</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>Hour</key>
+			<integer>12</integer>
+			<key>Minute</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>Hour</key>
+			<integer>16</integer>
+			<key>Minute</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>Hour</key>
+			<integer>19</integer>
+			<key>Minute</key>
+			<integer>0</integer>
+		</dict>
+	</array>
+</dict>
+</plist>

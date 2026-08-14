@@ -32,6 +32,12 @@ AGENTS = Path.home() / "Library" / "LaunchAgents"
 # 谁哪天跑一次 install_agents.py，全自动发布就静悄悄退回半自动，
 # 而且只会在「稿子预填好了却没人点发布」时才被发现。已补齐。
 JOBS = {
+    # 采集 —— 供给端源头。到 2026-08-14 为止这一步一直是**人手工跑**的：
+    # 运行日志里的 run1-run4 出自会话临时脚本（xhs/素材库/.run3_work/），
+    # 仓库里从来没有对应任务，全自动链条最上游是断的。
+    # 时点与其余任务全部错开，避免同时打小红书撞风控、也便于归因。
+    "com.eric.xhscollect": ("xhs-collect/daily_collect.py", [],
+                            [(8, 0), (12, 0), (16, 0), (19, 0)]),
     "com.eric.xhsprobe":   ("xhs-probe/daily_probe.sh", [],
                             [(10, 0), (14, 30), (18, 30)]),
     "com.eric.xhsaudit":   ("xhs-health/independent_audit.py", [], [(13, 0), (17, 30)]),

@@ -36,6 +36,7 @@ PUB_DATA = SUCAI / "发布数据.csv"
 LAUNCHD_JOBS = {
     # 常驻服务，不是定时任务，但它一挂后面全挂 —— 采集/发布/数据回收都要经过它
     "com.eric.cdpproxy": "CDP 代理（常驻）",
+    "com.eric.xhscollect": "采集（供给源头）",   # 2026-08-14 加
     "com.eric.xhsprobe": "采集探测",
     "com.eric.xhsdata": "发布数据回收",
     "com.eric.xhsaudit": "独立审核",
