@@ -43,13 +43,24 @@ JOBS = {
 }
 
 
+# ⛔ 2026-08-13：日志不再落 /tmp。macOS 会定期清理 /tmp，2026-08-13 查 probe
+# 为什么连挂三轮时，7 个任务的日志**一个都不在**，只能靠翻探测原始 JSON 里的
+# _error 才找出根因。日志得比它记录的事故活得久。
+# 放 ~/Library/Logs/xhs/：本机盘（外置卷没挂载时也写得进去）、macOS 标准位置、
+# Console.app 直接可看。这里是 plist 层的兜底文件；每次运行的完整输出由
+# launchd_runner.py 另写按天切分的 <task>-YYYY-MM-DD.log。
+LOG_DIR = Path.home() / "Library" / "Logs" / "xhs"
+
+
 def build(label, rel, extra, times):
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log = str(LOG_DIR / f"launchd-{label}.log")
     return {
         "Label": label,
         "ProgramArguments": [PYTHON, str(RUNNER), rel, *extra],
         "StartCalendarInterval": [{"Hour": h, "Minute": m} for h, m in times],
-        "StandardOutPath": f"/tmp/{label.split('.')[-1]}.log",
-        "StandardErrorPath": f"/tmp/{label.split('.')[-1]}.log",
+        "StandardOutPath": log,
+        "StandardErrorPath": log,
     }
 
 

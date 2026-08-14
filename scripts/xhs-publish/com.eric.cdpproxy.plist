@@ -30,8 +30,8 @@
     <key>ThrottleInterval</key>
     <integer>30</integer>
     <key>StandardOutPath</key>
-    <string>/tmp/cdpproxy.log</string>
+    <string>/Users/eric/Library/Logs/xhs/launchd-com.eric.cdpproxy.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/cdpproxy.log</string>
+    <string>/Users/eric/Library/Logs/xhs/launchd-com.eric.cdpproxy.log</string>
 </dict>
 </plist>

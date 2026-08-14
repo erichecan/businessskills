@@ -195,6 +195,13 @@ def section_launchd():
         rc = code >> 8 if code > 255 else code
         if rc == 0:
             lines.append(f"　　✅ {desc} — 上次退出 0")
+        elif rc == 3:
+            # ⛔ 2026-08-13：退出码 3 = 「任务跑成功了，但它发现了问题」
+            # （health_check.EXIT_ALERTS）。此前 health_check 有告警就退 1，
+            # 这里一律画成 ❌ 静默失败 —— 监控自己天天挂红，人很快就对红色脱敏，
+            # 于是真正挂掉的任务（比如当天全挂的 probe）反而混在里面看不出来。
+            # 任务健康与内容健康是两件事，这一栏只该报前者。
+            lines.append(f"　　⚠️ {desc} — 跑通了，但报出告警（见上面各节 / 健康告警.md）")
         else:
             hint = "（外置卷权限：launchd 读不了 /Volumes）" if rc in (2, 126) else ""
             lines.append(f"　　❌ {desc} — 上次退出码 {rc}{hint}")

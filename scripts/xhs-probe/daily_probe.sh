@@ -53,3 +53,13 @@ fi
 "$PY" "$DIR/backfill.py" --date "$DAY"
 
 echo "===== $(date '+%F %T') 探词链路结束 ====="
+
+# ⛔ 2026-08-13：这里原先什么都不做，脚本的退出码于是等于最后一条命令（backfill）的。
+# 结果当天三轮探测全挂（launchd 的 PATH 里没有 opencli，每轮抓 0 条）却一路退 0，
+# brief 照报「✅ 采集探测 — 上次退出 0」，整整一天没人知道采不到数据。
+# 「探测挂了也要继续处理存量」这个决定本身是对的，但继续跑和如实上报是两回事 ——
+# 咽下退出码等于把唯一的报警渠道也一并关掉了。
+if [ "$probe_rc" -ne 0 ]; then
+  echo "⛔ 本轮探测失败（probe_opencli.py 退出码 ${probe_rc}），存量已照常处理。"
+  exit "$probe_rc"
+fi

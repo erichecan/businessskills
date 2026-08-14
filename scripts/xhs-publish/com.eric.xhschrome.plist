@@ -41,8 +41,8 @@
     <integer>30</integer>
 
     <key>StandardOutPath</key>
-    <string>/tmp/xhschrome.log</string>
+    <string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhschrome.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/xhschrome.log</string>
+    <string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhschrome.log</string>
 </dict>
 </plist>

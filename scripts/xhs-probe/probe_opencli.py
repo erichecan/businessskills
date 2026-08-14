@@ -27,11 +27,14 @@ density 仍由 probe.judge_density() 这套确定性规则算，本文件只负�
 """
 import argparse
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import time
 from datetime import date, datetime
+from functools import lru_cache
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -47,9 +50,37 @@ OC_TIMEOUT = 180
 GAP = 2.5           # 每次 opencli 调用之间的间隔，别把日常 Chrome 打成风控目标
 
 
+@lru_cache(maxsize=1)
+def opencli_bin() -> str:
+    """解析 opencli 的可执行路径，不依赖调用者的 PATH 干不干净。
+
+    ⛔ 2026-08-13：这里原先写死裸名 "opencli"，靠 PATH 解析。launchd 给的 PATH 只有
+    /usr/bin:/bin:/usr/sbin:/sbin，于是**手动跑必通、定时跑必挂** ——
+    当天三轮探测全部 0 条，每个 probe_*.json 里都是
+    「[Errno 2] No such file or directory: 'opencli'」，而 daily_probe.sh 把失败
+    吞成一句 echo、brief 照报「✅ 采集探测 退出 0」，挂了一整天没人发现。
+
+    launchd_runner.py 已经在 runner 那层把 PATH 补齐（覆盖所有定时任务），
+    这里是第二道：直接调这个脚本、或者从任何 PATH 不全的地方调用时也不会再踩。
+    找不到就抛 —— 静默返回 None 会被上层当成「这条词没数据」，
+    和「工具压根没装」混为一谈，正是这次查了半天的原因。
+    """
+    p = shutil.which("opencli")
+    if p:
+        return p
+    for c in ("/opt/homebrew/bin/opencli", "/usr/local/bin/opencli",
+              str(Path.home() / ".local/bin/opencli"),
+              str(Path.home() / ".bun/bin/opencli")):
+        if os.access(c, os.X_OK):
+            return c
+    raise FileNotFoundError(
+        "找不到 opencli。装了的话是 PATH 问题（launchd 的 PATH 不含 /opt/homebrew/bin）；"
+        "没装就跑 npm i -g @jackwener/opencli")
+
+
 def oc(args, timeout=OC_TIMEOUT):
     """调 opencli 并解析 JSON。失败返回 None（由调用方决定降级还是抛）。"""
-    r = subprocess.run(["opencli", "xiaohongshu", *args, "-f", "json"],
+    r = subprocess.run([opencli_bin(), "xiaohongshu", *args, "-f", "json"],
                        capture_output=True, text=True, timeout=timeout)
     out = (r.stdout or "").strip()
     if not out:

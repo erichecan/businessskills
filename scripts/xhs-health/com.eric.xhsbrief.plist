@@ -19,8 +19,8 @@
          /Library/Developer/CommandLineTools/usr/bin/python3（/usr/bin/python3 只是它的 shim）加进去，
          否则这个任务会和其余 5 个一样静默失败（退出码 2/126），日志只写「Operation not permitted」。 -->
     <key>StandardOutPath</key>
-    <string>/tmp/xhsbrief.log</string>
+    <string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhsbrief.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/xhsbrief.log</string>
+    <string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhsbrief.log</string>
 </dict>
 </plist>

@@ -137,7 +137,22 @@ def check_publish_backfill(alerts):
         link = (r.get("笔记链接") or "").strip()
         ratio = (r.get("搜索来源占比") or "").strip()
         if status == "已发布" and not link:
-            unlinked.append(kw)
+            # ⛔ 2026-08-13（Eric 定）：只对**发布满 7 天**仍没链接的报。
+            # 刚发的、以及定时还没到点的笔记本来就没有链接 ——「定时发布」那一刻笔记
+            # 还没出去，noteId 得等 fetch_stats 事后从创作后台列表里捞回来。
+            # 不设门槛的话每天新发的稿都会立刻进名单，名单长期挂着一串「其实没问题」的词，
+            # 真正补不上的那几个反而被淹掉（2026-08-13 的告警里 6 条正是这样）。
+            #
+            # ⚠️ 只推迟「报」，没有推迟「补」—— backfill_note_links 仍旧每天跑，是故意的：
+            # 创作后台列表页只显示最近几天，等满 7 天再去捞就永远捞不到了；
+            # 而 aged_candidates 反过来又要靠笔记链接才能开单篇详情页（fetch_stats.py:173），
+            # 补晚了整条预测闭环就断死。补要趁早，报要延后，两件事的时点本就不该相同。
+            try:
+                aged = pub and (today - date.fromisoformat(pub)).days >= 7
+            except ValueError:
+                aged = True          # 发布日格式非法，下面那条分支会单独点名
+            if aged or not pub:      # 没有发布日却标着已发布，本身就是记录不实
+                unlinked.append(kw if pub else f"{kw}（标已发布却没有发布日）")
         if pub and not ratio:
             try:
                 if (today - date.fromisoformat(pub)).days >= 7:
@@ -293,7 +308,7 @@ def main() -> int:
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     if not alerts:
         print(f"[{now}] 健康检查通过：日志新鲜、schema 合规、成稿均有审核记录")
-        return 0
+        return EXIT_OK
 
     report = f"\n## {now} 健康检查告警\n\n" + "\n\n".join(f"- {a}" for a in alerts) + "\n"
     with ALERT_FILE.open("a", encoding="utf-8") as f:
@@ -304,8 +319,27 @@ def main() -> int:
     for a in alerts:
         print(f"  ⛔ {a}")
     notify("小红书采集任务告警", f"{len(alerts)} 项异常，详见 素材库/健康告警.md")
-    return 1
+    return EXIT_ALERTS
+
+
+# 退出码语义（2026-08-13 定）。
+# 起因：brief 天天报「❌ 健康检查 — 上次退出码 1」，看着像脚本坏了，
+# 实际是它**正常干完活并且发现了 4 项告警**。监控自己被误判成故障，
+# 结果是所有绿灯都不可信 —— 人会开始忽略这一栏，那监控就白建了。
+# 「检查跑失败」和「检查跑成功但有问题」是两回事，退出码必须分得开：
+EXIT_OK = 0        # 检查跑完，没有告警
+EXIT_FAILED = 1    # 检查**本身**没跑成（异常、文件读不了）—— 这才是要救的
+EXIT_ALERTS = 3    # 检查跑完了，发现 N 项告警 —— 任务是健康的，内容需要人管
+                   # 用 3 不用 2：2 已被 launchd_runner 占作「找不到脚本/外置卷未挂载」
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as e:                                   # noqa: BLE001
+        # 兜底：任何未捕获异常都必须落成 EXIT_FAILED，不能让 Python 默认的 1
+        # 和「有告警」的 1 混在一起 —— 那正是之前分不清的原因。
+        import traceback
+        traceback.print_exc()
+        print(f"⛔ 健康检查本身失败：{e}", file=sys.stderr)
+        sys.exit(EXIT_FAILED)

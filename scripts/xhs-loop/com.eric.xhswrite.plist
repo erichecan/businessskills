@@ -15,9 +15,9 @@
 		<string>1</string>
 	</array>
 	<key>StandardErrorPath</key>
-	<string>/tmp/xhswrite.log</string>
+	<string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhswrite.log</string>
 	<key>StandardOutPath</key>
-	<string>/tmp/xhswrite.log</string>
+	<string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhswrite.log</string>
 	<key>StartCalendarInterval</key>
 	<array>
 		<!-- 2026-08-11 两处改动，都有实测依据。
