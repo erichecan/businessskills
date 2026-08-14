@@ -19,7 +19,8 @@
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 DAY=$(date +%Y%m%d)
-PY=/usr/bin/python3
+PY="${XHS_PY:-/opt/homebrew/bin/python3}"   # runner 会注入 XHS_PY；手动跑时退到 Homebrew 的 3.14
+# ⛔ 别改回 /usr/bin/python3：那是 3.9.6，跑不了仓库里的 3.10+ 语法（见 launchd_runner.py 顶部）
 QUEUE_FLOOR=40
 REFILL=100
 

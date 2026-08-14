@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.eric.xhstriage</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/python3</string>
+		<string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/launchd_runner.py</string>
+		<string>xhs-health/triage_pending.py</string>
+		<string>--limit</string>
+		<string>5</string>
+	</array>
+	<key>StandardErrorPath</key>
+	<string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhstriage.log</string>
+	<key>StandardOutPath</key>
+	<string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhstriage.log</string>
+	<key>StartCalendarInterval</key>
+	<array>
+		<dict>
+			<key>Hour</key>
+			<integer>20</integer>
+			<key>Minute</key>
+			<integer>30</integer>
+		</dict>
+	</array>
+</dict>
+</plist>

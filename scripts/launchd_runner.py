@@ -66,6 +66,12 @@ def child_env():
     env = {**os.environ, "PYTHONUNBUFFERED": "1"}
     cur = env.get("PATH", "/usr/bin:/bin:/usr/sbin:/sbin").split(":")
     env["PATH"] = ":".join([p for p in EXTRA_PATH if p not in cur] + cur)
+    # 让 .sh 里的 python 调用跟 runner 用同一个解释器。
+    # 2026-08-13 发现 daily_data.sh / daily_probe.sh 都硬编码 PY=/usr/bin/python3
+    # ——那是 3.9.6，而 runner 是 3.14.6。文件顶部注释早就记过这个坑：
+    # refine_loop.py 用了 3.10+ 的 `dict | None` 注解，3.9 加载就抛 TypeError。
+    # 两个解释器并存意味着「同一份代码，看谁调它决定能不能跑」，迟早再踩。
+    env["XHS_PY"] = sys.executable
     return env
 
 

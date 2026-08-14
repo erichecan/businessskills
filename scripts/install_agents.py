@@ -22,23 +22,37 @@ PYTHON = "/opt/homebrew/bin/python3"
 AGENTS = Path.home() / "Library" / "LaunchAgents"
 
 # label → (相对 scripts/ 的脚本, 参数, 触发时点)
-# 时点全部保持原样，这次只换解释器和入口，不动调度 —— 一次只改一件事，
-# 出问题才分得清是权限没生效还是时点改错了。
+#
+# ⚠️ 时点这一列基本只是初值：existing_times() 会沿用磁盘上已有的时点，
+# 所以这里写的和实际跑的早就不一样了（实际见 ~/Library/LaunchAgents/*.plist）。
+# 2026-08-13 已把这一列同步成磁盘上的真实值，免得读代码的人被误导。
+#
+# ⛔ 但**参数这一列没有任何保护**，跑一次就按这里重写。
+# 2026-08-13 发现 xhspublish 在这里写着 []，磁盘上却是 --full-auto ——
+# 谁哪天跑一次 install_agents.py，全自动发布就静悄悄退回半自动，
+# 而且只会在「稿子预填好了却没人点发布」时才被发现。已补齐。
 JOBS = {
     "com.eric.xhsprobe":   ("xhs-probe/daily_probe.sh", [],
-                            [(0, 15), (6, 15), (12, 15), (18, 15)]),
-    "com.eric.xhsaudit":   ("xhs-health/independent_audit.py", [], [(9, 5)]),
+                            [(10, 0), (14, 30), (18, 30)]),
+    "com.eric.xhsaudit":   ("xhs-health/independent_audit.py", [], [(13, 0), (17, 30)]),
     "com.eric.xhshealth":  ("xhs-health/health_check.py", [], [(9, 30), (19, 30)]),
-    "com.eric.xhsdata":    ("xhs-publish/daily_data.sh", [], [(8, 30)]),
+    "com.eric.xhsdata":    ("xhs-publish/daily_data.sh", [], [(21, 15)]),
+    # 待人工分诊（2026-08-13 加，Eric 授权把这个判断权交给自动化）。
+    # 排在审核 17:30 之后、发布 22:00 之前：审完当天的稿，立刻决定
+    # 卡住的那些是退回返工还是归档，并把里面可复用的话术捞进 话术复用库.csv。
+    # 走 Gemini 免费层，不吃 Claude 订阅额度。
+    "com.eric.xhstriage":  ("xhs-health/triage_pending.py", ["--limit", "5"], [(20, 30)]),
     # 一天四批，每批 返工2 + 新稿2 = 4 篇，理论 16 篇/天。
     # 时点按 Claude 的 5 小时额度窗口切：额度 4am 重置，之后每 5 小时一个窗口，
     # 每个窗口开头半小时开跑，一批只吃一个窗口的额度，不会把后面几批饿死。
     # 返工排在新稿前面且占一半：今天实测返工 3 篇全过线（84→89 / 82→88 / 76→87），
     # 其中两篇只用 1 轮 ≈ 2 次 claude 调用，而新稿要跑满 3 轮 ≈ 6 次。
     # 同样的额度，返工的产出效率是新稿的三倍。
-    "com.eric.xhswrite":   ("xhs-loop/refine_loop.py", ["--rework", "2", "--count", "2"],
-                            [(4, 30), (9, 30), (14, 30), (19, 30)]),
-    "com.eric.xhspublish": ("xhs-publish/auto_publish.py", [], [(9, 0), (14, 0), (21, 0)]),
+    "com.eric.xhswrite":   ("xhs-loop/refine_loop.py", ["--rework", "1", "--count", "1"],
+                            [(11, 0), (15, 30)]),
+    # --full-auto：连最后那下「定时发布」也自己点（Eric 2026-08-06 明确要求）。
+    # 这个参数必须留在这里 —— 见上面 JOBS 顶部那条 ⛔。
+    "com.eric.xhspublish": ("xhs-publish/auto_publish.py", ["--full-auto"], [(22, 0)]),
     "com.eric.xhsbrief":   ("xhs-health/nightly_brief.py", [], [(21, 0)]),
 }
 
