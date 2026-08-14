@@ -358,11 +358,21 @@ def check_one(d, f, all_drafts, lane_override=None):
         issues.append(f"CTA 是「说说你的情况」型（命中「{m.group()}」）—— 清单第 3 条禁止："
                       "要读者写一段、公开贴领导原话，是最贵的一种评论")
 
-    nb = len(NOT_BUT.findall(body))
+    # ⛔ 2026-08-13 修：与上面 CTA 窗口同型的坑，2026-08-12 只修了 CTA 一条，这两条漏网。
+    # 这两个指标量的是「读者读到的文字里有多少 AI 味」，但 body 是**去掉代码块的全文**，
+    # 于是三样根本不会被读者看到的东西也被算了进去：
+    #   ① 备选标题（「评委扣分的不是内容是这个」—— 备选压根不会发出去）
+    #   ② 「## 处置」里的打分说明、strongest_moment 引用（引的还是正文原句，重复计数）
+    #   ③ 「机械自检」那一行本身 —— 它字面写着「「不是X是Y」句式 1 处」，自己命中自己
+    # 实测《答辩被打断，评委问的根本不是项目本身》：正文节 1 处（合格），
+    # 按全文算 3 处 → 被判违规、卡在发布闸门外。判据没变，只把窗口挪到该量的地方。
+    prose = body_sec or body
+
+    nb = len(NOT_BUT.findall(prose))
     if nb > 2:
         issues.append(f"「不是X是Y」句式 {nb} 处（>2，AI 味硬指标）")
 
-    gen = GENERIC_READER.findall(body)
+    gen = GENERIC_READER.findall(prose)
     if len(gen) > MAX_GENERIC:
         issues.append(f"泛指群体词 {len(gen)} 处（>{MAX_GENERIC}）：{'、'.join(gen[:4])}"
                       f" —— 把读者归进第三方群体，视角该对着读者说")

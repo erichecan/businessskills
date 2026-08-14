@@ -181,9 +181,14 @@ def gate(name):
     if not imgs:
         return False, "成品图目录没有已渲染的卡片图"
 
-    r = subprocess.run([sys.executable, str(HEALTH_DIR / "draft_check.py"), "--days", "30"],
+    # ⛔ 2026-08-13 修：原先取的是整份 stdout 里第一条「- 」开头的行，而 --days 30
+    # 一次要检查 80+ 篇，那一行几乎总是**别的稿**的问题。实测本篇真实拦点是
+    # 「不是X是Y」3 处，闸门却报「正文节 899 字」（另一篇的），照着这条改稿永远改不对。
+    # 改成只跑本篇（--file），拦点就一定是本篇的。
+    r = subprocess.run([sys.executable, str(HEALTH_DIR / "draft_check.py"),
+                        "--file", name, "--lane", "搜索流"],
                        capture_output=True, text=True)
-    if r.returncode != 0 and name in r.stdout:
+    if r.returncode != 0:
         first = next((l.strip() for l in r.stdout.splitlines() if l.strip().startswith("-")), "见 draft_check 输出")
         return False, f"机械及格线未过：{first}"
 

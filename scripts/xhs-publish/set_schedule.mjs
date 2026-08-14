@@ -192,12 +192,27 @@ async function main() {
 
   // 3. 选日期。⛔ 必须排掉 .disabled —— 过去的日子和上/下月溢出的格子都是 disabled，
   //    不排的话「7 号」可能点到上个月那个 7 号，或者点了个点不动的格子还以为成功了。
+  //
+  // ⛔ 2026-08-13 修：目标日**已经是当前选中日**时，再点一次是「取消选中」，
+  //    不是「选中」。组件随即把整个定时区收掉、连 .post-time-wrapper 里的
+  //    定时开关都重置回 unchecked，datepicker 从 DOM 里整个消失 ——
+  //    下一步 ensurePanel 去找 .d-datepicker-input-filter 就报「没找到元素」，
+  //    看起来像选择器失效，实际是被自己点没的。
+  //    只在跨午夜时现形：默认时间是「当前+1.5h」，23:25 跑时它已经是次日，
+  //    而轮换池给的目标也是次日 → 同一天，一点就废。22:00 跑时默认还在当天，撞不上。
+  //    判断用时间框的文本而不是格子的 selected class：class 名会随组件版本变，
+  //    时间框的值是这一步真正要改的东西，且后面第 5 步还会回读兜底。
+  const dateStr = `${Y}-${String(MO).padStart(2, '0')}-${String(D).padStart(2, '0')}`;
   await ensurePanel('选日期前');
-  await clickBy(cdp,
-    `[...${POP}.querySelectorAll('.d-datepicker-cell-main:not(.disabled)')]
-       .find(e => e.textContent.trim() === '${D}')`,
-    `选日期 ${D} 号`);
-  console.log(`✅ 已选 ${D} 号`);
+  if (String(await readInput(cdp)).includes(dateStr)) {
+    console.log(`✅ ${D} 号已是当前选中日，跳过点击（再点会取消选中）`);
+  } else {
+    await clickBy(cdp,
+      `[...${POP}.querySelectorAll('.d-datepicker-cell-main:not(.disabled)')]
+         .find(e => e.textContent.trim() === '${D}')`,
+      `选日期 ${D} 号`);
+    console.log(`✅ 已选 ${D} 号`);
+  }
 
   // 4. 选时、分。两条 timebar 分别是 24 个时和 60 个分，单元要先滚进条内可视区
   await ensurePanel('选时分前');          // 选完日期面板常会自己收起
