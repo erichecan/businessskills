@@ -57,7 +57,7 @@ DISPOSITION_COL_INDEX = 14  # 插入审核方之后，处置就落在这一列
 PASS_SCORE = 80
 
 
-def decide_disposition(score, redline):
+def decide_disposition(score, redline, mech_ok=True):
     """处置由代码算，不让模型自己填 —— 和「审核方」「口径」两列同一个道理（D7）。
 
     ⛔ 这是 2026-08-05 查出的真 bug。原先 prompt 只写「处置用 发布/待人工/归档」，
@@ -100,8 +100,14 @@ def decide_disposition(score, redline):
         return "待人工"          # 分数都没解析出来，别替人做决定
     if not clean:
         return "返工" if s >= 70 else "归档"
+    # ⛔ 2026-08-14 补：机械项不过就不能判「发布」，哪怕分数够。
+    # 不补的话会出现一种没人管的死状态 —— 处置写着「发布」，闸门却因为机械项
+    # 把它拦下：它既不在返工队列（rework_queue 只取处置=返工），又永远发不出去。
+    # 2026-08-14 从归档捞回 4 篇 80+ 分的稿时全部落进这个夹缝
+    # （2 篇正文复述卡片 13/9 处、2 篇 CTA 没编号选项）。
+    # 判「返工」才对：分数够、机械项差一处，正是返工最擅长修的那种。
     if s >= PASS_SCORE:
-        return "发布"
+        return "发布" if mech_ok else "返工"
     if s >= PASS_SCORE - 10:
         return "返工"
     return "待人工" if s >= 55 else "归档"
@@ -495,8 +501,14 @@ def audit_one(draft: Path, lane: str = None) -> bool:
     fields.insert(AUDITOR_COL_INDEX, "独立审核")
     if len(fields) > DISPOSITION_COL_INDEX:
         model_said = fields[DISPOSITION_COL_INDEX].strip()
+        # 机械项在 build_audit_prompt 里是内联喂给模型的，这里要拿它来定处置，
+        # 所以单独取一次（纯代码检查，不花额度）。
+        mech = mechanical_result(draft.name)
         decided = decide_disposition(fields[2] if len(fields) > 2 else "",
-                                     fields[12] if len(fields) > 12 else "")
+                                     fields[12] if len(fields) > 12 else "",
+                                     mech_ok=mech.strip() == "机械检查通过")
+        if decided == "返工" and mech.strip() != "机械检查通过":
+            print(f"   机械项未过 → 即使分数达标也不判发布：{mech.splitlines()[-1][:60]}")
         fields[DISPOSITION_COL_INDEX] = decided
         if model_said and model_said != decided:
             print(f"   处置：模型写「{model_said}」→ 按分档规则改判「{decided}」")
