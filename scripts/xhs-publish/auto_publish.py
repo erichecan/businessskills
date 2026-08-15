@@ -141,6 +141,40 @@ def published_already():
     return {r["成稿文件"].strip() for r in read_csv(PUB_LOG) if r.get("发布", "").startswith("✅")}
 
 
+# 同一个关键词最多发几篇。2026-08-15 Eric 提出「话题重复度太高，
+# 已经有差不多 6 篇汇报被打断了」，查证属实且比这更糟 ——
+# 后台 33 篇已发布里「被打断」类占 5 篇（汇报 3 + 答辩 2）、「绩效面谈被打低分」3 篇。
+#
+# 数据说明重复发不划算：**量不累积，反而集体停在低位**。
+#     晋升答辩      1050 → 301           （第 2 篇跌 3.5 倍）
+#     绩效被打低分   157 → 107 → 107
+#     汇报被打断      62 →  61 →  60      （三篇几乎一样，都很低）
+# 对照单主题的稿：156 / 153 / 149。同词的后续篇是在跟自己抢同一个搜索位。
+#
+# 阈值定 2 而不是 1：第 2 篇仍能拿到第 1 篇的 30-70%（301、107），有价值；
+# 第 3 篇起明显是内耗。
+#
+# ⛔ 为什么闸门必须管这件事：选题层的 used_keywords() 只在**选新题**时排重，
+# 而**返工不走选题** —— 一篇稿返工 N 次就产生 N 个成稿文件，标题各不相同，
+# 闸门原来只查「标题是否重复」，于是同一个词的多个版本全都发了出去。
+# 这正是那 3 篇「汇报被领导打断」的由来（refine_loop.py:218 的注释早就记着
+# 「这个词前排 0.14，还在这个词上写了 3 篇」，但没人把它接到闸门上）。
+MAX_PER_KEYWORD = 2
+
+
+def published_keyword_counts():
+    """已发布笔记按「成稿声明的关键词」计数。归档稿也要读 —— 发过的稿多半已归档。"""
+    counts = {}
+    for r in read_csv(PUB_LOG):
+        if not (r.get("发布") or "").startswith("✅"):
+            continue
+        name = (r.get("成稿文件") or "").strip()
+        kw = keyword_of(name)
+        if kw:
+            counts[kw] = counts.get(kw, 0) + 1
+    return counts
+
+
 def backend_titles():
     """创作后台抓回来的真实已发标题。
 
@@ -183,6 +217,15 @@ def gate(name):
     t = draft_title_of(name)
     if t and t in backend_titles():
         return False, f"创作后台已有同名笔记「{t}」（发布日志漏记，再发即重复）"
+
+    # 同词限发（见 MAX_PER_KEYWORD 上方的数据）。标题查重拦不住这种情况：
+    # 同一个词的几个返工版本标题各不相同，逐条看都「不重复」，合起来就是刷屏。
+    kw = keyword_of(name)
+    if kw:
+        n = published_keyword_counts().get(kw, 0)
+        if n >= MAX_PER_KEYWORD:
+            return False, (f"关键词「{kw}」已发布 {n} 篇（上限 {MAX_PER_KEYWORD}）——"
+                           f"同词再发是跟自己抢同一个搜索位，实测第 3 篇起量不累积")
 
     stem = name.removeprefix("成稿_").removesuffix(".md")
     imgs = sorted((SUCAI / "成品图" / stem).glob("*.png")) if (SUCAI / "成品图" / stem).is_dir() else []
@@ -245,6 +288,10 @@ def keyword_of(name):
     比拿标题去猜可靠。2026-08-05 之前只按标题匹配，而标题策略早已改成「不复读搜索原句」
     （见 commit ee904ce），于是每篇都匹配不上、发布日和笔记链接一路空着没人发现。"""
     f = SUCAI / name
+    if not f.exists():
+        # 已发布的稿多半已经被挪进 归档稿/。不找这里的话
+        # published_keyword_counts() 会永远数出 0，同词限发形同虚设。
+        f = SUCAI / "归档稿" / name
     if not f.exists():
         return ""
     head = f.read_text(encoding="utf-8")[:2000]

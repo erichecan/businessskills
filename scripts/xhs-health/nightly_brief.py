@@ -225,6 +225,28 @@ def section_outcome():
                          f"搜索流这套打法（按搜索位强度选词、标题塞关键词）"
                          f"要不要继续，该拿这组数字重估一次了")
 
+    # ── 话题集中度：重复发同一个词是在跟自己抢搜索位
+    # 2026-08-15 Eric 提出「已经有差不多 6 篇汇报被打断了」，查证属实：
+    # 后台 33 篇里「被打断」类 5 篇、「绩效面谈被打低分」3 篇。
+    # 而数据显示重复发不划算 —— 晋升答辩 1050→301、绩效 157→107→107、
+    # 汇报被打断 62→61→60，量不累积反而集体停在低位。
+    # 闸门已加同词上限，这里让分布**在发生之前**就看得见。
+    try:
+        sys.path.insert(0, str(REPO / "scripts" / "xhs-publish"))
+        from auto_publish import MAX_PER_KEYWORD, published_keyword_counts
+        counts = published_keyword_counts()
+        hot = [(k, v) for k, v in counts.items() if v >= 2]
+        if hot:
+            hot.sort(key=lambda x: -x[1])
+            desc = "、".join(f"{k}×{v}" for k, v in hot[:4])
+            full = [k for k, v in hot if v >= MAX_PER_KEYWORD]
+            lines.append(f"　　· 话题集中度：{len(counts)} 个词已发布 · 重复词 {len(hot)} 个（{desc}）")
+            if full:
+                lines.append(f"　　  ⚠️ {len(full)} 个词已达上限 {MAX_PER_KEYWORD} 篇，"
+                             f"闸门会拦住同词新稿 —— 供给要往新词上走")
+    except Exception:                                       # noqa: BLE001
+        pass
+
     # ── 预测校准：样本够没够，够了就该动手
     calib = read_csv(SUCAI / "预测校准.csv")
     views = [r for r in calib if (r.get("指标") or "").strip() == "观看"]

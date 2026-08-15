@@ -888,15 +888,30 @@ def rework_queue() -> list:
     # 已发出去的稿不该再返工：改了也不会重发，纯烧额度。
     # 两个来源都要查——发布日志记流程走过的，人工放行记人拍板放行的。
     sys.path.insert(0, str(REPO / "scripts" / "xhs-publish"))
+    kw_full = set()
     try:
-        from auto_publish import published_already
+        from auto_publish import (MAX_PER_KEYWORD, keyword_of,
+                                  published_already, published_keyword_counts)
         released |= published_already()
+        # ⛔ 2026-08-15：同一关键词已发满的，返工也别再排。
+        # 闸门那边已经拦住不让发（见 auto_publish.MAX_PER_KEYWORD），
+        # 这里不拦的话，loop 会一直挑这些「离过线最近」的高分稿去改 ——
+        # 改好了照样发不出去，纯烧额度。实测返工队列里「汇报被领导打断怎么接」
+        # 和「绩效面谈被打低分怎么开口」各压着好几篇，两个词都已经发满 3 篇。
+        counts = published_keyword_counts()
+        kw_full = {k for k, v in counts.items() if v >= MAX_PER_KEYWORD}
     except Exception:
-        pass
+        keyword_of = None
     out = []
+    skipped_full = []
     for fname, r in latest.items():
         if (r.get("处置") or "").strip() != "返工" or fname in released:
             continue
+        if keyword_of and kw_full:
+            kw = keyword_of(fname)
+            if kw in kw_full:
+                skipped_full.append((fname, kw))
+                continue
         path = next((p for p in (SUCAI / fname, SUCAI / "归档稿" / fname) if p.exists()), None)
         if not path:
             continue
@@ -906,6 +921,11 @@ def rework_queue() -> list:
             score = 0
         out.append({"file": fname, "path": path, "score": score, "row": r,
                     "stale": is_stale_score(r)})
+    # 静默跳过会让人以为队列本来就这么短，得说出来 —— 这几篇不是没排上，是发不出去
+    if skipped_full:
+        kws = sorted({k for _, k in skipped_full})
+        print(f"   · 跳过 {len(skipped_full)} 篇：关键词已发满 {MAX_PER_KEYWORD} 篇"
+              f"（{'、'.join(kws)}），改好了也过不了闸门")
     return sorted(out, key=lambda x: -x["score"])
 
 
