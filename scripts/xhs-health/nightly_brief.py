@@ -19,6 +19,7 @@
 import argparse
 import csv
 import re
+import shutil
 import subprocess
 import sys
 from datetime import date
@@ -379,9 +380,10 @@ def notify_brief(today, blocks, path):
     通知里放**当天最要紧的那条**，不是「brief 已生成」这种无信息量的话：
     看一眼通知就知道今天要不要动手，不用先打开文件才发现全绿。
 
-    ⚠️ 点击跳转做不到：osascript 的 display notification 不支持附加点击动作，
-    要做得装 terminal-notifier。所以配套写了固定路径 brief-latest.html
-    （见 main），钉在 Dock 或存书签，一次点击到位。
+    点通知直接开页面走 terminal-notifier 的 -open（2026-08-14 Eric 让装的）：
+    osascript 的 display notification 不支持附加点击动作，点了只会消失。
+    没装或调用失败时退回 osascript —— 通知本身比「能不能点」重要，
+    不能因为少个工具就整条提醒都没了。
     """
     fails = [lines[0] for lines, ok in blocks if not ok]
     if fails:
@@ -389,10 +391,24 @@ def notify_brief(today, blocks, path):
         text = f"{len(fails)} 项要处理：{first}"
     else:
         text = "全绿，没有需要你处理的"
+    title = f"小红书 brief · {today[5:]}"
+    tn = shutil.which("terminal-notifier") or "/opt/homebrew/bin/terminal-notifier"
+    if Path(tn).exists():
+        try:
+            subprocess.run([tn, "-title", title, "-message", text,
+                            "-subtitle", "点这条打开今天的 brief",
+                            "-open", path.as_uri(),
+                            "-sound", "Basso" if fails else "Glass",
+                            # 固定 group：同一天多次生成时替换掉上一条，不堆一串
+                            "-group", "xhs-brief"],
+                           check=False, timeout=10)
+            return
+        except Exception:                                   # noqa: BLE001
+            pass
     try:
         subprocess.run(
             ["osascript", "-e",
-             f'display notification "{text}" with title "小红书 brief · {today[5:]}"'
+             f'display notification "{text}" with title "{title}"'
              f' subtitle "preview/brief-latest.html"'
              f' sound name "{"Basso" if fails else "Glass"}"'],
             check=False, timeout=10)

@@ -77,6 +77,97 @@ def _body_section(text):
     return m.group(1) if m else ""
 
 
+# ── 正文复述卡片（2026-08-14 加）──────────────────────────────────────────
+# 这是**最大的单一扣分项**，而且一直只能靠审核员肉眼发现 —— 等发现时一整轮
+# claude -p 已经烧掉了。08-11 之后 63 条独立审核里 56% 命中这条；
+# 80-84 分那一档 11 篇更集中，9 篇写着同一句话：
+#   「正文几乎逐字复述七张卡片 → 完整关键词只出现 1-2 次」
+# 两件事其实是一件：正文被卡片内容占满，就没地方承载关键词了。
+# 而搜索流的分工写死在成稿模板里 —— **7 张图承载内容，正文承载关键词**。
+#
+# 判据用「连续 N 字命中」而不是整句相等：复述时人会改标点、调语序、换连接词，
+# 整句比对一条都抓不到。N=12 是权衡后的值：太短会误伤（「面试官」「怎么办」这类
+# 短语本来就会同时出现在图和正文里），太长又抓不到改写型复述。
+# 参数由回测标定，不是拍脑袋：拿 29 篇有独立审核结论的稿做样本，
+# 以审核员判没判「复述」为标准答案，扫 N×MAX 的组合（结果见下）：
+#     N=8  MAX=2 → 准确 62% 召回 83%（误报 9 篇）
+#     N=12 MAX=2 → 准确 59% 召回 72%（误报 9 篇）
+#     N=12 MAX=8 → 准确 100% 召回 44%（**误报 0**）   ← 采用
+#     N=20 MAX=3 → 准确 100% 召回 33%
+# 选零误报那一档：这是**硬拦截**，误报会让一篇没毛病的稿被打回重写、白烧一轮
+# claude -p，比漏报贵得多。漏掉的那一半是「改写型复述」（改了措辞语序），
+# 机械比对本来就抓不到，继续交给审核员 —— 机械项只负责抓确凿的。
+CARD_ECHO_N = 12          # 连续 12 字与某张卡片相同 → 记一处
+CARD_ECHO_MAX = 8         # 8 处以上＝通篇搬运。少数几处呼应是正常的
+
+
+def _card_texts(fname):
+    """取同名 cards.json 里每张卡的可读文本。取不到就返回空 —— 没有卡片
+    不该判违规（推荐流的稿本来就没有七卡）。"""
+    import json as _json
+    stem = fname.removeprefix("成稿_").removesuffix(".md")
+    p = SUCAI / f"图文_{stem}_cards.json"
+    if not p.exists():
+        return []
+    try:
+        cards = _json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError):
+        return []
+    if isinstance(cards, dict):
+        cards = cards.get("cards") or []
+    out = []
+    for c in cards:
+        if not isinstance(c, dict):
+            continue
+        # body 是卡片正文，最容易被搬进成稿正文；quote/title 也一并看
+        txt = " ".join(str(c.get(k) or "") for k in ("title", "quote", "body"))
+        out.append(_norm(re.sub(r"<[^>]+>", "", txt)))     # 卡片 body 里有 <br>
+    return [t for t in out if t]
+
+
+def _card_echo(body, cards, keyword=""):
+    """正文里有多少处连续 CARD_ECHO_N 字与卡片重合。返回 (处数, 示例)。
+
+    ⛔ 关键词必须先剔掉再比。首图卡要求**逐字等于用户搜索原句**，正文又要求
+    承载同一个关键词 —— 两边都出现是设计要求，不是复述。首版没剔，
+    结果 4 篇回测里 2 篇报的「复述」示例全是关键词本身（「hr面试薪酬谈判有哪些技」），
+    等于拿制度要求的事去判违规。
+    """
+    nb = _norm(body)
+    if keyword:
+        nb = nb.replace(_norm(keyword), "")
+        cards = [c.replace(_norm(keyword), "") for c in cards]
+    if not nb or not cards:
+        return 0, ""
+    hits, seen, sample = 0, set(), ""
+    for i in range(len(nb) - CARD_ECHO_N + 1):
+        frag = nb[i:i + CARD_ECHO_N]
+        if frag in seen:
+            continue
+        for c in cards:
+            if frag in c:
+                hits += 1
+                seen.update(nb[j:j + CARD_ECHO_N]
+                            for j in range(i, min(i + CARD_ECHO_N, len(nb) - CARD_ECHO_N + 1)))
+                if not sample:
+                    sample = frag
+                break
+    return hits, sample
+
+
+def _keyword_hits(text, body):
+    """完整关键词在正文里出现几次。规格是 3-5 次（SKILL.md 维度 1 判据④）。
+
+    与上面那条同源：正文被卡片内容占满 → 关键词挤不进去。18 篇两病并发。
+    这一项以前也只有审核员在数，纯机械的事没必要花模型额度。
+    """
+    m = re.search(r"关键词来源[^「]*「([^」]+)」", text[:2000])
+    if not m:
+        return None, ""
+    kw = m.group(1).strip()
+    return _norm(body).count(_norm(kw)), kw
+
+
 QUOTE_RE = re.compile(r"[「“\"']([^「」“”\"'\n]{6,60})[」”\"']")
 QUOTE_MIN = 8          # 短于这个字数的引语不查：6-8 字的口语短句在任何库里都容易撞上
 FUZZY_N = 8            # 整句查不到时，用 8 字连续相同判「疑似改写」——比 STRONG_N(6) 严
@@ -367,6 +458,25 @@ def check_one(d, f, all_drafts, lane_override=None):
     # 实测《答辩被打断，评委问的根本不是项目本身》：正文节 1 处（合格），
     # 按全文算 3 处 → 被判违规、卡在发布闸门外。判据没变，只把窗口挪到该量的地方。
     prose = body_sec or body
+
+    # 正文复述卡片 + 关键词密度（2026-08-14 加，见文件上方 CARD_ECHO_N 处的注释）
+    if body_sec:
+        hits, kw = _keyword_hits(text, body_sec)
+        echo, sample = _card_echo(body_sec, _card_texts(f.name), kw)
+        if echo > CARD_ECHO_MAX:
+            issues.append(
+                f"正文复述卡片 {echo} 处（>{CARD_ECHO_MAX}）：如「{sample}」——"
+                f"搜索流的分工是 7 张图承载内容、正文承载关键词，"
+                f"把卡片抄进正文等于两头落空")
+        # 次数规格按关键词长度分档。SKILL.md 写的是 3-5 次，但那条针对的是普通关键词：
+        # 正文总共才 100-500 字，一个 14 字的长尾词塞 3 次就占掉 42 字，
+        # 而且读起来就是关键词堆砌 —— 会反过来被「AI 味」那几条判扣分。
+        # 两条规则打架时以可读性为准，长尾词只要求「完整出现过 ≥2 次」。
+        if hits is not None:
+            lo, hi = (2, 99) if len(kw) > 10 else (3, 5)
+            if not lo <= hits <= hi:
+                spec = f"≥{lo} 次" if hi == 99 else f"{lo}-{hi} 次"
+                issues.append(f"完整关键词「{kw}」在正文出现 {hits} 次（规格 {spec}）")
 
     nb = len(NOT_BUT.findall(prose))
     if nb > 2:

@@ -63,6 +63,8 @@ CIKU = SUCAI / "词库.csv"
 PUB_LOG = SUCAI / "发布日志.csv"
 PROXY_BASE = "http://localhost:3456"
 HEALTH_DIR = REPO / "scripts" / "xhs-health"
+# 闸门发现缺成品图时现场补渲染用。与 refine_loop.CARDS_SCRIPT 是同一个脚本。
+CARDS_SCRIPT = SUCAI / "图文模板" / "make_cards.py"
 
 sys.path.insert(0, str(REPO / "scripts" / "case-entry"))
 
@@ -73,7 +75,13 @@ PUB_LOG_COLS = ["日期", "成稿文件", "标题", "闸门", "预填", "定时"
 SLOT_HOURS = [9, 11, 12, 17, 18, 20, 22]
 DAILY_QUOTA = 3          # 每天发 3 篇，不是一天占满 7 个时段
 SCHED_LEAD = timedelta(minutes=30)   # 小红书定时发布需要提前量，太近会被拒
-TRUSTED_AUDITORS = {"独立审核", "人工放行"}
+# 谁的「处置」算数。gate 取的是这些审核方里**最后一条**，所以少列一个，
+# 那一方的结论就等于没写过。
+# ⛔ 2026-08-14 补两个，都是踩到才发现的：
+#   · 自动分诊（08-13 加）—— 不列进来的话，分诊判了「归档」闸门也看不见，
+#     稿子仍按更早那条独立审核的「发布」放出去。反了。
+#   · 阈值重判（08-14 阈值 85→80 时批量补的行）—— 不列进来重判就白写。
+TRUSTED_AUDITORS = {"独立审核", "人工放行", "自动分诊", "阈值重判"}
 
 # 接力模式：预填一篇 → 轮询等人点完「定时发布」→ 自动预填下一篇。
 # 有了它，一天跑一次（22:00）就能走完 DAILY_QUOTA 篇；此前只能靠一天跑三次凑。
@@ -179,7 +187,27 @@ def gate(name):
     stem = name.removeprefix("成稿_").removesuffix(".md")
     imgs = sorted((SUCAI / "成品图" / stem).glob("*.png")) if (SUCAI / "成品图" / stem).is_dir() else []
     if not imgs:
-        return False, "成品图目录没有已渲染的卡片图"
+        # ⛔ 2026-08-14：缺图不该直接拦下一篇其他条件都合格的稿。
+        # 渲染是**纯机械步骤**（headless Chrome 跑 make_cards.py，不花任何 AI 额度），
+        # 缺了现场补就是，没有理由让稿子停在这。
+        #
+        # 为什么会缺：refine_loop 只在**过线时**才渲染（rework_one 结尾「过线就渲染图交闸门」）。
+        # 于是没过线的稿从来没有图 —— 2026-08-14 把阈值从 85 降到 80 之后，
+        # 返工队列里 6 篇够格的稿**全部**卡在「图 0 张」，一篇都放不出来。
+        # 阈值一改，这批稿的图就集体缺席，这个耦合以前没人注意到。
+        cards = SUCAI / f"图文_{stem}_cards.json"
+        if cards.exists():
+            out = SUCAI / "成品图" / stem
+            r = subprocess.run([sys.executable, str(CARDS_SCRIPT), str(cards), f"{out}/"],
+                               cwd=str(CARDS_SCRIPT.parent), capture_output=True,
+                               text=True, timeout=300)
+            imgs = sorted(out.glob("*.png")) if out.is_dir() else []
+            if imgs:
+                print(f"   · {name} 缺成品图，已现场渲染 {len(imgs)} 张")
+            else:
+                return False, f"成品图缺失且现场渲染失败：{(r.stderr or r.stdout)[:80]}"
+        else:
+            return False, "成品图目录没有已渲染的卡片图，且没有卡片 JSON 可渲染"
 
     # ⛔ 2026-08-13 修：原先取的是整份 stdout 里第一条「- 」开头的行，而 --days 30
     # 一次要检查 80+ 篇，那一行几乎总是**别的稿**的问题。实测本篇真实拦点是
