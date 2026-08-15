@@ -369,6 +369,37 @@ def render_html(today, blocks):
             f'</div></body></html>')
 
 
+def notify_brief(today, blocks, path):
+    """brief 生成完弹一条系统通知（2026-08-14 Eric 要的）。
+
+    为什么需要：brief 以前生成完就静静躺在 docs/ 里，全靠人记得每天 21 点后去开。
+    这个项目里已经反复验证过——只要依赖人主动去看，实际执行率就趋近于零
+    （「待人工」积压 12 天、复盘结论从没被执行过，都是这个模式）。
+
+    通知里放**当天最要紧的那条**，不是「brief 已生成」这种无信息量的话：
+    看一眼通知就知道今天要不要动手，不用先打开文件才发现全绿。
+
+    ⚠️ 点击跳转做不到：osascript 的 display notification 不支持附加点击动作，
+    要做得装 terminal-notifier。所以配套写了固定路径 brief-latest.html
+    （见 main），钉在 Dock 或存书签，一次点击到位。
+    """
+    fails = [lines[0] for lines, ok in blocks if not ok]
+    if fails:
+        first = re.sub(r"[*#`]", "", fails[0])[:90]
+        text = f"{len(fails)} 项要处理：{first}"
+    else:
+        text = "全绿，没有需要你处理的"
+    try:
+        subprocess.run(
+            ["osascript", "-e",
+             f'display notification "{text}" with title "小红书 brief · {today[5:]}"'
+             f' subtitle "preview/brief-latest.html"'
+             f' sound name "{"Basso" if fails else "Glass"}"'],
+            check=False, timeout=10)
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--stdout", action="store_true", help="只打印不写文件")
@@ -393,9 +424,17 @@ def main():
         md_out.write_text(text, encoding="utf-8")
         print(f"→ 已写入 {md_out}")
         PREVIEW.mkdir(exist_ok=True)
+        html = render_html(today, blocks)
         html_out = PREVIEW / f"{today.replace('-', '')}-brief.html"
-        html_out.write_text(render_html(today, blocks), encoding="utf-8")
+        html_out.write_text(html, encoding="utf-8")
         print(f"→ 已写入 {html_out}")
+        # 固定路径（2026-08-14 Eric 要的）：按日期命名的那份是存档，
+        # 这份始终是最新一天，路径不变才能钉在 Dock / 存成书签，一次点击到位。
+        # 写完整副本而不是符号链接 —— 链接在浏览器里另存、同步、备份时容易失效。
+        latest = PREVIEW / "brief-latest.html"
+        latest.write_text(html, encoding="utf-8")
+        print(f"→ 固定入口 {latest}")
+        notify_brief(today, blocks, latest)
     return 0
 
 
