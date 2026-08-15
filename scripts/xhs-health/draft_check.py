@@ -77,97 +77,6 @@ def _body_section(text):
     return m.group(1) if m else ""
 
 
-# ── 正文复述卡片（2026-08-14 加）──────────────────────────────────────────
-# 这是**最大的单一扣分项**，而且一直只能靠审核员肉眼发现 —— 等发现时一整轮
-# claude -p 已经烧掉了。08-11 之后 63 条独立审核里 56% 命中这条；
-# 80-84 分那一档 11 篇更集中，9 篇写着同一句话：
-#   「正文几乎逐字复述七张卡片 → 完整关键词只出现 1-2 次」
-# 两件事其实是一件：正文被卡片内容占满，就没地方承载关键词了。
-# 而搜索流的分工写死在成稿模板里 —— **7 张图承载内容，正文承载关键词**。
-#
-# 判据用「连续 N 字命中」而不是整句相等：复述时人会改标点、调语序、换连接词，
-# 整句比对一条都抓不到。N=12 是权衡后的值：太短会误伤（「面试官」「怎么办」这类
-# 短语本来就会同时出现在图和正文里），太长又抓不到改写型复述。
-# 参数由回测标定，不是拍脑袋：拿 29 篇有独立审核结论的稿做样本，
-# 以审核员判没判「复述」为标准答案，扫 N×MAX 的组合（结果见下）：
-#     N=8  MAX=2 → 准确 62% 召回 83%（误报 9 篇）
-#     N=12 MAX=2 → 准确 59% 召回 72%（误报 9 篇）
-#     N=12 MAX=8 → 准确 100% 召回 44%（**误报 0**）   ← 采用
-#     N=20 MAX=3 → 准确 100% 召回 33%
-# 选零误报那一档：这是**硬拦截**，误报会让一篇没毛病的稿被打回重写、白烧一轮
-# claude -p，比漏报贵得多。漏掉的那一半是「改写型复述」（改了措辞语序），
-# 机械比对本来就抓不到，继续交给审核员 —— 机械项只负责抓确凿的。
-CARD_ECHO_N = 12          # 连续 12 字与某张卡片相同 → 记一处
-CARD_ECHO_MAX = 8         # 8 处以上＝通篇搬运。少数几处呼应是正常的
-
-
-def _card_texts(fname):
-    """取同名 cards.json 里每张卡的可读文本。取不到就返回空 —— 没有卡片
-    不该判违规（推荐流的稿本来就没有七卡）。"""
-    import json as _json
-    stem = fname.removeprefix("成稿_").removesuffix(".md")
-    p = SUCAI / f"图文_{stem}_cards.json"
-    if not p.exists():
-        return []
-    try:
-        cards = _json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, _json.JSONDecodeError):
-        return []
-    if isinstance(cards, dict):
-        cards = cards.get("cards") or []
-    out = []
-    for c in cards:
-        if not isinstance(c, dict):
-            continue
-        # body 是卡片正文，最容易被搬进成稿正文；quote/title 也一并看
-        txt = " ".join(str(c.get(k) or "") for k in ("title", "quote", "body"))
-        out.append(_norm(re.sub(r"<[^>]+>", "", txt)))     # 卡片 body 里有 <br>
-    return [t for t in out if t]
-
-
-def _card_echo(body, cards, keyword=""):
-    """正文里有多少处连续 CARD_ECHO_N 字与卡片重合。返回 (处数, 示例)。
-
-    ⛔ 关键词必须先剔掉再比。首图卡要求**逐字等于用户搜索原句**，正文又要求
-    承载同一个关键词 —— 两边都出现是设计要求，不是复述。首版没剔，
-    结果 4 篇回测里 2 篇报的「复述」示例全是关键词本身（「hr面试薪酬谈判有哪些技」），
-    等于拿制度要求的事去判违规。
-    """
-    nb = _norm(body)
-    if keyword:
-        nb = nb.replace(_norm(keyword), "")
-        cards = [c.replace(_norm(keyword), "") for c in cards]
-    if not nb or not cards:
-        return 0, ""
-    hits, seen, sample = 0, set(), ""
-    for i in range(len(nb) - CARD_ECHO_N + 1):
-        frag = nb[i:i + CARD_ECHO_N]
-        if frag in seen:
-            continue
-        for c in cards:
-            if frag in c:
-                hits += 1
-                seen.update(nb[j:j + CARD_ECHO_N]
-                            for j in range(i, min(i + CARD_ECHO_N, len(nb) - CARD_ECHO_N + 1)))
-                if not sample:
-                    sample = frag
-                break
-    return hits, sample
-
-
-def _keyword_hits(text, body):
-    """完整关键词在正文里出现几次。规格是 3-5 次（SKILL.md 维度 1 判据④）。
-
-    与上面那条同源：正文被卡片内容占满 → 关键词挤不进去。18 篇两病并发。
-    这一项以前也只有审核员在数，纯机械的事没必要花模型额度。
-    """
-    m = re.search(r"关键词来源[^「]*「([^」]+)」", text[:2000])
-    if not m:
-        return None, ""
-    kw = m.group(1).strip()
-    return _norm(body).count(_norm(kw)), kw
-
-
 QUOTE_RE = re.compile(r"[「“\"']([^「」“”\"'\n]{6,60})[」”\"']")
 QUOTE_MIN = 8          # 短于这个字数的引语不查：6-8 字的口语短句在任何库里都容易撞上
 FUZZY_N = 8            # 整句查不到时，用 8 字连续相同判「疑似改写」——比 STRONG_N(6) 严
@@ -459,31 +368,25 @@ def check_one(d, f, all_drafts, lane_override=None):
     # 按全文算 3 处 → 被判违规、卡在发布闸门外。判据没变，只把窗口挪到该量的地方。
     prose = body_sec or body
 
-    # 正文复述卡片 + 关键词密度（2026-08-14 加，见文件上方 CARD_ECHO_N 处的注释）
-    if body_sec:
-        hits, kw = _keyword_hits(text, body_sec)
-        echo, sample = _card_echo(body_sec, _card_texts(f.name), kw)
-        if echo > CARD_ECHO_MAX:
-            issues.append(
-                f"正文复述卡片 {echo} 处（>{CARD_ECHO_MAX}）：如「{sample}」——"
-                f"搜索流的分工是 7 张图承载内容、正文承载关键词，"
-                f"把卡片抄进正文等于两头落空")
-        # ⛔ 硬拦只到「少于 2 次」，不照搬 SKILL.md 的 3-5 次规格。
-        # 首版直接拿 3-5 当机械门槛，当场把返工链路卡死：2026-08-15 实测一轮返工
-        # 三次尝试全被这条拦下（1 次 → 未过；第 2 轮 77 分；第 3 轮做到 2 次 → 仍未过），
-        # 三次 claude -p 全废，稿子回滚归档。
-        #
-        # 错在混淆了两种判据的性质：3-5 次是**审核维度里的扣分项**（差一点扣一点分），
-        # 而机械项是**硬拦截**（不过就发不出去）。把软性规格升级成硬门槛，
-        # 等于给链路加了一道谁都过不去的闸。何况正文只有 100-500 字，
-        # 一个 10 字的词塞 3 次占掉 30 字，读起来就是关键词堆砌 —— 又会撞上 AI 味那几条。
-        #
-        # 机械项只管确凿的那一端：0-1 次＝正文根本没承载关键词，搜索流的正文职能落空。
-        # 「2 次还是 3 次」这种程度问题留给审核员按维度扣分。
-        if hits is not None and hits < 2:
-            issues.append(f"完整关键词「{kw}」在正文只出现 {hits} 次 —— "
-                          f"搜索流的正文职能就是承载关键词（审核规格 3-5 次，"
-                          f"这里只硬拦 <2 次）")
+    # ⛔ 2026-08-15 删除「正文复述卡片」与「关键词次数」两项（Eric 定）。
+    #
+    # 它们只活了一天。加的时候理由看着很硬 —— 08-11 之后 63 条独立审核里 56% 扣在
+    # 「正文复述卡片」，是最大的单一扣分项。但 Eric 问了一句「为什么非要卡着不放」，
+    # 回头去查依据，发现整条规则建立在一个从没验证过的前提上：
+    # 「搜索流分工＝7 张图承载内容 + 正文承载关键词」出自 07-31 的拍板，不是数据。
+    #
+    # 拿账号自己 23 篇已发布笔记算相关系数（对观看量）：
+    #     复述卡片处数   r = -0.040   几乎无关
+    #     关键词出现次数 r = -0.148   几乎无关
+    #     正文字数       r = +0.097   几乎无关
+    # 观看最高那篇（1050，全账号第一）复述 6 处、关键词 **0 次**。
+    # 再对外部基准：32 篇搜索位高赞笔记正文中位 **60 字**，
+    # 日均赞前三名的正文是 **0 / 0 / 69 字** —— 爆款根本不写正文。
+    #
+    # 所以这两条既没有数据支持，代价还很实：2026-08-15 一轮返工三次尝试全被
+    # 关键词那条拦下（1 次→未过、第 2 轮 77 分、第 3 轮 2 次→仍未过），
+    # 三次 claude -p 全废、稿子回滚归档。删掉。
+    # 省下的注意力放到标题和选词上 —— 那两项是有数据的（547 条 / 360 倍差异）。
 
     nb = len(NOT_BUT.findall(prose))
     if nb > 2:
