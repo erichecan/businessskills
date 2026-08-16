@@ -117,21 +117,55 @@ const evaluate = async (cdp, js) => {
 };
 
 /** 传一段返回元素的 JS 表达式，滚进可视区后按视口坐标点它。
- *  滚动和取坐标必须在同一次求值里做完 —— 分两次的话拿到的是滚动前的 rect。 */
+ *
+ * ⛔ 2026-08-16 重写。老版本把 scrollIntoView 和 getBoundingClientRect 放在
+ * **同一次求值**里（注释说「分两次拿到的是滚动前的 rect」）—— 那个理由只在
+ * 不等待的前提下成立，代价是滚动尚未稳定就把坐标读走了。
+ * 实测后果：timebar 里 24 个「时」，需要滚动才能露出的目标会点偏 ——
+ * 目标 20:00 点成了 13:00（差 7 格），11:00 也失败，而 12:00（无需滚动）成功。
+ * 一晚三篇里两篇栽在这。
+ *
+ * 现在分三步：滚动 → 等它稳 → 重取坐标，并且**点之前用 elementFromPoint
+ * 校验该坐标处真的是目标元素**（被遮挡/坐标失效都会在这暴露），不中就重试。
+ * 校验比「小心地一次算对」可靠：点偏了会立刻发现，而不是等回读时才看出来。 */
 async function clickBy(cdp, exprReturningEl, label) {
-  const box = await evaluate(cdp, `(() => {
-    const el = ${exprReturningEl};
-    if (!el) return null;
-    el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
-    const r = el.getBoundingClientRect();
-    if (r.width < 1 || r.height < 1) return { hidden: true };
-    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-  })()`);
-  if (!box) throw new Error(`${label}：没找到元素`);
-  if (box.hidden) throw new Error(`${label}：元素存在但不可见`);
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: box.x, y: box.y, button: 'left', clickCount: 1 });
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: box.x, y: box.y, button: 'left', clickCount: 1 });
-  await sleep(450);
+  let last = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await evaluate(cdp, `(() => {
+      const el = ${exprReturningEl};
+      if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+      return !!el;
+    })()`);
+    await sleep(260);                       // 让滚动与重排落定，再取坐标
+
+    const box = await evaluate(cdp, `(() => {
+      const el = ${exprReturningEl};
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) return { hidden: true };
+      const x = r.x + r.width / 2, y = r.y + r.height / 2;
+      const hit = document.elementFromPoint(x, y);
+      return {
+        x, y,
+        onTarget: !!hit && (hit === el || el.contains(hit) || hit.contains(el)),
+        want: (el.textContent || '').trim().slice(0, 12),
+        got: hit ? (hit.textContent || '').trim().slice(0, 12) : '(无)',
+      };
+    })()`);
+    if (!box) throw new Error(`${label}：没找到元素`);
+    if (box.hidden) throw new Error(`${label}：元素存在但不可见`);
+    last = box;
+
+    if (box.onTarget) {
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: box.x, y: box.y, button: 'left', clickCount: 1 });
+      await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: box.x, y: box.y, button: 'left', clickCount: 1 });
+      await sleep(450);
+      return;
+    }
+    console.log(`  ⟳ ${label}：坐标处是「${box.got}」不是「${box.want}」，重定位（第 ${attempt} 次）`);
+    await sleep(220);
+  }
+  throw new Error(`${label}：三次重定位后坐标处仍是「${last?.got}」而非「${last?.want}」，不点，避免点错格子`);
 }
 
 const POP = `document.querySelector('.post-time-date-picker-popover-class')`;
