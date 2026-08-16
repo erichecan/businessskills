@@ -6,11 +6,22 @@
 import csv
 import json
 import re
+import sys
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+
+# ⛔ 闸门线只能有一个来源。2026-08-15 查出这个页面把「过线」硬编码成 ≥85，
+# 而 independent_audit.PASS_SCORE 08-14 已降到 80 —— 于是 81-84 分的稿
+# 在页面上显示成橙色、不计入「过线 N 篇」，看页面的人以为今天没出稿，
+# 实际它们早就够格发布了。别在这里再写一次数字。
+sys.path.insert(0, str(REPO / "scripts" / "xhs-health"))
+try:
+    from independent_audit import PASS_SCORE
+except Exception:                     # 审核脚本缺失时页面仍要能开
+    PASS_SCORE = 80
 CSV_PATH = REPO / "xhs" / "素材库" / "案例库.csv"
 # 来源/来源链接/状态 三列由 harvest_cases.py 引入：案例库同时收 Eric 自己的经历（来源=自有）
 # 和采集来的真实原话（来源=采集）。⛔ 这里少写一列，界面保存时 DictWriter 会把整列抹掉。
@@ -158,6 +169,7 @@ async function loadDrafts(){
  renderDrafts();
 }
 const PSTATE=['已发布','已定时','已预填','预填失败','未处理'];
+const PASS_SCORE=__PASS_SCORE__;   // 由 case_entry.py 从 independent_audit 注入，别在此写死
 function renderDrafts(){
  const f=document.querySelector('input[name=tf]:checked')?.value||'all';
  let ds=allDrafts;
@@ -182,7 +194,7 @@ function renderDrafts(){
  document.getElementById('dlist').innerHTML=days.map(k=>{
   const g=groups[k], open=!collapsed.has(k);
   const c={};for(const s of PSTATE) c[s]=g.filter(d=>(d.pub||{}).state===s).length;
-  const pass=g.filter(d=>d.independent&&d.score>=85).length;
+  const pass=g.filter(d=>d.independent&&d.score>=PASS_SCORE).length;
   const chips=[['🟢',c['已发布']],['🔵',c['已定时']],['🟡',c['已预填']],['⚪️',c['未处理']],['🔴',c['预填失败']]]
     .filter(([,n])=>n).map(([e,n])=>e+n).join(' ');
   return `<div onclick="toggleDay('${k}')" style="padding:7px 11px;margin:${open?'12px 0 6px':'6px 0'};border-radius:6px;cursor:pointer;user-select:none;font-size:13px;background:${k===today?'#1c1c1c':'#e6e5de'};color:${k===today?'#fff':'#444'}">
@@ -207,7 +219,7 @@ function draftItem(d){
      <b>${d.name.replace(/^成稿_\\d{4}-\\d{2}-\\d{2}_/,'').replace(/^成稿_/,'').replace(/\\.md$/,'')}</b>
      <span style="color:${p.color||'#bbb'};white-space:nowrap;font-size:11.5px">${p.label||''}</span></div>
     ${d.archived?'<span style="color:#999">[归档]</span> ':''}<span style="font-size:11px;padding:1px 6px;border-radius:8px;background:${d.lane==='推荐流'?'#e8e0f5':'#e0eef5'};color:#555">${d.lane}</span>
-    <span style="color:${d.score===null?'#bbb':!d.independent?'#999':d.score>=85?'#2f7d4f':d.score>=70?'#b06c00':'#c0392b'}">${
+    <span style="color:${d.score===null?'#bbb':!d.independent?'#999':d.score>=PASS_SCORE?'#2f7d4f':d.score>=PASS_SCORE-10?'#b06c00':'#c0392b'}">${
       d.score===null?'未审核':d.score+' 分 · '+(d.grade||'')+(d.independent?'':' ⚠️ 仅自评')}</span>
     <span style="color:#aaa">· 图 ${d.images}</span>${d.disposition?` <span style="color:#888">· ${d.disposition}</span>`:''}<br>
     <span style="color:${c};font-size:12px">${ic} 标题${d.tverdict}（${d.tlen}字）</span>
@@ -395,6 +407,8 @@ const h=location.hash.slice(1);
 if(['view','drafts'].includes(h)) showTab(h);
 load().catch(()=>{const m=document.getElementById('msg');m.textContent='❌ 服务未运行，请先启动';m.style.color='#c0392b';});
 </script></body></html>"""
+
+PAGE = PAGE.replace("__PASS_SCORE__", str(PASS_SCORE))
 
 
 SUCAI = CSV_PATH.parent

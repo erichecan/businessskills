@@ -25,6 +25,13 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 SUCAI = REPO / "xhs" / "素材库"
+
+# 闸门线的唯一来源，别在本文件里再写一次数字（见 quality_factor 的注释）。
+sys.path.insert(0, str(REPO / "scripts" / "xhs-health"))
+try:
+    from independent_audit import PASS_SCORE
+except Exception:
+    PASS_SCORE = 80
 CIKU = SUCAI / "词库.csv"
 AUDIT_LOG = SUCAI / "审核记录.csv"
 PROBE_DIR = SUCAI / "探测原始"
@@ -78,11 +85,14 @@ def views_base(density, med=None):
 
 # 内容质量在搜索排名里占 40%，是单项权重最高的
 def quality_factor(score):
+    # ⛔ 2026-08-15：中间档原本写死 85，与闸门线 80 脱节 —— 80-84 分的稿
+    # （现在是可发布的一档）会被按 0.7 折算，预测系统性偏低，复盘时看起来像
+    # 「发了但不及预期」，其实是预测基线错了。改为跟 PASS_SCORE 走。
     if score is None:
         return 0.85          # 没审核分时取偏保守值，不假装知道
-    if score >= 90:
+    if score >= PASS_SCORE + 10:
         return 1.3
-    if score >= 85:
+    if score >= PASS_SCORE:
         return 1.0
     return 0.7
 
