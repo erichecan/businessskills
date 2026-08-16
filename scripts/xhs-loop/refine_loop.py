@@ -1237,6 +1237,13 @@ def mech_fix_one(item, dry_run=False) -> str:
         path.write_text(text[:m.start(2)] + new_body + "\n" + text[m.end(2):], encoding="utf-8")
         ok, mech = mech_check(fname)
         if ok:
+            # ⛔ 归档稿里的要挪回素材库根目录 —— auto_publish.candidates() 只扫根目录，
+            # 留在 归档稿/ 里修好了闸门也看不见，等于白修。
+            # （rework_one 是在返工**开始前**挪，机修不重写全文所以放到成功后再挪，
+            #  失败时文件已还原、位置也不动，不留痕迹。）
+            if path.parent.name == "归档稿":
+                path = path.replace(SUCAI / fname)
+                print(f"   · 从 归档稿/ 挪回素材库（闸门只扫根目录）")
             print(f"   ✅ 机械项已过（第 {attempt} 次）—— 未重审，沿用原 {item['score']} 分")
             return "修好"
         print(f"   ⚠️ 第 {attempt} 次修完仍不过：{mech.splitlines()[-1][:70] if mech else ''}")

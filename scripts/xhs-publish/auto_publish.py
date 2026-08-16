@@ -196,6 +196,11 @@ MAX_PER_KEYWORD_TOTAL = 4      # 同词所有角度合计
 ANGLE_RE = re.compile(r"^>?\s*角度[:：]\s*\**\s*([^\n*]+)", re.M)
 ANGLE_UNSET = "未声明"
 
+# 「这一栏等于没有红线」的判据。见 gate() 里红线那段的注释：
+# 「无」「无。」「无；首图…已逼近红线」「无（待核：…）」都算无；
+# 「无法确认…」不算（「无」后面跟的是字，不是标点或结束）。
+NO_REDLINE_RE = re.compile(r"^\s*(无|None|-)\s*($|[；;，,。、（(：:])")
+
 
 def angle_of(name):
     """成稿头部的 `> 角度：面试官视角·他在筛什么`。取不到返回「未声明」。
@@ -298,8 +303,12 @@ def gate(name):
         return False, "审核记录里没有可解析的总分"
 
     # 红线从严：历史上任何一次判过红线，就得人看一眼，不看中位数。
-    reds = [r for r in trusted
-            if (r.get("红线") or "").strip() not in ("", "无", "无。", "None", "-")]
+    #
+    # ⛔ 判「无」不能用等值比较。审核员经常写成「无；首图非搜索原句已逼近红线」
+    # 「无（待核：两条原话未见于 csv）」—— 这些都是**没有红线**，只是附了一句说明。
+    # 按等值比较会把它们全判成有红线，实测误伤 2 篇 82-84 分的稿。
+    # 判据：以「无」开头、且紧跟结束或标点。这样「无法确认…」不会被误当成无红线。
+    reds = [r for r in trusted if not NO_REDLINE_RE.match((r.get("红线") or "").strip() or "无")]
     if reds:
         return False, (f"历史 {len(trusted)} 次审核里有 {len(reds)} 次判过红线"
                        f"（最近一次「{(reds[-1].get('红线') or '').strip()[:40]}」）"
@@ -344,6 +353,24 @@ def _gate_rest(name, verdict):
 
     stem = name.removeprefix("成稿_").removesuffix(".md")
     imgs = sorted((SUCAI / "成品图" / stem).glob("*.png")) if (SUCAI / "成品图" / stem).is_dir() else []
+
+    # ⛔ 2026-08-16：不能只判「有没有图」，要判**张数够不够**。
+    # 实测 成稿_2026-08-06_面试不说名字不扣分 的 cards JSON 有 7 张卡片，
+    # 成品图目录却只有一张 01_cover.png（case_entry 预览时缓存的封面），
+    # 而闸门 `if not imgs` 认为「有图」就放行 —— 发出去会是一篇只有封面、
+    # 缺 6 张内页的笔记。这是发布事故，不是瑕疵。
+    want = 0
+    cards_json = SUCAI / f"图文_{stem}_cards.json"
+    if cards_json.exists():
+        try:
+            data = json.loads(cards_json.read_text(encoding="utf-8"))
+            want = len(data) if isinstance(data, list) else len(data.get("cards") or [])
+        except (ValueError, OSError):
+            want = 0
+    if want and len(imgs) < want:
+        print(f"   · {name} 成品图只有 {len(imgs)}/{want} 张，重新渲染")
+        imgs = []                    # 交给下面那段统一现场渲染
+
     if not imgs:
         # ⛔ 2026-08-14：缺图不该直接拦下一篇其他条件都合格的稿。
         # 渲染是**纯机械步骤**（headless Chrome 跑 make_cards.py，不花任何 AI 额度），
@@ -360,8 +387,11 @@ def _gate_rest(name, verdict):
                                cwd=str(CARDS_SCRIPT.parent), capture_output=True,
                                text=True, timeout=300)
             imgs = sorted(out.glob("*.png")) if out.is_dir() else []
-            if imgs:
+            if imgs and (not want or len(imgs) >= want):
                 print(f"   · {name} 缺成品图，已现场渲染 {len(imgs)} 张")
+            elif imgs:
+                return False, (f"成品图只渲出 {len(imgs)}/{want} 张，缺内页不能发"
+                               f"（{(r.stderr or r.stdout)[:60]}）")
             else:
                 return False, f"成品图缺失且现场渲染失败：{(r.stderr or r.stdout)[:80]}"
         else:
