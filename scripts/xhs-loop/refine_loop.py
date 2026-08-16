@@ -66,6 +66,23 @@ CASE_BUDGET = 30     # 案例库保留行数（整库 101 行）
 # 2026-08-14 由 85 降到 80（Eric 定）。
 PASS_SCORE = 80
 MAX_ROUNDS = 3
+
+# ── 库存目标（2026-08-16 Eric 定，做法学 ximalaya 那条线）──────────────────
+#
+# 库存 = **闸门放行、还没发出去**的篇数，也就是「现在立刻能发几篇」。
+# 30 篇 ≈ 一个月缓冲（按每天发 1 篇算），给做稿失败、撞额度、规则变更留余量。
+#
+# 为什么要有这个数：在此之前写稿任务是固定 `--count 1`，跟库存无关 ——
+# 库存空了也只写一篇，库存堆着也照写不误。ximalaya 那条线的经验是
+# 「发布必保，做稿让路」：发布只依赖已有库存，做稿随时可能半路停，
+# 所以要靠**囤够库存**来保证「今天有没有更新」不取决于一件会失败的事。
+#
+# ⛔ 补库存的顺序按性价比来，这是 businessskills 比 ximalaya 多出来的一层：
+#     ① 机修   —— 分数已过线、只差机械项，prompt 约 1.1k 字
+#     ② 返工   —— 把 79 分推到 80，prompt 几万字
+#     ③ 写新稿 —— 最贵，还要占用一个新关键词
+# 同样一份额度，先做 ① 能多放出好几篇。
+STOCK_TARGET = 30
 WRITE_TIMEOUT = 900
 RETRIES = 2          # claude -p 普通失败（格式跑偏/超时）的重试次数
 RETRY_WAIT = 45      # 普通失败重试前等待秒数
@@ -1122,6 +1139,21 @@ def rework_one(item, args, lane="搜索流"):
 BODY_SEC_RE = re.compile(r"(^#{1,3}\s*\*{0,2}正文[^\n]*\n)(.*?)(?=\n#{1,3}\s|\Z)", re.M | re.S)
 
 
+def stock() -> int:
+    """库存 = 闸门现在就放行、还没发出去的篇数。
+
+    直接问 auto_publish.candidates()，不自己复算一套判据 ——
+    库存的定义必须和闸门完全一致，否则会出现「库存说够了、实际发不出」。
+    """
+    sys.path.insert(0, str(REPO / "scripts" / "xhs-publish"))
+    try:
+        from auto_publish import candidates
+        return sum(1 for _, ok, _ in candidates() if ok)
+    except Exception as e:                                  # noqa: BLE001
+        print(f"   ⚠️ 读库存失败（{e}），按 0 处理")
+        return 0
+
+
 def mech_fix_queue() -> list:
     """处置=机修、且机械项**确实还不过**的稿。"""
     latest = {}
@@ -1368,6 +1400,9 @@ def main() -> int:
                     help="定点修 N 篇处置=机修 的稿（默认全部）。这一档分数已过线、"
                          "只差机械项，只改正文节、不重写全文、不重新审核")
     ap.add_argument("--mech-fix-only", action="store_true", help="只做机修，不返工也不写新稿")
+    ap.add_argument("--stock", type=int, nargs="?", const=STOCK_TARGET, metavar="N",
+                    help=f"补库存到 N 篇可发（默认 {STOCK_TARGET}）。按性价比顺序做："
+                         "机修 → 返工 → 写新稿；库存达标就停手，把额度省给明天")
     ap.add_argument("--rework-file", action="append", metavar="FILENAME",
                     help="指定返工哪几篇（可重复），不按分数自动排队")
     ap.add_argument("--lane", default="搜索流", choices=["搜索流", "推荐流"])
@@ -1376,6 +1411,33 @@ def main() -> int:
     args = ap.parse_args()
 
     tally = {"过线": 0, "归档": 0, "失败": 0}
+
+    # ── 库存模式：按性价比补到目标，达标就停手 ────────────────────────────
+    # 覆盖掉手工传的 --mech-fix / --rework / --count，由库存缺口决定各做几篇。
+    if args.stock:
+        have = stock()
+        need = args.stock - have
+        print(f"{'='*54}\n库存 {have}/{args.stock} 篇可发", end="")
+        if need <= 0:
+            print(" —— 已达标，不做新稿，额度省给明天。")
+            return 0
+        print(f"，缺 {need} 篇。按性价比补：机修 → 返工 → 写新稿\n")
+        # ① 机修最便宜（prompt ~1.1k 字），能放出几篇算几篇
+        mq = mech_fix_queue()[:need]
+        for item in mq:
+            if args.dry_run:
+                print(f"[dry-run] 机修 {item['file']}")
+                continue
+            mech_fix_one(item)
+        have = stock() if mq and not args.dry_run else have
+        need = args.stock - have
+        if need <= 0:
+            print(f"\n✅ 机修后库存已达标（{have}/{args.stock}），不必返工也不必写新稿。")
+            return 0
+        print(f"\n机修后库存 {have}/{args.stock}，还缺 {need} 篇 → 转返工/写新稿")
+        # ② 返工、③ 写新稿：交给下面既有流程，用库存缺口定量
+        args.rework = args.rework or min(need, 3)
+        args.count = min(need, args.count if args.count > 1 else 1)
 
     # 机修排在最前面：这批稿分数已经过线，只差一处机械项，改完直接能发 ——
     # 单位额度的产出远高于返工（返工是把 79 分推到 80，机修是把已达标的稿放出去）。

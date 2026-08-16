@@ -119,7 +119,18 @@ def pick_keywords(pool, limit):
     def last_run(r):
         return (r.get("最近运行") or "").strip() or "0000-00-00"
 
-    seeds = [r for r in pool if (r.get("类型") or "").strip() == "种子"]
+    # ⛔ 2026-08-16：种子也要按「最近运行」轮换，不能再 seeds[:4] 硬取前四。
+    #
+    # 原来是无序切片，于是池子里排在前面的那 4 个种子**每轮必投、永远只投它们**。
+    # 后果有两层：
+    #   ① 那 4 个词（职场表达/面试技巧/面试什么话该说/面试什么话不能说）各跑了
+    #      169-170 次，命中率掉到 0%/0%/5%，备注里自己写着「饱和」—— 还在每天投。
+    #   ② 3/4 是面试词，等于整个采集漏斗 75% 的入口是面试。这就是选题面收窄的根因：
+    #      已发布 22 篇里 14 篇面试/答辩/谈薪，而记忆库中非面试类占 41%、
+    #      热度天花板高一个数量级（治同事 55.9万 vs 面试最高 8.4万）。
+    # 新加的种子若还按无序切片，会永远排在后面、一次都投不出去。
+    seeds = sorted([r for r in pool if (r.get("类型") or "").strip() == "种子"],
+                   key=last_run)
     active = sorted([r for r in pool if (r.get("类型") or "").strip() == "活跃"],
                     key=last_run)
     cands = sorted([r for r in pool if (r.get("类型") or "").strip() == "候选"],
