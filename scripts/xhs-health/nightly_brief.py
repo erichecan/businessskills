@@ -158,6 +158,26 @@ def section_publish():
         for n, _, t in stale:
             lines.append(f"　　　 {n}（后台标题「{t}」）")
     lines.append("　　注：创作平台一次只放得下一篇，每篇预填后最后一步（选时段+点发布）仍需人点约 10 秒。")
+
+    # 存量债：审核判过「发布」、却被**后来收紧的机械规则**挡在外面的稿。
+    # 2026-08-15 加。这批稿掉在没人管的夹缝里 —— rework_queue 只取处置=返工，
+    # 它们是「发布」；闸门又因机械项拦下。08-08 换 CTA 口径那次一口气废掉 17 篇，
+    # 攒到 55 篇曾达标却没发出去才被发现。让它每天自己冒出来，别再靠人想起来查。
+    try:
+        r = subprocess.run([sys.executable, str(Path(__file__).parent / "draft_check.py"),
+                            "--regress"], capture_output=True, text=True, timeout=300)
+        if r.returncode == 1:
+            head = r.stdout.strip().splitlines()[0] if r.stdout.strip() else ""
+            n = re.search(r"(\d+) 篇", head)
+            names = [l.strip() for l in r.stdout.splitlines()
+                     if l.startswith("  成稿_")]
+            lines.append(f"　　⚠️ 另有 **{n.group(1) if n else '?'} 篇**审核判「发布」但卡在当前机械规则上"
+                         f"（规则收紧留下的存量债，跑 `draft_check.py --regress` 看明细）：")
+            for nm in names[:6]:
+                lines.append(f"　　　 {nm}")
+    except Exception as e:
+        lines.append(f"　　⚠️ 存量回归检查失败：{e}")
+
     return lines, len(real) > 0
 
 

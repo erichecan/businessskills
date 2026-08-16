@@ -334,9 +334,6 @@ def check_one(d, f, all_drafts, lane_override=None):
     if "正文总字数" in text:
         issues.append("成稿文件包含「正文总字数」标注行（应只打印不落盘）")
 
-    if not any(h in text for h in CTA_HINTS):
-        issues.append("未检出 CTA/互动段（无问句结尾、无评论区引导）")
-
     # 必须命中清单 第 3 条：CTA 得是「回一个字母/编号」型
     #
     # ⛔ 2026-08-12 修：这里原本取 body[-260:]，而 body 是**去掉代码块的全文**
@@ -347,12 +344,23 @@ def check_one(d, f, all_drafts, lane_override=None):
     # 实测这篇：正文节里有 10 个 A/B/C 标记、正文节尾窗口命中 8 个，
     # 按全文尾窗口只命中 1 个 → 判违规。今天三篇稿（2 篇 Claude + 1 篇 Gemini）全中此坑。
     # 判据没变（仍是「结尾要 2–4 个选项」），只是把窗口挪到该量的地方。
+    #
+    # ⛔ 2026-08-15：旧的 CTA_HINTS 检查（「未检出 CTA/互动段」，要正文里有
+    # 「评论区」字样或问号结尾）原本单独挂在这条前面，两条判据打架 ——
+    # 08-08 换成编号口径之后，一个完全合格的编号 CTA（「A xxx／B xxx／C xxx」）
+    # 只要没写「评论区」三个字，就会被旧检查判「未检出 CTA」。
+    # 实测修存量稿时三篇全中：新 CTA 过了新口径、栽在旧口径上。
+    # 旧口径是被取代的那一个，降级为 fallback：编号选项够了就不必再问它。
+    # 保留它是因为两条并不完全冗余 —— 正文里列「A方案 B方案」也会命中 CTA_OPTION，
+    # 这时旧口径能兜住「这段到底是不是在跟读者要互动」。
     cta_src = body_sec or body
     tail = cta_src[-CTA_TAIL_CHARS:]
     if len(CTA_OPTION.findall(tail)) < 2:
         issues.append(
             f"CTA 没给编号选项（正文末 {CTA_TAIL_CHARS} 字内 A/B/C 或 ①②③ 少于 2 个）。"
             "清单第 3 条：结尾要 2–4 个选项，让读者回一个字母就能参与")
+        if not any(h in text for h in CTA_HINTS):
+            issues.append("且未检出任何 CTA/互动段（无问句结尾、无评论区引导）")
     m = CTA_EXPENSIVE.search(cta_src)
     if m:
         issues.append(f"CTA 是「说说你的情况」型（命中「{m.group()}」）—— 清单第 3 条禁止："
@@ -406,14 +414,80 @@ def check_one(d, f, all_drafts, lane_override=None):
     return issues
 
 
+def regress() -> int:
+    """全量回归：审核判过「发布」、但按**当前**机械规则不过的稿。
+
+    ⛔ 这个命令的存在理由（2026-08-15）：机械项每收紧一次，就会静默废掉一批存量稿。
+    CTA 判据 08-08 换口径（从「有没有 CTA」改成「有没有编号选项」）之后，
+    08-02~08-08 写的 17 篇**当时合格、独立审核判发布**的稿集体变成不合格，
+    而且掉进了没人管的夹缝：rework_queue 只取处置=返工，它们是「发布」；
+    闸门又因机械项拦下。就这么烂了一周，攒到 55 篇曾达标却没发出去的稿。
+
+    所以规则一改就要跑一次这个，把存量债显性化 —— 要么补修，要么明确归档，
+    不能让它们无声地躺着。
+    """
+    import csv as _csv
+    audit_log = SUCAI / "审核记录.csv"
+    pub_log = SUCAI / "发布日志.csv"
+    if not audit_log.exists():
+        print("没有审核记录，跳过")
+        return 0
+    published = set()
+    if pub_log.exists():
+        with pub_log.open(encoding="utf-8-sig") as f:
+            published = {(r.get("成稿文件") or "").strip() for r in _csv.DictReader(f)
+                         if (r.get("发布") or "").startswith("✅")}
+    latest = {}
+    with audit_log.open(encoding="utf-8-sig") as f:
+        for r in _csv.DictReader(f):
+            if (r.get("审核方") or "").strip() == "独立审核":
+                latest[(r.get("成稿文件") or "").strip()] = r
+
+    all_drafts = drafts_sorted()
+    index = {f.name: (d, f) for d, f in all_drafts}
+    for f in (SUCAI / "归档稿").glob("成稿_*.md"):
+        m = DATE_RE.search(f.name)
+        if m and f.name not in index:
+            index[f.name] = (date.fromisoformat(m.group(1)), f)
+
+    stuck = []
+    for name, row in latest.items():
+        if name in published or (row.get("处置") or "").strip() != "发布":
+            continue
+        got = index.get(name)
+        if not got:
+            stuck.append((name, ["成稿文件已不在 素材库/ 或 归档稿/"]))
+            continue
+        d, path = got
+        issues = check_one(d, path, all_drafts)
+        if issues:
+            stuck.append((name, issues))
+
+    if not stuck:
+        print("✅ 全量回归通过：没有「审核判发布但机械项不过」的存量稿")
+        return 0
+    print(f"⛔ {len(stuck)} 篇审核判「发布」的稿卡在当前机械规则上 —— "
+          f"这是规则变更留下的存量债，要么补修要么明确归档：\n")
+    for name, issues in stuck:
+        print(f"  {name}")
+        for i in issues:
+            print(f"     - {i}")
+    return 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--regress", action="store_true",
+                    help="全量回归：列出「审核判发布但按当前机械规则不过」的存量稿")
     ap.add_argument("--days", type=int, default=2)
     ap.add_argument("--file", metavar="FILENAME",
                     help="只检查指定成稿（refine_loop 单篇复检用）；退出码 2 = 文件不存在")
     ap.add_argument("--lane", choices=["搜索流", "推荐流"],
                     help="覆盖稿内口径标记（默认读成稿头部的「口径：X」，读不到按搜索流）")
     args = ap.parse_args()
+
+    if args.regress:
+        return regress()
 
     all_drafts = drafts_sorted()
     if args.file:
