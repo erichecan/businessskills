@@ -16,6 +16,7 @@
 import argparse
 import csv
 import shutil
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -25,6 +26,30 @@ from independent_audit import decide_disposition
 
 REPO = Path(__file__).resolve().parents[2]
 AUDIT_LOG = REPO / "xhs" / "素材库" / "审核记录.csv"
+SUCAI = AUDIT_LOG.parent
+DRAFT_CHECK = Path(__file__).parent / "draft_check.py"
+
+_MECH_CACHE = {}
+
+
+def mech_ok_of(name):
+    """这篇稿现在过不过机械项。实跑 draft_check --file，一篇只跑一次。
+
+    ⛔ 必须传给 decide_disposition —— 不传的话它按 mech_ok=True 算，
+    会把「分数够但机械项不过」的稿判成「发布」，而闸门那边照样拦，
+    稿子就掉进 2026-08-14 记过的那个夹缝：处置写着发布，却永远发不出去。
+    2026-08-16 起这一档有专门的去处（机修），更不能判错。
+    """
+    if name in _MECH_CACHE:
+        return _MECH_CACHE[name]
+    if not name:
+        return True
+    r = subprocess.run([sys.executable, str(DRAFT_CHECK), "--file", name,
+                        "--lane", "搜索流"], capture_output=True, text=True)
+    # 退出码 2 = 文件不在（素材库和归档稿都没有）。无从判定时按「通过」处理，
+    # 免得把一批查无此文的历史行全推进「机修」这个需要动手的档。
+    _MECH_CACHE[name] = r.returncode != 1
+    return _MECH_CACHE[name]
 
 
 def main():
@@ -41,7 +66,8 @@ def main():
         if (r.get("审核方") or "").strip() != "独立审核":
             continue          # 自评行不动：它本来就没有处置权（D7）
         old = (r.get("处置") or "").strip()
-        new = decide_disposition(r.get("总分"), r.get("红线"))
+        new = decide_disposition(r.get("总分"), r.get("红线"),
+                                 mech_ok=mech_ok_of((r.get("成稿文件") or "").strip()))
         if old == new:
             continue
         r["处置"] = new

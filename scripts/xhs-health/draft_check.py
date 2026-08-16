@@ -492,8 +492,16 @@ def main() -> int:
     all_drafts = drafts_sorted()
     if args.file:
         recent = [(d, f) for d, f in all_drafts if f.name == args.file]
+        # 归档稿里的也要能查 —— 重分类和存量回归都要对已 park 的稿判机械项，
+        # 只扫根目录的话它们永远「找不到」，于是被当成无法判定而漏掉。
         if not recent:
-            print(f"找不到 {args.file}（需在 素材库/ 下且文件名含 YYYY-MM-DD）", file=sys.stderr)
+            p = SUCAI / "归档稿" / args.file
+            m = DATE_RE.search(args.file)
+            if p.exists() and m:
+                recent = [(date.fromisoformat(m.group(1)), p)]
+        if not recent:
+            print(f"找不到 {args.file}（素材库/ 与 归档稿/ 下均无，且文件名需含 YYYY-MM-DD）",
+                  file=sys.stderr)
             return 2
     else:
         cutoff = date.today() - timedelta(days=args.days)

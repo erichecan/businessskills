@@ -1104,6 +1104,148 @@ def rework_one(item, args, lane="搜索流"):
     return "归档"
 
 
+# ── 机修通道（2026-08-16）──────────────────────────────────────────────────
+#
+# 「机修」= 分数够、无红线，只差一处机械项。这一档以前判「返工」，代价极大：
+# 返工走的是 write_draft **重写全文** + 重新跑 independent_audit，于是
+#   ① 只需要补 3 行 CTA 的稿被整篇重写
+#   ② 重写完重新审 —— 重复审同一份稿标准差 4.16 分，等于重抽一次签
+#   ③ CTA 编号选项这类要求 AI 经常修不掉，回到 ①，无限循环
+# 实测 成稿_2026-08-07_汇报被打断 被这样审了 12 次仍归档。
+#
+# 机修通道只做三件事：拿到**具体违规项** → 让模型只改正文节 → 重跑 draft_check。
+# ⛔ 不重写卡片、不改标题、**不重新审核**。内容主体没变，分数就不该重抽 ——
+# gate() 那边取的是历次独立审核的中位分，机修不往审核记录里写任何分数。
+#
+# 状态不落盘，靠实跑 draft_check 判定：修好了自然离开队列，gate() 自然放行。
+# 这样不会出现「标着已修好、其实没修好」的第三种状态。
+BODY_SEC_RE = re.compile(r"(^#{1,3}\s*\*{0,2}正文[^\n]*\n)(.*?)(?=\n#{1,3}\s|\Z)", re.M | re.S)
+
+
+def mech_fix_queue() -> list:
+    """处置=机修、且机械项**确实还不过**的稿。"""
+    latest = {}
+    for r in csv.DictReader(AUDIT_LOG.open(encoding="utf-8-sig")) if AUDIT_LOG.exists() else []:
+        if (r.get("审核方") or "").strip() == "独立审核":
+            latest[(r.get("成稿文件") or "").strip()] = r
+    sys.path.insert(0, str(REPO / "scripts" / "xhs-publish"))
+    kw_full, angle_full, keyword_of, angle_of = set(), set(), None, None
+    try:
+        from auto_publish import (MAX_PER_KEYWORD_ANGLE, MAX_PER_KEYWORD_TOTAL,
+                                  angle_of, keyword_of, published_already,
+                                  published_angle_counts, published_keyword_counts)
+        released = published_already()
+        # 和返工队列同一个道理：配额已满的稿修好了也过不了闸门，别在它们身上花额度。
+        kw_full = {k for k, v in published_keyword_counts().items()
+                   if v >= MAX_PER_KEYWORD_TOTAL}
+        angle_full = {ka for ka, v in published_angle_counts().items()
+                      if v >= MAX_PER_KEYWORD_ANGLE}
+    except Exception:
+        released = set()
+
+    out, skipped = [], []
+    for fname, r in latest.items():
+        if (r.get("处置") or "").strip() != "机修" or fname in released:
+            continue
+        path = next((p for p in (SUCAI / fname, SUCAI / "归档稿" / fname) if p.exists()), None)
+        if not path:
+            continue
+        if keyword_of:
+            kw = keyword_of(fname)
+            if kw in kw_full or (angle_of and (kw, angle_of(fname)) in angle_full):
+                skipped.append(fname)
+                continue
+        ok, mech = mech_check(fname)
+        if ok:
+            continue                      # 已经修好了，自然离开队列
+        try:
+            score = int((r.get("总分") or "0").strip())
+        except ValueError:
+            score = 0
+        out.append({"file": fname, "path": path, "score": score, "mech": mech})
+    if skipped:
+        print(f"   · 跳过 {len(skipped)} 篇：配额已满，修好也过不了闸门")
+    return sorted(out, key=lambda x: -x["score"])
+
+
+MECH_FIX_PROMPT = """你在修一篇已经通过内容审核的小红书成稿。它的内容质量没有问题
+（独立审核 {score} 分，已达发布线），只差下面这几处**机械项**没过。
+
+⛔ 这不是返工，不要重写。只做修掉这几项所必需的最小改动，其余一个字都别动 ——
+标题、卡片、话题标签、结构、观点、案例、引语全部保持原样。
+
+【必须修掉的机械项（代码硬核对，改完会重新跑一遍）】
+{mech}
+
+【字数预算 —— 这是硬约束，最容易在这翻车】
+当前正文节 {cur} 字，规格 {lo}-{hi} 字。补一段 A/B/C 选项大约要 80-110 字，
+{budget}
+⛔ 别为了保住原句而砍掉选项或只写两行 —— 选项是必须的，啰嗦的原句不是。
+
+【修改要点】
+· CTA 没给编号选项 → 把结尾那句开放式提问换成 2–4 个带字母编号的选项，
+  形如「你是哪一种？评论区回个字母：」再跟 A/B/C 三行。
+  每个选项是一种**正文里真实出现过的具体处境**，破折号后给一个正文没给过的具体回报。
+  ⛔ 选项文案里必须出现「评论区」三个字。
+· 正文字数超上限 → 就近压缩最啰嗦的那一两句，别删有信息量的细节。
+· 平均句长超标 / 排比过多 / 「不是X是Y」过多 / 泛指群体词过多 → 局部改写命中的那几处。
+
+【当前正文节全文】
+{body}
+
+只输出修改后的**正文节内容**（不含「## 正文」这行标题本身），
+前后不要加任何解释、不要加代码块围栏。"""
+
+
+def mech_fix_one(item, dry_run=False) -> str:
+    """定点修一篇。返回 修好 / 未修好 / 失败。"""
+    fname, path = item["file"], item["path"]
+    print(f"\n{'='*54}\n机修 {fname}（{item['score']} 分，内容已过线，只差机械项）")
+    for line in item["mech"].splitlines():
+        if line.strip().startswith("-"):
+            print(f"   {line.strip()}")
+
+    text = path.read_text(encoding="utf-8")
+    m = BODY_SEC_RE.search(text)
+    if not m:
+        print("   ⛔ 找不到「## 正文」节，跳过（这篇得人工看）")
+        return "失败"
+
+    body = m.group(2).strip()
+    cur = len(re.sub(r"\s", "", body))
+    lo, hi = 100, 560                       # 与 draft_check.BODY_RANGE 同一套规格
+    room = hi - cur
+    if room >= 110:
+        budget = f"当前还剩 {room} 字余量，够放下选项，正文其余部分可以原样保留。"
+    else:
+        budget = (f"当前只剩 {room} 字余量，**不够**放下选项 —— "
+                  f"必须同时压缩正文里最啰嗦的一两句，至少腾出 {110 - room} 字。"
+                  f"改完总字数必须 ≤{hi}。")
+    prompt = MECH_FIX_PROMPT.format(score=item["score"], mech=item["mech"], body=body,
+                                    cur=cur, lo=lo, hi=hi, budget=budget)
+    if dry_run:
+        print(f"   [dry-run] prompt {len(prompt)} 字，正文节 {len(m.group(2).strip())} 字")
+        return "未修好"
+
+    for attempt in (1, 2):
+        out = run_model(prompt, f"mechfix_{attempt}", first_pass=False)
+        new_body = re.sub(r"^```[a-z]*\n?|\n?```$", "", (out or "").strip(), flags=re.M).strip()
+        if not new_body:
+            print(f"   ⚠️ 第 {attempt} 次模型没输出正文，重试")
+            continue
+        backup = text
+        path.write_text(text[:m.start(2)] + new_body + "\n" + text[m.end(2):], encoding="utf-8")
+        ok, mech = mech_check(fname)
+        if ok:
+            print(f"   ✅ 机械项已过（第 {attempt} 次）—— 未重审，沿用原 {item['score']} 分")
+            return "修好"
+        print(f"   ⚠️ 第 {attempt} 次修完仍不过：{mech.splitlines()[-1][:70] if mech else ''}")
+        path.write_text(backup, encoding="utf-8")     # 没修好就还原，别留半成品
+        item["mech"] = mech
+    print("   ⛔ 两次都没修好，留在机修队列（这篇可能得人工看）")
+    return "未修好"
+
+
 def keyword_of_draft(path: Path) -> str:
     """成稿头部写着「关键词来源：`词库.csv`「XXX」」，直接取，不靠标题猜。"""
     m = re.search(r"关键词来源[^「]*「([^」]+)」", path.read_text(encoding="utf-8")[:2000])
@@ -1215,6 +1357,10 @@ def main() -> int:
                     help="先返工 N 篇处置=返工 的旧稿（默认 3），再写新稿。"
                          "返工优先：这批离 85 只差一两分，改一句就能过，比从零写新稿省得多")
     ap.add_argument("--rework-only", action="store_true", help="只返工，不写新稿")
+    ap.add_argument("--mech-fix", type=int, nargs="?", const=99, metavar="N",
+                    help="定点修 N 篇处置=机修 的稿（默认全部）。这一档分数已过线、"
+                         "只差机械项，只改正文节、不重写全文、不重新审核")
+    ap.add_argument("--mech-fix-only", action="store_true", help="只做机修，不返工也不写新稿")
     ap.add_argument("--rework-file", action="append", metavar="FILENAME",
                     help="指定返工哪几篇（可重复），不按分数自动排队")
     ap.add_argument("--lane", default="搜索流", choices=["搜索流", "推荐流"])
@@ -1223,6 +1369,22 @@ def main() -> int:
     args = ap.parse_args()
 
     tally = {"过线": 0, "归档": 0, "失败": 0}
+
+    # 机修排在最前面：这批稿分数已经过线，只差一处机械项，改完直接能发 ——
+    # 单位额度的产出远高于返工（返工是把 79 分推到 80，机修是把已达标的稿放出去）。
+    n_mech = args.mech_fix if args.mech_fix is not None else (99 if args.mech_fix_only else 0)
+    if n_mech:
+        mq = mech_fix_queue()
+        if not mq:
+            print("机修队列为空（没有处置=机修 且机械项仍不过的稿）")
+        mtally = {"修好": 0, "未修好": 0, "失败": 0}
+        for item in mq[:n_mech]:
+            mtally[mech_fix_one(item, args.dry_run)] += 1
+        if mq:
+            print(f"\n{'='*54}\n机修 {min(len(mq), n_mech)} 篇："
+                  f"修好 {mtally['修好']} · 未修好 {mtally['未修好']} · 失败 {mtally['失败']}")
+        if args.mech_fix_only:
+            return 0
 
     # 返工排在写新稿前面：这批稿离 85 只差一两分、扣分点已由审核报告点名，
     # 一次定向修改的成本远低于从零写一篇，额度花在这里回报最高。
