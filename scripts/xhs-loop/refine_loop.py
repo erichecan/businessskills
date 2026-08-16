@@ -524,6 +524,21 @@ def build_prompt(row: dict, feedback: str, round_no: int, lane: str = "搜索流
 
 【本篇口径：{lane}】必须在成稿头部的引言区写一行 `> 口径：{lane}` ——
 draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，漏了会按搜索流误判。
+
+【本篇角度】还必须在引言区写一行 `> 角度：<轴>·<一句话说清这篇从哪切进去>`。
+发布闸门按「关键词 × 角度」计配额：同词同角度最多 2 篇，同词各角度合计最多 4 篇。
+**漏写会被归进「未声明」桶**，和该词所有没写角度的稿挤同一个配额，多半直接发不出去。
+
+角度不是标题的换句话说，是**切入口不同**。同一个关键词至少能从这几条轴切：
+  · 视角：求职者 / **面试官·HR·领导那一侧**（本账号人设特权，信息差最大）
+  · 时序：事前准备 / 事中救场 / 事后补救
+  · 极性：怎么做对 / **怎么做砸**（反面清单）
+  · 人群：应届 / 转行 / 35+ / 体制内
+  · 情绪：给方法 / 给共鸣兜底
+例：关键词「HR问你的缺点该怎么回答」
+  `> 角度：面试官视角·他听缺点时在筛什么`
+  `> 角度：反面·这4种答案他一听就知道你背过`
+两篇都写这个词，但不抢同一个搜索位。⛔ 别把同一个切入口换个说法当成新角度。
 {spec['rules'].replace('{TITLE_RULES}', title_rules() if '{TITLE_RULES}' in spec['rules'] else '')}
 
 【知识框架（内容生产的大脑，本篇必须落在它的定位、红线、骨架和质量标准之内）】
@@ -893,17 +908,24 @@ def rework_queue() -> list:
     # 两个来源都要查——发布日志记流程走过的，人工放行记人拍板放行的。
     sys.path.insert(0, str(REPO / "scripts" / "xhs-publish"))
     kw_full = set()
+    angle_full = set()
+    angle_of = None
     try:
-        from auto_publish import (MAX_PER_KEYWORD, keyword_of,
-                                  published_already, published_keyword_counts)
+        from auto_publish import (MAX_PER_KEYWORD_ANGLE, MAX_PER_KEYWORD_TOTAL,
+                                  angle_of, keyword_of, published_already,
+                                  published_angle_counts, published_keyword_counts)
         released |= published_already()
         # ⛔ 2026-08-15：同一关键词已发满的，返工也别再排。
-        # 闸门那边已经拦住不让发（见 auto_publish.MAX_PER_KEYWORD），
-        # 这里不拦的话，loop 会一直挑这些「离过线最近」的高分稿去改 ——
-        # 改好了照样发不出去，纯烧额度。实测返工队列里「汇报被领导打断怎么接」
-        # 和「绩效面谈被打低分怎么开口」各压着好几篇，两个词都已经发满 3 篇。
-        counts = published_keyword_counts()
-        kw_full = {k for k, v in counts.items() if v >= MAX_PER_KEYWORD}
+        # 闸门那边已经拦住不让发，这里不拦的话，loop 会一直挑这些「离过线最近」的
+        # 高分稿去改 —— 改好了照样发不出去，纯烧额度。实测返工队列里
+        # 「汇报被领导打断怎么接」和「绩效面谈被打低分怎么开口」各压着好几篇。
+        #
+        # 配额同日改成两层（同词同角度 ≤2 / 同词总量 ≤4），这里必须跟着改，
+        # 否则会把「同词但换了角度、闸门其实放行」的稿误当发满而跳过。
+        kw_full = {k for k, v in published_keyword_counts().items()
+                   if v >= MAX_PER_KEYWORD_TOTAL}
+        angle_full = {ka for ka, v in published_angle_counts().items()
+                      if v >= MAX_PER_KEYWORD_ANGLE}
     except Exception:
         keyword_of = None
     out = []
@@ -911,10 +933,13 @@ def rework_queue() -> list:
     for fname, r in latest.items():
         if (r.get("处置") or "").strip() != "返工" or fname in released:
             continue
-        if keyword_of and kw_full:
+        if keyword_of and (kw_full or angle_full):
             kw = keyword_of(fname)
             if kw in kw_full:
-                skipped_full.append((fname, kw))
+                skipped_full.append((fname, f"{kw}（各角度合计已满）"))
+                continue
+            if angle_of and (kw, angle_of(fname)) in angle_full:
+                skipped_full.append((fname, f"{kw} × {angle_of(fname)}"))
                 continue
         path = next((p for p in (SUCAI / fname, SUCAI / "归档稿" / fname) if p.exists()), None)
         if not path:
@@ -928,8 +953,8 @@ def rework_queue() -> list:
     # 静默跳过会让人以为队列本来就这么短，得说出来 —— 这几篇不是没排上，是发不出去
     if skipped_full:
         kws = sorted({k for _, k in skipped_full})
-        print(f"   · 跳过 {len(skipped_full)} 篇：关键词已发满 {MAX_PER_KEYWORD} 篇"
-              f"（{'、'.join(kws)}），改好了也过不了闸门")
+        print(f"   · 跳过 {len(skipped_full)} 篇：配额已满"
+              f"（{'、'.join(kws)}），改好了也过不了闸门 —— 换个角度或换词才有用")
     return sorted(out, key=lambda x: -x["score"])
 
 

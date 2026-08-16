@@ -41,6 +41,7 @@ import sys
 import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from statistics import median
 
 # ⛔ 小红书发布页的日历是**北京时间**（页面上就写着「北京时间」），而本机在北美（EDT，
 # 比北京慢 12 小时）。时段轮换池那 7 个点是给中国读者选的，本来就该按北京时间算。
@@ -63,6 +64,14 @@ CIKU = SUCAI / "词库.csv"
 PUB_LOG = SUCAI / "发布日志.csv"
 PROXY_BASE = "http://localhost:3456"
 HEALTH_DIR = REPO / "scripts" / "xhs-health"
+
+# 闸门线的唯一来源 —— 别在本文件里再写一次数字（2026-08-15 查出全仓有四处
+# 各写各的 85，而这里早已是 80，详见 independent_audit.PASS_SCORE 上方注释）。
+sys.path.insert(0, str(HEALTH_DIR))
+try:
+    from independent_audit import PASS_SCORE
+except Exception:
+    PASS_SCORE = 80
 # 闸门发现缺成品图时现场补渲染用。与 refine_loop.CARDS_SCRIPT 是同一个脚本。
 CARDS_SCRIPT = SUCAI / "图文模板" / "make_cards.py"
 
@@ -159,7 +168,48 @@ def published_already():
 # 闸门原来只查「标题是否重复」，于是同一个词的多个版本全都发了出去。
 # 这正是那 3 篇「汇报被领导打断」的由来（refine_loop.py:218 的注释早就记着
 # 「这个词前排 0.14，还在这个词上写了 3 篇」，但没人把它接到闸门上）。
-MAX_PER_KEYWORD = 2
+#
+# ⛔ 常量 MAX_PER_KEYWORD 已于 2026-08-15 拆成下面两个，别再加回来 ——
+# 留一个没人用的旧阈值在这，早晚有人照着它改出第三套口径。
+
+# ── 2026-08-15 受控实验：把配额的键从「关键词」换成「关键词 × 角度」（Eric 定）──
+#
+# 原来的 MAX_PER_KEYWORD=2 拦的是关键词。它背后的数据是可靠的：
+#     晋升答辩      1050 → 301
+#     绩效被打低分   157 → 107 → 107
+#     汇报被打断      62 →  61 →  60      对照单主题稿 156/153/149
+# 但要看清这批数据证明的到底是什么 —— 那几篇同词稿**角度也相同**
+# （都是「求职者视角·该怎么做」），是在跟自己抢同一个搜索位。
+# 所以它证明的是「同词**同角度**」内耗，这个结论保留。
+#
+# 「同词**不同角度**」会不会内耗，**账号历史上零样本** —— 至今所有稿都是一词一角度，
+# 角度的唯一来源是 probe 探出的那一个答案空缺。不能拿上面的数据外推。
+#
+# 因此开一个受控实验，而不是直接放开：
+#   · 同词同角度 ≤2 篇       —— 保留已验证的结论，不动
+#   · 同词总量   ≤4 篇       —— 不同角度另开配额，但给总量封顶，避免刷屏
+#   · 角度必须在成稿头部显式声明，声明不了的按「未声明」归一 —— 不声明就退化成旧规则
+# 发布后拿真实数据对比「同词不同角度」的第 2、3 篇有没有掉量，再决定放开还是收回。
+MAX_PER_KEYWORD_ANGLE = 2      # 同词同角度
+MAX_PER_KEYWORD_TOTAL = 4      # 同词所有角度合计
+
+ANGLE_RE = re.compile(r"^>?\s*角度[:：]\s*\**\s*([^\n*]+)", re.M)
+ANGLE_UNSET = "未声明"
+
+
+def angle_of(name):
+    """成稿头部的 `> 角度：面试官视角·他在筛什么`。取不到返回「未声明」。
+
+    ⛔ 取不到时**不能**当成「一个独特的新角度」放行 —— 那会让不写声明成为绕开
+    配额的后门。所有未声明的稿共享同一个桶，等于退回旧的「同词 ≤2」规则。
+    """
+    f = SUCAI / name
+    if not f.exists():
+        f = SUCAI / "归档稿" / name
+    if not f.exists():
+        return ANGLE_UNSET
+    m = ANGLE_RE.search(f.read_text(encoding="utf-8")[:2000])
+    return m.group(1).strip() if m else ANGLE_UNSET
 
 
 def published_keyword_counts():
@@ -172,6 +222,20 @@ def published_keyword_counts():
         kw = keyword_of(name)
         if kw:
             counts[kw] = counts.get(kw, 0) + 1
+    return counts
+
+
+def published_angle_counts():
+    """已发布笔记按 (关键词, 角度) 计数。返回 {(kw, angle): n}。"""
+    counts = {}
+    for r in read_csv(PUB_LOG):
+        if not (r.get("发布") or "").startswith("✅"):
+            continue
+        name = (r.get("成稿文件") or "").strip()
+        kw = keyword_of(name)
+        if kw:
+            key = (kw, angle_of(name))
+            counts[key] = counts.get(key, 0) + 1
     return counts
 
 
@@ -205,10 +269,51 @@ def gate(name):
         self_only = [r for r in rows if (r.get("审核方") or "").strip() == "自评"]
         return False, "只有自评、无独立审核" if self_only else "无任何审核记录"
 
-    latest = trusted[-1]
-    disposition = (latest.get("处置") or "").strip()
-    if disposition != "发布":
-        return False, f"{latest.get('审核方')}处置为「{disposition}」（需「发布」；可用 --approve 人工放行）"
+    # ⛔ 2026-08-15 换口径：中位分，不是最后一次。（Eric 定）
+    #
+    # 起因是实测出来的一个硬事实：**对同一份内容完全没变的稿反复跑独立审核，
+    # 分数极差中位 11 分、标准差 4.16**。举例（同一个文件，8 次审核）：
+    #     成稿_2026-08-08_汇报被打断  [86, 83, 90, 78, 82, 89, 78, 88]
+    #     成稿_2026-08-07_汇报被打断  [84,81,82,81,81,81,81,81,86,72,81,83]
+    # 22 篇有 ≥3 次审核的稿里，**14 篇的分数范围跨越了 80 分闸门线**。
+    #
+    # 取 trusted[-1] 等于让「最后一次抽到几分」决定发不发 —— 这是抽签，不是判定。
+    # 它还制造了一个假象：「返工三轮反降到 83」看着像改坏了，其实多半只是重抽了一次签，
+    # 于是 loop 继续返工、继续抽，8 月 134 次返工里相当一部分耗在这个循环里。
+    #
+    # 中位数对这种噪声稳健得多。实测切换的净效果：新放行 1 篇、收紧 5 篇 ——
+    # 它不是用来增产的（产量瓶颈是机械项存量债，已由 --regress 那条线解决），
+    # 是用来让判定不再取决于运气。被收紧的 5 篇中位分本来就不够。
+    manual = [r for r in trusted if (r.get("审核方") or "").strip() == "人工放行"]
+    if manual:
+        return _gate_rest(name, f"人工放行（{manual[-1].get('备注', '')[:30]}）")
+
+    scores = []
+    for r in trusted:
+        try:
+            scores.append(int((r.get("总分") or "").strip()))
+        except ValueError:
+            pass
+    if not scores:
+        return False, "审核记录里没有可解析的总分"
+
+    # 红线从严：历史上任何一次判过红线，就得人看一眼，不看中位数。
+    reds = [r for r in trusted
+            if (r.get("红线") or "").strip() not in ("", "无", "无。", "None", "-")]
+    if reds:
+        return False, (f"历史 {len(trusted)} 次审核里有 {len(reds)} 次判过红线"
+                       f"（最近一次「{(reds[-1].get('红线') or '').strip()[:40]}」）"
+                       f"—— 红线不看中位数，需人工确认后 --approve")
+
+    med = median(scores)
+    if med < PASS_SCORE:
+        return False, (f"审核中位分 {med:g} < {PASS_SCORE}"
+                       f"（{len(scores)} 次审核 {scores}；已改用中位数，不再看最后一次）")
+    return _gate_rest(name, f"审核中位分 {med:g}/{len(scores)} 次 {scores}")
+
+
+def _gate_rest(name, verdict):
+    """中位分/人工放行已判可发之后，剩下的那几道闸（重复、同词、图、机械项）。"""
 
     if name in published_already():
         return False, "发布日志显示已发布过"
@@ -218,14 +323,24 @@ def gate(name):
     if t and t in backend_titles():
         return False, f"创作后台已有同名笔记「{t}」（发布日志漏记，再发即重复）"
 
-    # 同词限发（见 MAX_PER_KEYWORD 上方的数据）。标题查重拦不住这种情况：
-    # 同一个词的几个返工版本标题各不相同，逐条看都「不重复」，合起来就是刷屏。
+    # 同词限发，两层配额（见 MAX_PER_KEYWORD_ANGLE 上方的完整依据）。
+    # 标题查重拦不住这种情况：同一个词的几个版本标题各不相同，逐条看都「不重复」，
+    # 合起来就是刷屏 —— 所以按声明的关键词和角度计数，不按标题。
     kw = keyword_of(name)
     if kw:
-        n = published_keyword_counts().get(kw, 0)
-        if n >= MAX_PER_KEYWORD:
-            return False, (f"关键词「{kw}」已发布 {n} 篇（上限 {MAX_PER_KEYWORD}）——"
-                           f"同词再发是跟自己抢同一个搜索位，实测第 3 篇起量不累积")
+        angle = angle_of(name)
+        same_angle = published_angle_counts().get((kw, angle), 0)
+        total = published_keyword_counts().get(kw, 0)
+        if same_angle >= MAX_PER_KEYWORD_ANGLE:
+            return False, (f"关键词「{kw}」× 角度「{angle}」已发布 {same_angle} 篇"
+                           f"（同角度上限 {MAX_PER_KEYWORD_ANGLE}）—— 同词同角度再发是"
+                           f"跟自己抢同一个搜索位，实测第 3 篇起量不累积"
+                           + ("；本篇未声明角度，未声明的稿共用一个桶，"
+                              "要开新角度得在成稿头部写 `> 角度：xxx`"
+                              if angle == ANGLE_UNSET else ""))
+        if total >= MAX_PER_KEYWORD_TOTAL:
+            return False, (f"关键词「{kw}」各角度合计已发布 {total} 篇"
+                           f"（同词总量上限 {MAX_PER_KEYWORD_TOTAL}）—— 角度再多也该换词了")
 
     stem = name.removeprefix("成稿_").removesuffix(".md")
     imgs = sorted((SUCAI / "成品图" / stem).glob("*.png")) if (SUCAI / "成品图" / stem).is_dir() else []
@@ -263,7 +378,7 @@ def gate(name):
         first = next((l.strip() for l in r.stdout.splitlines() if l.strip().startswith("-")), "见 draft_check 输出")
         return False, f"机械及格线未过：{first}"
 
-    return True, f"{latest.get('审核方')} {latest.get('总分')}分 · 处置发布 · 机械项通过 · {len(imgs)} 张图"
+    return True, f"{verdict} · 机械项通过 · {len(imgs)} 张图"
 
 
 def candidates():

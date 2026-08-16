@@ -251,19 +251,34 @@ def section_outcome():
     # 而数据显示重复发不划算 —— 晋升答辩 1050→301、绩效 157→107→107、
     # 汇报被打断 62→61→60，量不累积反而集体停在低位。
     # 闸门已加同词上限，这里让分布**在发生之前**就看得见。
+    # 2026-08-15 起配额分两层（同词同角度 ≤2 / 同词总量 ≤4），这里跟着按两层报，
+    # 并显式点出「未声明角度」有多少 —— 角度没声明的稿全挤在一个桶里，
+    # 是当前最容易把配额吃光的原因，得让它看得见。
     try:
         sys.path.insert(0, str(REPO / "scripts" / "xhs-publish"))
-        from auto_publish import MAX_PER_KEYWORD, published_keyword_counts
+        from auto_publish import (ANGLE_UNSET, MAX_PER_KEYWORD_ANGLE,
+                                  MAX_PER_KEYWORD_TOTAL, published_angle_counts,
+                                  published_keyword_counts)
         counts = published_keyword_counts()
+        angles = published_angle_counts()
         hot = [(k, v) for k, v in counts.items() if v >= 2]
         if hot:
             hot.sort(key=lambda x: -x[1])
             desc = "、".join(f"{k}×{v}" for k, v in hot[:4])
-            full = [k for k, v in hot if v >= MAX_PER_KEYWORD]
             lines.append(f"　　· 话题集中度：{len(counts)} 个词已发布 · 重复词 {len(hot)} 个（{desc}）")
-            if full:
-                lines.append(f"　　  ⚠️ {len(full)} 个词已达上限 {MAX_PER_KEYWORD} 篇，"
-                             f"闸门会拦住同词新稿 —— 供给要往新词上走")
+            full_angle = [(k, a) for (k, a), v in angles.items() if v >= MAX_PER_KEYWORD_ANGLE]
+            full_total = [k for k, v in counts.items() if v >= MAX_PER_KEYWORD_TOTAL]
+            if full_angle:
+                lines.append(f"　　  ⚠️ {len(full_angle)} 个「词×角度」已达上限 "
+                             f"{MAX_PER_KEYWORD_ANGLE} 篇 —— 同角度会被拦，"
+                             f"换个角度（写 `> 角度：xxx`）或换词")
+            if full_total:
+                lines.append(f"　　  ⚠️ {len(full_total)} 个词各角度合计已达 "
+                             f"{MAX_PER_KEYWORD_TOTAL} 篇上限 —— 角度再多也该换词了")
+        unset = sum(v for (_, a), v in angles.items() if a == ANGLE_UNSET)
+        if unset:
+            lines.append(f"　　  · 已发布里 {unset} 篇未声明角度，共用一个配额桶"
+                         f"（新稿在成稿头部写 `> 角度：xxx` 才另开配额）")
     except Exception:                                       # noqa: BLE001
         pass
 
