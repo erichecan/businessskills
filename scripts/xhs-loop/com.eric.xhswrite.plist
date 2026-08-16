@@ -9,12 +9,13 @@
 		<string>/opt/homebrew/bin/python3</string>
 		<string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/launchd_runner.py</string>
 		<string>xhs-loop/refine_loop.py</string>
-		<!-- 2026-08-16 Eric 定：从固定「返工1+新稿1」改成**按库存目标补**。
-		     原来的固定量跟库存无关 —— 库存空了也只做一篇，库存堆着也照做不误。
-		     ximalaya 那条线的经验是「发布必保，做稿让路」：发布只依赖已有库存，
+		<!-- 2026-08-16 Eric 定：从固定「返工1+新稿1」改成按库存目标补。
+		     原来的固定量跟库存无关：库存空了也只做一篇，库存堆着也照做不误。
+		     ximalaya 那条线的经验是「发布必保，做稿让路」——发布只依赖已有库存，
 		     做稿随时可能撞额度半路停，所以要靠囤够库存来保证每天有得发。
-		     --stock 会按性价比顺序补：机修(prompt~1.1k) → 返工(几万) → 写新稿(最贵)，
-		     达标就停手把额度省给明天。30 篇 ≈ 一个月缓冲。 -->
+		     stock 模式按性价比顺序补：机修(prompt 约 1.1k 字) → 返工(几万) → 写新稿(最贵)，
+		     达标就停手把额度省给明天。30 篇 约等于 一个月缓冲。
+		     ⛔ XML 注释里不能出现连续两个减号，别在这写参数的长横线形式。 -->
 		<string>--stock</string>
 		<string>30</string>
 	</array>
