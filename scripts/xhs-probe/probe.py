@@ -40,6 +40,9 @@ SEARCH_URL = "https://www.xiaohongshu.com/search_result?keyword={kw}&source=web_
 MAX_KEYWORDS_PER_RUN = 5
 DELAY_BETWEEN_KEYWORDS = (45, 90)
 DELAY_IN_PAGE = (2, 5)
+# 开跑前的随机错峰上限（秒），与 daily_collect.JITTER_MAX 同一套理由：
+# 词间延迟已经随机，但 launchd 掐整点触发这件事抖动不掉，得在入口补。
+JITTER_MAX = 15 * 60
 PAGE_LOAD_WAIT = 4
 COMMENT_NOTES = 3      # 每个词点开几篇**高赞**笔记（取评论 + 正文）
 LOW_LIKE_NOTES = 2     # 2026-08-12 加：再点开几篇**低赞**笔记做对照组。
@@ -607,10 +610,21 @@ def main():
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--recompute", metavar="YYYYMMDD",
                     help="按当前阈值离线重算该日全部 JSON 的 density，不联网")
+    ap.add_argument("--no-jitter", action="store_true",
+                    help="跳过开跑前的随机延迟（手工调试用；定时任务别加）")
     args = ap.parse_args()
 
     if args.recompute:
         return recompute(args.recompute)
+
+    # ⛔ 开跑前随机错峰（2026-08-16 加，与 daily_collect 同一套理由）。
+    # 词间延迟这里本来就有 (45,90) 随机，缺的是**开跑时刻**的随机 ——
+    # launchd 掐整点触发，「每天 12:30 准时开始搜索」这个规律抖动不掉。
+    # --recompute 是离线重算，不联网，所以放在它后面判断。
+    if not args.no_jitter:
+        wait = random.uniform(0, JITTER_MAX)
+        print(f"（错峰等待 {wait / 60:.1f} 分钟再开跑，避开整点规律）", flush=True)
+        time.sleep(wait)
 
     if not proxy_alive():
         print("CDP Proxy 未就绪。先跑：node ~/.claude/skills/web-access/scripts/check-deps.mjs", file=sys.stderr)

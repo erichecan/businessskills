@@ -15,30 +15,25 @@
 	<key>StandardOutPath</key>
 	<string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhscollect.log</string>
 	<key>StartCalendarInterval</key>
+	<!-- 2026-08-16 降频错峰（Eric 定）。这天主站被风控：opencli 搜索连常见词都返回空数组，创作者中心却正常。原排班搜索类每天 7 轮、最小间隔仅 0.5 小时（18:30 probe 紧接 19:00 collect）。改为 5 轮、最小间隔 2.5 小时。⛔ 注意同日多轮的命中率实测并没有递减（run1 31.7% 到 run6 43.4%），所以这是拿采集量换存活的真实取舍，不是砍掉没用的部分 —— 风控一旦触发，一整天什么都采不到，那才是最大的损失。脚本侧另加了开跑前 0-15 分钟随机错峰，抵消 launchd 掐整点的规律性。 -->
 	<array>
 		<dict>
 			<key>Hour</key>
-			<integer>8</integer>
+			<integer>9</integer>
 			<key>Minute</key>
 			<integer>0</integer>
 		</dict>
 		<dict>
 			<key>Hour</key>
-			<integer>12</integer>
+			<integer>15</integer>
 			<key>Minute</key>
 			<integer>0</integer>
 		</dict>
 		<dict>
 			<key>Hour</key>
-			<integer>16</integer>
+			<integer>20</integer>
 			<key>Minute</key>
-			<integer>0</integer>
-		</dict>
-		<dict>
-			<key>Hour</key>
-			<integer>19</integer>
-			<key>Minute</key>
-			<integer>0</integer>
+			<integer>30</integer>
 		</dict>
 	</array>
 </dict>

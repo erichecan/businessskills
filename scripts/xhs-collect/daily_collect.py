@@ -39,6 +39,7 @@ Eric 2026-08-14：「做成定时任务」。
 import argparse
 import csv
 import json
+import random
 import re
 import sys
 import time
@@ -62,7 +63,31 @@ PER_KEYWORD = 20      # 每词抓几条。手工流程一直是 20，改了命�
 KEYWORDS_PER_RUN = 8  # 4 种子 + 2 长空档活跃 + 2 候选
 SEED_N, AGED_N, CAND_N = 4, 2, 2
 PROMOTE_RATE = 0.40   # 候选词命中率达标即升活跃。手工流程用的就是 40%
-GAP = 2.5             # 两次 opencli 之间的间隔，别把日常 Chrome 打成风控目标
+# ⛔ 2026-08-16 从「2.5 秒固定」改成随机区间（Eric：调时间和频率，避开风控）。
+#
+# 起因：这天主站搜索被风控，`opencli xiaohongshu search 面试` 连常见词都返回空数组，
+# 而创作者中心 whoami 正常 —— 是主站单独被限。
+#
+# 回头看请求特征，daily_collect 是最像机器的一环：
+#   · 间隔 2.5 秒**固定**，没有任何抖动
+#   · 一轮 8 词 × 每词 20 条，全程约 20 秒打完 160 条抓取
+# 对照同仓库的 probe.py：DELAY_BETWEEN_KEYWORDS = (45, 90) 秒**随机**。
+# 同一个账号、同一个 Chrome，两个脚本的节奏差了 20-35 倍。
+#
+# 区间取 (20, 45)：与 ximalaya 那条线的 upload_delay 同一个量级
+# （那边注释写着「反封控：和小红书那套同一个道理，别连着传」）。
+# 一轮 8 词因此从 ~20 秒拉到 2.5-6 分钟 —— 慢，但这一步本来就不赶时间。
+GAP_RANGE = (20, 45)
+
+# 开跑前的随机错峰上限（秒）。launchd 掐整点触发，规律性本身就是特征。
+# 15 分钟够把「每天 09:00 准时一串搜索」摊成「09:00-09:15 之间某个时刻」，
+# 又不会跟下一个任务的时段撞上（改版后搜索类任务间隔 ≥2.5 小时）。
+JITTER_MAX = 15 * 60
+
+
+def gap_sleep():
+    """两次 opencli 之间随机停一会儿。随机比固定重要 —— 固定间隔本身就是特征。"""
+    time.sleep(random.uniform(*GAP_RANGE))
 
 MEMORY_COLS = ["标题", "URL", "来源", "关键词", "首次收录日期", "热度"]
 RUN_LOG_COLS = ["日期", "轮次", "跑的关键词数", "总抓取条数(估)", "本轮新增条数",
@@ -254,7 +279,18 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=KEYWORDS_PER_RUN)
     ap.add_argument("--engine", default="gemini", choices=["gemini", "claude"])
+    ap.add_argument("--no-jitter", action="store_true",
+                    help="跳过开跑前的随机延迟（手工调试用；定时任务别加）")
     args = ap.parse_args()
+
+    # ⛔ 开跑前先随机等一会儿（2026-08-16 加）。
+    # launchd 是**掐着整点**触发的，于是每天 08:00:0x / 12:00:0x 准时来一串搜索 ——
+    # 这个规律性本身就是特征，间隔随机化解决不了它。
+    # dry-run 和手工调试不等，免得每次验证都干坐几分钟。
+    if not (args.dry_run or args.no_jitter):
+        wait = random.uniform(0, JITTER_MAX)
+        print(f"（错峰等待 {wait / 60:.1f} 分钟再开跑，避开整点规律）", flush=True)
+        time.sleep(wait)
 
     today = date.today().isoformat()
     pool = read_csv(POOL)
@@ -299,7 +335,7 @@ def main():
         print(f"    → 抓 {n} 条，新增 {len(fresh)} 条（{len(fresh) / n * 100:.1f}%）"
               f"{f'，相关性过滤剔除 {dropped} 条' if dropped else ''}")
         if i < len(picked):
-            time.sleep(GAP)
+            gap_sleep()
 
     if args.dry_run:
         print(f"\n[dry-run] 会新增 {len(all_new)} 条，未写入任何文件")
