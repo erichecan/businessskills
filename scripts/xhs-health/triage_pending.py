@@ -220,8 +220,8 @@ def ask(prompt, engine):
             print(f"   ⚠️ Gemini 调用失败：{e}")
             return ""
     import subprocess
-    from headless_cli import HEADLESS_FLAGS, ensure_cwd
-    r = subprocess.run([str(Path.home() / ".local/bin/claude"), *HEADLESS_FLAGS, "-p", prompt],
+    from headless_cli import build_argv, ensure_cwd
+    r = subprocess.run(build_argv(Path.home() / ".local/bin/claude", prompt),
                        cwd=str(ensure_cwd()), capture_output=True, text=True, timeout=600)
     return (r.stdout or "").strip()
 

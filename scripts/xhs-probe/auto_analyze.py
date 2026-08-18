@@ -30,7 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import gemini_cli  # noqa: E402
 from claude_limits import WEEKLY, classify_limit, limit_banner  # noqa: E402
-from headless_cli import HEADLESS_FLAGS, ensure_cwd  # noqa: E402
+from headless_cli import build_argv, ensure_cwd  # noqa: E402
 
 BARE_CWD = ensure_cwd()
 
@@ -157,7 +157,7 @@ def run_claude(prompt: str, tag: str) -> str:
     while True:
         attempt += 1
         try:
-            r = subprocess.run([str(CLAUDE), *HEADLESS_FLAGS, "-p", prompt],
+            r = subprocess.run(build_argv(CLAUDE, prompt),
                                cwd=str(BARE_CWD), capture_output=True, text=True,
                                timeout=TIMEOUT)
             out = (r.stdout or "").strip()

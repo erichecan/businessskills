@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from claude_limits import WEEKLY, classify_limit, limit_banner  # noqa: E402
-from headless_cli import HEADLESS_FLAGS, ensure_cwd  # noqa: E402
+from headless_cli import build_argv, ensure_cwd  # noqa: E402
 
 BARE_CWD = ensure_cwd()
 
@@ -145,7 +145,7 @@ def run_claude_waiting_out_limits(prompt):
     """
     waited = 0
     while True:
-        r = subprocess.run([str(CLAUDE), *HEADLESS_FLAGS, "-p", prompt],
+        r = subprocess.run(build_argv(CLAUDE, prompt),
                            cwd=str(BARE_CWD), capture_output=True, text=True, timeout=600)
         out = (r.stdout or "").strip()
         kind = classify_limit(out, r.stderr or "")
@@ -450,6 +450,10 @@ def build_audit_prompt(draft: Path, lane: str = None):
   · 但「下面没有」**不等于「编造」** —— 原话也可能来自探测结果，
     见后面【probe 探测结果 quotes】那一块，核对是否编造时两块都要看。
   · 别因为「只给了子集所以无法核验」而降级 —— 核验所需的行已经在里面了。
+
+──────────────────────────────
+以上是每篇都一样的规则（缓存前缀到此为止）。以下是本篇专属的材料。
+────────────────────────────────────────────────────
 
 【词库.csv（维度 1 的判据：本词的竞争密度/意图强度。整库 {ciku_total} 行，只给本篇这行）】
 {ciku}

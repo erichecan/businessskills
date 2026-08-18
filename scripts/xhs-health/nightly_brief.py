@@ -376,6 +376,25 @@ code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;
 """
 
 
+def section_usage():
+    """额度消耗看板。见 usage_report.py —— 口径和「为什么必须按 message.id 去重」都在那。"""
+    try:
+        import usage_report
+        text = usage_report.report()
+        over = usage_report.WARN_AT
+    except Exception as e:                                    # noqa: BLE001
+        return ([f"## 额度消耗", f"　　⚠️ 统计失败：{e}"], True)   # 统计挂了不该拦住 brief
+    lines = [l if l.startswith("##") else "　" + l for l in text.splitlines() if l.strip()]
+    total = 0.0
+    for l in text.splitlines():
+        if l.strip().startswith("合计"):
+            try:
+                total = float(l.split("$")[1].split()[0])
+            except (IndexError, ValueError):
+                pass
+    return (lines, total < over)
+
+
 def _esc(s):
     return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
@@ -481,7 +500,7 @@ def main():
     today = date.today().isoformat()
     blocks = [section_collect(today), section_keywords(today), section_drafts(today),
               section_publish(), section_outcome(), section_calibrate(),
-              section_launchd()]
+              section_launchd(), section_usage()]
     body = [f"# 每日 brief · {today}", ""]
     for lines, _ in blocks:
         body += lines + [""]

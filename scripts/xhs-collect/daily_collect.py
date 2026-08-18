@@ -202,9 +202,9 @@ def filter_relevant(titles, engine):
             return set(range(len(titles)))
     else:
         import subprocess
-        from headless_cli import HEADLESS_FLAGS, ensure_cwd
-        r = subprocess.run([str(Path.home() / ".local/bin/claude"), *HEADLESS_FLAGS,
-                            "-p", prompt], cwd=str(ensure_cwd()),
+        from headless_cli import build_argv, ensure_cwd
+        r = subprocess.run(build_argv(Path.home() / ".local/bin/claude", prompt),
+                           cwd=str(ensure_cwd()),
                            capture_output=True, text=True, timeout=600)
         out = (r.stdout or "").strip()
     m = re.search(r"\{.*\}", out, re.S)

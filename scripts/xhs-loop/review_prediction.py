@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import gemini_cli  # noqa: E402
 from claude_limits import WEEKLY, classify_limit, limit_banner  # noqa: E402
-from headless_cli import HEADLESS_FLAGS, ensure_cwd  # noqa: E402
+from headless_cli import build_argv, ensure_cwd  # noqa: E402
 
 BARE_CWD = ensure_cwd()
 REPO = Path(__file__).resolve().parents[2]
@@ -168,7 +168,7 @@ def _run_attribution(prompt: str, tag: str) -> str:
 
     waited = 0
     while True:
-        r = subprocess.run([str(CLAUDE), *HEADLESS_FLAGS, "-p", prompt],
+        r = subprocess.run(build_argv(CLAUDE, prompt),
                            cwd=str(BARE_CWD), capture_output=True, text=True, timeout=600)
         out = (r.stdout or "").strip()
         kind = classify_limit(out, (r.stderr or "")[:2000])
