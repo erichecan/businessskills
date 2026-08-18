@@ -3,11 +3,21 @@
 # 只动 StartCalendarInterval 类任务，常驻服务（xhschrome / cdpproxy）永不触碰。
 #
 # ⛔ 必须从 ~/.local/bin/ 调用，不要直接跑仓库里这份（2026-08-18 定）。
-# /Volumes/datacenter 是外挂卷（apfs, nodev, nosuid, noowners）。从**交互式终端**
-# 跑没问题，但从 launchd / 后台上下文调用会被 macOS TCC 拒掉：
+#
+# 实测现象：8/16 改完风控降频后 pause 了任务，8/17 00:30 的 resume 失败，报
 #     /bin/bash: .../scripts/xhs-schedule: Operation not permitted
-# 8/16 改完风控降频后 pause 了任务，8/17 00:30 的 resume 就是这么静默失败的 ——
 # 9 个定时任务全部停摆，日志止于 8/16，两天零产出，没有任何报错被人看到。
+#
+# 已排除的原因：**不是卷的 noexec** —— /Volumes/datacenter 挂载选项只有
+# nodev/nosuid/noowners，而且从交互式终端跑这个脚本一切正常。
+#
+# 确切机制没查实（可能是后台上下文缺完全磁盘访问，也可能是凌晨外挂卷尚未就绪），
+# 但有一个对照事实很清楚：**9 个 plist 一直能正常跑**，而它们的写法是
+#     /opt/homebrew/bin/python3  /Volumes/.../launchd_runner.py  <子脚本>
+# —— 解释器在本地卷，外挂卷上的文件只是**参数**。出问题的是本脚本这种
+# 「直接 exec 外挂卷上的可执行文件」。
+#
+# 所以修法不依赖根因：把它装到本地卷，从 ~/.local/bin/ 调，两种解释都绕开了。
 #
 # 用法：
 #   bash scripts/xhs-schedule install   # 装/更新到 ~/.local/bin/（改完这份就要跑一次）
@@ -57,7 +67,10 @@ case "${1:-}" in
     ;;
   status)
     for j in "${JOBS[@]}"; do
-      if launchctl list | grep -q "	$j\$"; then
+      # ⛔ 别用 `launchctl list | grep`：2026-08-18 实测它会漏报已加载的任务
+      # （xhswrite / xhspublish 明明在 list 里，判据却说「已暂停」）。
+      # `launchctl list <label>` 直接查单个服务，加载了返回 0，没加载返回非 0。
+      if launchctl list "$j" >/dev/null 2>&1; then
         echo "已加载   $j"
       else
         echo "已暂停   $j"

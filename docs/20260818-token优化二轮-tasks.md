@@ -11,15 +11,22 @@
 ---
 
 ## T0 恢复停摆的 9 个 launchd 定时任务
-- [~] 进行中 · 前置改造已完成，`resume` 待 T2 改造落地后再执行
-      （现在 resume 会让 11:00 那轮跑旧配置，白烧一轮）
+- [x] 完成 · T2 定案后执行，`launchctl list` 确认 **10/10 全部已加载**
 - **已完成**：
   - ✅ `scripts/xhs-schedule` 加 `install` 子命令，已装到 `~/.local/bin/xhs-schedule`
   - ✅ `com.eric.ximalaya.daily.plist` 的 XML 修好（`daily --ahead` 里的连续双减号，
         `plistlib` 现已能解析；LaunchAgents 和 ximalaya 仓库两份都改了）
-  - ✅ 根因确认：**不是外挂卷 noexec**（挂载选项只有 nodev/nosuid/noowners，
-        交互式终端里执行正常），是 **launchd / 后台上下文访问 /Volumes 被 macOS TCC 拒**
-- **待做**：`xhs-schedule resume` + `status` 确认 9 个全部「已加载」
+  - ✅ 已排除 noexec（挂载选项只有 nodev/nosuid/noowners，交互式终端执行正常）。
+        确切机制没查实，但有个对照事实：**9 个 plist 一直能跑**，它们的写法是
+        `/opt/homebrew/bin/python3 /Volumes/.../launchd_runner.py <子脚本>` ——
+        解释器在本地卷，外挂卷文件只是**参数**；出问题的是「直接 exec 外挂卷上的脚本」。
+        修法不依赖根因：装到本地卷，两种解释都绕开
+- **恢复时又踩到两个坑，都已修**：
+  1. `ximalaya.daily` 处于 **disabled** 状态，`bootstrap` 不够，要先 `launchctl enable`
+  2. `xhswrite` / `xhspublish` 报 `Bootstrap failed: 5: Input/output error` ——
+     其实是**已经加载了**，重复 bootstrap 才报这个；`bootout` 再 `bootstrap` 即可
+  3. `xhs-schedule status` 的判据 `launchctl list | grep -q "\t$j\$"` **会漏报**
+     （这两个明明在 list 里却显示「已暂停」），换成 `launchctl list "$j"` 直接查单个服务
 - **问题**：`launchctl print gui/501` 只剩 xhschrome / cdpproxy；9 个 xhs 任务全部未加载。
   日志止于 8/16。`schedule-resume.log`（8/17 00:30）显示
   `/bin/bash: …/scripts/xhs-schedule: Operation not permitted` —— 8/16 风控改造后
@@ -61,7 +68,35 @@
   先跑一个会话量一量再定死。
 
 ## T2 headless 三链路：+safe-mode +禁 skills +effort medium +静态区搬进 system prompt
-- [ ] 待办 · **本轮自动化侧最大收益，周省约 $73**
+- [x] 完成 · `b4139ec` + 本次 · **8 篇平行复审 + 贴线稿 3 连测，全部通过**
+
+### 验收结果（2026-08-18）
+| 成稿 | 基线 | 新配置 | 差 | 跨 85 线 | 字段 |
+|---|---:|---:|---:|:---:|---:|
+| 老实人面试怎么选着说 | 40 | 39 | −1 | 否 | 15 |
+| 工资太低跳槽谈薪 | 44 | 45 | +1 | 否 | 15 |
+| 说完方案领导没反应 | 54 | 54 | 0 | 否 | 15 |
+| 试用期没拿到结果 | 46 | 50 | +4 | 否 | 15 |
+| 结构化面试不能说 | 64 | 61 | −3 | 否 | 15 |
+| 汇报被打断 | 49 | 47 | −2 | 否 | 15 |
+| 谈薪预算就这么多 | 51 | 55 | +4 | 否 | 15 |
+| 答辩讲一半被打断 | 61 | 65 | +4 | 否 | 15 |
+
+**总分差中位 +1、均值 +0.9、区间 [−3, +4]，跨线 0/8，字段 8/8 正确。
+成本 $6.56 → $2.16（−67%）。**
+
+**贴线稿专项**（`成稿_2026-08-17_面试官看出能力差`，生产代码连跑 3 次）：
+**85 / 87 / 87，档位全绿，跨线 0/3。** 对照 A 基线 86、E 87。
+→ 此前 F1 那次 84 是**单次波动，不是系统性偏移**；「append 会系统性降 2–3 分」的
+担心被推翻，三选一的补救方案（下调发布线 / 强化 system 权重 / 放弃 append）都不需要了。
+
+⚠️ 8 篇样本的基线分落在 40–64，全部远离 85 线 —— 「不改变发布决策」这一条
+主要靠贴线专项的 3 连测支撑，不是靠这 8 篇。以后再有贴线稿要顺手记一笔实际分。
+
+### 端到端验证
+- `test_headless_split.py`：5 个写稿变体 / 3 篇审核稿静态段逐字节一致（33,282 / 27,457 字）✅
+- probe（无 SPLIT_MARK，应降级）：不加 append 参数，JSON 6 个 key 齐全、16 条 quotes ✅
+- 写稿返工路径：slug / 正文 1,529 字 / 口径行 / 角度行 / cards 7 张 全部正确 ✅
 - **问题**：`claude -p` 每次注入 26.1k 新写 1h 缓存（CLAUDE.md + skills 列表 + 工具定义），
   占写稿单次成本 27%、审核 32%、probe 65%。`headless_cli.py` 注释里「38.7k 是地板价、
   `--bare` 不可用」的结论**已过期** —— `--safe-mode` 保留 auth，实测降到 17.5k，
