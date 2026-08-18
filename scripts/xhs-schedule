@@ -1,0 +1,74 @@
+#!/bin/bash
+# 批量暂停 / 恢复 xhs + ximalaya 的 launchd 定时任务。
+# 只动 StartCalendarInterval 类任务，常驻服务（xhschrome / cdpproxy）永不触碰。
+#
+# ⛔ 必须从 ~/.local/bin/ 调用，不要直接跑仓库里这份（2026-08-18 定）。
+# /Volumes/datacenter 是外挂卷（apfs, nodev, nosuid, noowners）。从**交互式终端**
+# 跑没问题，但从 launchd / 后台上下文调用会被 macOS TCC 拒掉：
+#     /bin/bash: .../scripts/xhs-schedule: Operation not permitted
+# 8/16 改完风控降频后 pause 了任务，8/17 00:30 的 resume 就是这么静默失败的 ——
+# 9 个定时任务全部停摆，日志止于 8/16，两天零产出，没有任何报错被人看到。
+#
+# 用法：
+#   bash scripts/xhs-schedule install   # 装/更新到 ~/.local/bin/（改完这份就要跑一次）
+#   xhs-schedule status | pause | resume
+
+set -uo pipefail
+
+JOBS=(
+  com.eric.xhsaudit
+  com.eric.xhsbrief
+  com.eric.xhscollect
+  com.eric.xhsdata
+  com.eric.xhshealth
+  com.eric.xhsprobe
+  com.eric.xhspublish
+  com.eric.xhstriage
+  com.eric.xhswrite
+  com.eric.ximalaya.daily
+)
+
+AGENTS="$HOME/Library/LaunchAgents"
+BIN="$HOME/.local/bin/xhs-schedule"
+LOG="$HOME/Library/Logs/xhs/schedule-toggle.log"
+mkdir -p "$(dirname "$LOG")"
+
+stamp() { date "+%Y-%m-%d %H:%M:%S"; }
+
+case "${1:-}" in
+  install)
+    mkdir -p "$(dirname "$BIN")"
+    cp "$0" "$BIN" && chmod +x "$BIN"
+    echo "✅ 已安装到 $BIN"
+    echo "   以后一律用 xhs-schedule {status|pause|resume}，别直接跑仓库里那份"
+    exit 0
+    ;;
+  pause)
+    for j in "${JOBS[@]}"; do
+      launchctl bootout "gui/$UID/$j" 2>/dev/null
+      echo "$(stamp) pause $j" >>"$LOG"
+    done
+    ;;
+  resume)
+    for j in "${JOBS[@]}"; do
+      launchctl bootstrap "gui/$UID" "$AGENTS/$j.plist" 2>/dev/null
+      echo "$(stamp) resume $j" >>"$LOG"
+    done
+    ;;
+  status)
+    for j in "${JOBS[@]}"; do
+      if launchctl list | grep -q "	$j\$"; then
+        echo "已加载   $j"
+      else
+        echo "已暂停   $j"
+      fi
+    done
+    exit 0
+    ;;
+  *)
+    echo "用法: xhs-schedule {install|pause|resume|status}" >&2
+    exit 1
+    ;;
+esac
+
+"$0" status
