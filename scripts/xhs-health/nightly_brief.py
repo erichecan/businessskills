@@ -18,11 +18,12 @@
 """
 import argparse
 import csv
+import os
 import re
 import shutil
 import subprocess
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -376,6 +377,65 @@ code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;
 """
 
 
+def _disabled_labels():
+    """launchctl 的 disabled 名单。
+
+    ⛔ 这是 `launchctl list` 看不出来的一种失败：被 `launchctl disable` 的任务
+    **不在 list 里，也不会自己过期**，而 bootstrap 会「成功」却永远不触发。
+    8/16 九个任务停摆两天、ximalaya.daily 建立后一次都没自动跑过（runs=0），
+    都是这一种 —— 两次都不是「不知道怎么恢复」，是**没有任何信号说它还没被恢复**。
+    """
+    out = subprocess.run(["launchctl", "print-disabled", f"gui/{os.getuid()}"],
+                         capture_output=True, text=True).stdout
+    return {m.group(1) for m in re.finditer(r'"([^"]+)"\s*=>\s*disabled', out)}
+
+
+# 跨项目心跳：只读别人的日志，不碰别人的调度。
+# 边界说明（2026-08-18）：ximalaya 的 pause/resume 归它自己管（见 xhs-schedule 注释），
+# 但**观测**留在这里 —— Eric 只看这一份 brief，告警分散到第二个地方等于没有。
+# 控制分离、观测集中。读不到就静默跳过，绝不因为隔壁项目的路径变了而拖垮本 brief。
+FOREIGN_HEARTBEATS = {
+    "喜马拉雅 daily": (Path.home() / "Library/Logs/ximalaya/daily.log", "com.eric.ximalaya.daily", 24),
+}
+
+
+def section_heartbeat():
+    """定时任务「本该跑却没跑」的检查 —— 花钱看板看不出这个。"""
+    lines, ok = ["## 定时任务心跳"], True
+    disabled = _disabled_labels()
+
+    bad = sorted(disabled & set(LAUNCHD_JOBS))
+    if bad:
+        ok = False
+        for j in bad:
+            lines.append(f"　　⛔ {j} 被 launchctl disable —— bootstrap 会「成功」但永不触发，"
+                         f"需 `launchctl enable gui/{os.getuid()}/{j}`")
+    else:
+        lines.append("　　✅ 本项目任务无一处于 disabled")
+
+    for name, (log, label, max_h) in FOREIGN_HEARTBEATS.items():
+        if label in disabled:
+            lines.append(f"　　⛔ {name}（{label}）被 disable，不会触发")
+            ok = False
+            continue
+        try:
+            marks = [l for l in log.read_text(encoding="utf-8", errors="ignore").splitlines()
+                     if l.startswith("▶")]
+            last = datetime.strptime(marks[-1].split("  ")[0][2:].rsplit(" ", 1)[0].strip(),
+                                     "%Y-%m-%d %H:%M:%S")
+        except (OSError, IndexError, ValueError) as e:
+            lines.append(f"　　· {name}：读不到运行记录（{type(e).__name__}），跳过")
+            continue
+        hours = (datetime.now() - last).total_seconds() / 3600
+        if hours > max_h:
+            lines.append(f"　　⛔ {name} 已 {hours:.0f} 小时没运行（上次 {last:%m-%d %H:%M}，"
+                         f"阈值 {max_h}h）—— 排期是排未来的，漏掉的档追不回来")
+            ok = False
+        else:
+            lines.append(f"　　✅ {name} {hours:.0f} 小时前跑过（{last:%m-%d %H:%M}）")
+    return (lines, ok)
+
+
 def section_usage():
     """额度消耗看板。见 usage_report.py —— 口径和「为什么必须按 message.id 去重」都在那。"""
     try:
@@ -500,7 +560,7 @@ def main():
     today = date.today().isoformat()
     blocks = [section_collect(today), section_keywords(today), section_drafts(today),
               section_publish(), section_outcome(), section_calibrate(),
-              section_launchd(), section_usage()]
+              section_launchd(), section_heartbeat(), section_usage()]
     body = [f"# 每日 brief · {today}", ""]
     for lines, _ in blocks:
         body += lines + [""]
