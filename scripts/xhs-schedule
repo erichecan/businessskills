@@ -1,6 +1,11 @@
 #!/bin/bash
-# 批量暂停 / 恢复 xhs + ximalaya 的 launchd 定时任务。
+# 批量暂停 / 恢复**本项目**的 launchd 定时任务。
 # 只动 StartCalendarInterval 类任务，常驻服务（xhschrome / cdpproxy）永不触碰。
+#
+# ⛔ 不再管 com.eric.ximalaya.daily（2026-08-18 移交）。喜马拉雅是独立项目
+#    （AIcoding/ximalaya，独立 git repo），它的定时任务该由它自己的脚本管 ——
+#    调度写在这边、代码在那边，是两个项目之间最容易被忘掉的一种耦合：
+#    在 ximalaya 仓库里翻遍代码也找不到「谁在暂停我的任务」。
 #
 # ⛔ 必须从 ~/.local/bin/ 调用，不要直接跑仓库里这份（2026-08-18 定）。
 #
@@ -35,8 +40,10 @@ JOBS=(
   com.eric.xhspublish
   com.eric.xhstriage
   com.eric.xhswrite
-  com.eric.ximalaya.daily
 )
+
+# 移交出去、本脚本不再管的任务。status 时提示一句，免得以为「全停了」其实还有在跑的。
+FOREIGN_JOBS=(com.eric.ximalaya.daily)
 
 AGENTS="$HOME/Library/LaunchAgents"
 BIN="$HOME/.local/bin/xhs-schedule"
@@ -75,6 +82,10 @@ case "${1:-}" in
       else
         echo "已暂停   $j"
       fi
+    done
+    for j in "${FOREIGN_JOBS[@]}"; do
+      if launchctl list "$j" >/dev/null 2>&1; then s="已加载"; else s="已暂停"; fi
+      echo "$s   $j   ← 归 ximalaya 项目管，本脚本不动它"
     done
     exit 0
     ;;

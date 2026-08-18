@@ -1092,25 +1092,31 @@ def rework_one(item, args, lane="搜索流"):
     # 分档：局部问题只重写正文节（prompt 约 1/4 大小），结构性问题才重建整篇。
     # 判据刻意保守，见 classify_rework 上方那段注释。
     mode, why = classify_rework(item["score"], args.threshold, report)
-    use_fix = mode == "局部"
-    print(f"   返工档位：{mode}（{why}）→ {'定向修订正文节' if use_fix else '全量重写'}")
+    _LABEL = {"局部": "定向修订正文节", "标题": "只改标题（含首图大字）", "结构": "全量重写"}
+    print(f"   返工档位：{mode}（{why}）→ {_LABEL[mode]}")
     prev_score = item["score"]
 
     for rnd in range(1, args.rounds + 1):
-        print(f"\n--- 返工第 {rnd}/{args.rounds} 轮（{'定向修订' if use_fix else '全量重写'}）---")
+        print(f"\n--- 返工第 {rnd}/{args.rounds} 轮（{_LABEL[mode]}）---")
         md = cards = None
-        if use_fix:
+        if mode == "标题":
+            # 它自己落盘（要同步改 cards.json 的首图大字），所以不走 save()。
+            if title_fix_one(draft, prev_score, args.threshold, report, kw):
+                md = draft.read_text(encoding="utf-8")
+            else:
+                mode = "结构"
+        elif mode == "局部":
             md = rework_fix_body(draft, prev_score, args.threshold, report, lane)
             if not md:
-                # 找不到正文节 / 模型没吐内容 —— 不在这一档硬扛，交回全量重写。
                 print("   ⚠️ 定向修订没拿到正文，本轮改走全量重写")
-                use_fix = False
-        if not use_fix:
+                mode = "结构"
+        if mode == "结构":
             new_slug, md, cards = write_draft(row, feedback, rnd, lane=lane)
         if not md:
             print("⛔ 返工输出解析失败（原始输出见 loop日志/）")
             break
-        draft = save(slug, md, cards)
+        if mode != "标题":
+            draft = save(slug, md, cards)
         ok, mech = mech_check(draft.name, lane)
         if not ok:
             print(f"机械检查未过：\n{mech}")
@@ -1125,9 +1131,9 @@ def rework_one(item, args, lane="搜索流"):
             best = {"score": score, "md": md, "cards": cards}
         # 定向修订没把分提上去 = 这篇的问题不是局部的，判档判错了。
         # 立刻切回全量重写，别在这一档上耗完剩下的轮次。
-        if use_fix and score <= prev_score:
-            print(f"   · 定向修订未提分（{prev_score} → {score}），下一轮改走全量重写")
-            use_fix = False
+        if mode != "结构" and score <= prev_score:
+            print(f"   · {_LABEL[mode]}未提分（{prev_score} → {score}），下一轮改走全量重写")
+            mode = "结构"
         prev_score = score
         if score >= args.threshold and redline in ("", "无") and disposition == "发布":
             print(f"\n✅ 返工过线（{item['score']} → {score}）")
@@ -1247,11 +1253,21 @@ def mech_fix_queue() -> list:
 # ⛔ 第一版就是搜关键词的，10 份真实报告全判「结构」、定向修订一次都触发不了 ——
 #    因为「开头」「首图」「标题」本来就是**维度名**，每份报告必然出现。
 #    教训：判据要读结构化字段，别读散文。
-_DIM_RE = re.compile(r"\*\*\d+\.\s*(.+?)[　\s]+(\d+)\s*/\s*(\d+)\s*\*\*")
+# 两种排版都出现过，序号可能在 ** 里也可能在外面，所以不锚定星号位置：
+#     **1. 搜索意图匹配　26/32**
+#     2. **标题·停不停　29/35** — 命中：…
+_DIM_RE = re.compile(r"\d+\.\s*\**\s*([^\d\n*/]+?)[　\s]+(\d+)\s*/\s*(\d+)")
 
 # 定向修订只重写「## 正文」节，所以只有失分落在这两个维度上才修得动。
 # 「开头」不算 —— 它虽然物理上在正文节里，但改开头往往要动全篇的论述顺序。
 _LOCAL_DIMS = ("正文", "CTA")
+
+# 标题档：只改标题本身，不动正文结构。但标题在成稿里出现在三个地方，必须同步改，
+# 少改一处就会「标题说 A、首图大字说 B」——读者点进来觉得被骗，评论和收藏都掉。
+#   ① 文件第 1 行的 H1
+#   ② 「## 发布标题」节里的【首选】那条（另外两条备选一并重出）
+#   ③ cards.json 第 1 张（type=cover）的 title + body —— 这就是首图大字
+_TITLE_DIMS = ("标题",)
 
 
 def classify_rework(score, threshold, report: str) -> tuple:
@@ -1272,19 +1288,128 @@ def classify_rework(score, threshold, report: str) -> tuple:
         # 分数已过线还进返工队列 = 卡的是红线（编造/冒充/选题绕弯），
         # 那不是「哪个维度差几分」的问题，改正文节碰不到它。
         return "结构", f"分数已过线（{score}≥{threshold}），卡的是红线不是分数"
-    if gap > 3:
-        return "结构", f"差 {gap} 分（>3），不是改几句话的事"
+    # ⛔ 这里曾有一条 `gap > 3 → 结构` 的硬前置，是错的：它是按正文档的补分能力
+    #    （正文 10 分 + CTA 5 分）拍的，却把标题档一起误伤了 —— 标题满分 35，
+    #    失分 8 分很常见，差 5 分时修标题完全够补，却被这条前置拦成「结构」。
+    #    headroom 判据本身就已经表达了「够不够」，不需要再加一个固定阈值。
     dims = {n.strip(): (int(g), int(f)) for n, g, f in _DIM_RE.findall(report)}
     if not dims:
         return "结构", "报告里解析不出逐维打分"
-    local = {k: v for k, v in dims.items() if any(d in k for d in _LOCAL_DIMS)}
-    if not local:
-        return "结构", "报告里没有正文/CTA 维度"
-    headroom = sum(f - g for g, f in local.values())
-    detail = "、".join(f"{k} {g}/{f}" for k, (g, f) in local.items())
-    if headroom >= gap:
-        return "局部", f"差 {gap} 分，{detail}，修满够补 {headroom} 分"
-    return "结构", f"差 {gap} 分，但{detail}最多只能补 {headroom} 分，必须动标题/选题"
+    def room(keys):
+        d = {k: v for k, v in dims.items() if any(x in k for x in keys)}
+        return sum(f - g for g, f in d.values()), "、".join(f"{k} {g}/{f}" for k, (g, f) in d.items())
+
+    # 先看正文档：它只重写「## 正文」节，是改动面最小的一档。
+    body_room, body_detail = room(_LOCAL_DIMS)
+    if body_room >= gap and body_detail:
+        return "局部", f"差 {gap} 分，{body_detail}，修满够补 {body_room} 分"
+    # 再看标题档：能补上分差就走它。改标题要联动三处（H1 / 发布标题节 / 首图大字），
+    # 比改正文重，所以排在正文之后。
+    title_room, title_detail = room(_TITLE_DIMS)
+    if title_room >= gap and title_detail:
+        return "标题", f"差 {gap} 分，{title_detail}，修满够补 {title_room} 分"
+    return "结构", (f"差 {gap} 分，正文/CTA 最多补 {body_room} 分、标题最多补 {title_room} 分，"
+                   f"都不够 —— 失分主要在选题匹配，那是选题定的，改不动")
+
+
+TITLE_FIX_PROMPT = """你在给一篇小红书成稿**只改标题**。正文一个字都不动。
+
+它离发布线只差 {gap} 分，扣分集中在标题维度。正文/CTA 已经够好了，
+问题在于标题没能让搜到这个问题的人停下来点进去。
+
+⛔ 只输出下面要求的 JSON，不要解释、不要代码块围栏。
+⛔ 不要改正文、不要改结构、不要换选题 —— 关键词是定死的，标题必须仍然命中它。
+
+【标题规则】
+{title_rules}
+
+【本篇关键词（标题必须命中，不能换）】
+{kw}
+
+【上一次独立审核 {score} 分（需 ≥{threshold}），标题维度的扣分理由】
+{report}
+
+【当前的三个候选标题】
+{titles}
+
+【当前首图大字（cards.json 第 1 张）】
+title（关键词那半句）：{cover_title}
+body（推翻的预设，用 <br> 换行）：{cover_body}
+
+【正文在讲什么（只作参照，别改它）】
+{body_gist}
+
+输出这个 JSON：
+{{
+  "titles": ["<新首选标题>", "<备选 2>", "<备选 3>"],
+  "why": "<一句话说清新首选推翻的是读者的哪个预设>",
+  "cover_title": "<首图大字上半：关键词那半句，≤14 字>",
+  "cover_body": "<首图大字下半：推翻预设那半句，用 <br> 分成两行，每行 ≤12 字>"
+}}
+
+⛔ cover_title / cover_body 必须和新首选标题说的是同一件事 —— 三处不一致
+（H1 / 发布标题 / 首图大字）是这一档最容易翻车的地方。"""
+
+
+def _cards_path(draft: Path) -> Path:
+    """成稿_YYYY-MM-DD_slug.md → 图文_YYYY-MM-DD_slug_cards.json（save() 就是这么命名的）。"""
+    return draft.parent / (draft.name.replace("成稿_", "图文_").removesuffix(".md") + "_cards.json")
+
+
+def title_fix_one(draft: Path, score, threshold, report, kw=""):
+    """标题定向修改：同步改 H1 / 发布标题节 / 首图大字三处。返回 True/False。
+
+    ⛔ 三处必须一起改。只改 md 不改 cards.json 的话，渲染出来就是
+    「标题说 A、首图大字说 B」—— 比不改更糟。
+    """
+    text = draft.read_text(encoding="utf-8")
+    m_sec = re.search(r"(^##\s*发布标题[^\n]*\n)(.*?)(?=\n#{1,3}\s|\Z)", text, re.S | re.M)
+    if not m_sec:
+        print("   ⛔ 找不到「## 发布标题」节，交回全量重写")
+        return False
+    cards_p = _cards_path(draft)
+    try:
+        cards = json.loads(cards_p.read_text(encoding="utf-8"))
+        cover = cards[0]
+    except (OSError, ValueError, IndexError):
+        print(f"   ⛔ 读不到 {cards_p.name} 的首张卡片，交回全量重写")
+        return False
+
+    body_m = BODY_SEC_RE.search(text)
+    gist = re.sub(r"\s+", " ", body_m.group(2))[:300] if body_m else ""
+    prompt = TITLE_FIX_PROMPT.format(
+        gap=threshold - score, score=score, threshold=threshold,
+        title_rules=title_rules(), kw=kw or "（成稿头部「关键词来源」那一行）",
+        report=report[:2500], titles=m_sec.group(2).strip()[:600],
+        cover_title=cover.get("title", ""), cover_body=cover.get("body", ""),
+        body_gist=gist)
+    out = run_model(prompt, "titlefix", first_pass=False)
+    raw = re.sub(r"^```(?:json)?\n?|\n?```$", "", (out or "").strip(), flags=re.M).strip()
+    try:
+        d = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
+        titles = [str(x).strip() for x in d["titles"] if str(x).strip()]
+        assert len(titles) >= 1 and d.get("cover_title") and d.get("cover_body")
+    except (ValueError, KeyError, AssertionError) as e:
+        print(f"   ⛔ 标题 JSON 解析失败（{e}），交回全量重写")
+        return False
+    if kw:
+        # 关键词是搜索位的命根子，标题丢了它这一篇就白做了。按字符逐个核，
+        # 因为词库里的关键词常带空格分词（「答辩只有30分钟 评委走流程」）。
+        core = re.sub(r"[\s·、，,]", "", kw)
+        if not any(c in re.sub(r"[\s·、，,]", "", titles[0]) for c in [core[:6]] if c):
+            print(f"   ⚠️ 新标题可能丢了关键词「{kw[:12]}」，仍写入但下一轮会被审核抓出来")
+
+    body_new = "\n".join(
+        [f"{i}. {'**【首选】' + tt + '**' if i == 1 else tt}"
+         + (f"（{d['why']}）" if i == 1 and d.get("why") else "")
+         for i, tt in enumerate(titles[:3], 1)])
+    text = re.sub(r"^#\s+.*$", f"# {titles[0]}", text, count=1, flags=re.M)   # ① H1
+    text = text[:m_sec.start(2)] + "\n" + body_new + "\n\n" + text[m_sec.end(2):]  # ② 发布标题节
+    draft.write_text(text, encoding="utf-8")
+    cover["title"], cover["body"] = d["cover_title"], d["cover_body"]          # ③ 首图大字
+    cards_p.write_text(json.dumps(cards, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"   · 标题改为「{titles[0]}」，首图大字同步（{cards_p.name}）")
+    return True
 
 
 REWORK_FIX_PROMPT = """你在做一篇小红书成稿的**定向返工**。它离发布线只差 {gap} 分，
