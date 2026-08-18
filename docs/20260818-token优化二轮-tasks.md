@@ -158,8 +158,38 @@
 - **若验收 2 不过**（有稿子跨过 85 线且确认是系统性偏移）：先量幅度是否稳定，
   稳定就把发布线从 85 下调到 83；不稳定就只保留 safe-mode + effort medium，放弃 append 拆分
 
-## T3 喜马拉雅链路做一次 T5 同款「禁工具」改造
-- [ ] 待办
+## T3 喜马拉雅链路
+- [x] 完成（结论：**基本不用做，且原估算是错的**）
+
+### 目录归属：不需要迁移，它早就是独立项目
+- 独立目录 `AIcoding/ximalaya/`、独立 git repo `github.com/erichecan/ximalaya`、
+  独立 CLAUDE.md / config.env / src/。`config.py` 里写着「本项目从
+  businessskills/喜马拉雅/ 搬到 AIcoding/ximalaya/ 之后…」—— 搬迁早就做过了。
+- 现存跨仓库依赖只有两条，方向都是 **ximalaya → businessskills**，都不构成「该搬走」：
+  1. `config.py`：`BUSINESSSKILLS_REPO` **只读引用成稿库**（数据依赖，环境变量可配）
+  2. `ai.py:244`：`from headless_cli import HEADLESS_FLAGS`（claude 逃生口，主用 Gemini）
+
+### ⛔ 原估算 $50/周 是错的，实际约 $2/周
+拆开那 20 个会话看：
+
+| | 会话数 | 成本 | 特征 |
+|---|---:|---:|---|
+| **交互式开发会话** | 3 | **$114.35** | 250/225/164 次请求、有工具调用、读缓存 36–61M |
+| 真正的 headless 链路 | 17 | **$5.34** | 1 请求、0 工具、$0.35/次 |
+
+「32.8 请求/次、7.5M 读缓存/次」是被那 3 个交互式会话拉高的**平均值** ——
+分类器把 `ximalaya`/`consulting` 目录下含「喜马拉雅」「口播稿」关键词的
+交互式会话也归进这一类了。那 $114 是开发成本，已被 T1 的 autoCompactWindow 覆盖。
+
+**教训：按关键词给会话分类时，一定要同时看「请求数 / 工具调用数」把交互式会话剔出去** ——
+headless 链路禁了全部工具，`ntool>0` 就必然不是它。这条已写进 `usage_report.py` 的验收。
+
+### 已验证
+- ximalaya 的 `_claude` import 的正是本仓库的 `headless_cli`，**自动继承了新 flags**
+  （safe-mode + 禁 skills + effort medium），固定开销 26.1k → 2.7k
+- 跨仓库 import 实测正常，`HEADLESS_FLAGS` 名字保留未改，逃生口没被改崩 ✅
+- 它没用 `build_argv`，拿不到 append 拆分 —— 但它的 prompt 本来就小
+  （17 次调用平均写缓存 27k，其中约 15k 还是 CLI 固定开销），拆了也没什么可省
 - **问题**：8 天 $119.69，单次 **32.8 请求 / 7.5M 读缓存 / $5.98** —— 和 businessskills
   改造前的写稿链路一模一样（会话内多轮工具往返累积上下文）。它跟本项目共用同一个周额度。
 - **改法**：照搬 `headless_cli.py` 的 `HEADLESS_FLAGS`（禁全部工具 + 空 cwd + safe-mode），
