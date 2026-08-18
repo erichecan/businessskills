@@ -399,6 +399,34 @@ FOREIGN_HEARTBEATS = {
 }
 
 
+def _last_run(log: Path):
+    """读日志里**最后一对** ▶/◀，返回 (启动时间, 退出码)。退出码 None = 有 ▶ 没 ◀。
+
+    ⛔ 只看 `▶` 是不够的：它只证明 runner 被拉起来了，不证明这轮干成了事。
+    对「发布必保」这条线，典型的失败形态恰恰是 Chrome 没起 / 登录态掉了 / 页面改版 ——
+    runner 照样被拉起、照样写 ▶，然后非 0 退出。只看 ▶ 会判成健康。
+    中途被杀更隐蔽：有 ▶、根本没有 ◀。
+
+    ⚠️ **必须只看最后一次，不能因为当天出现过非 0 就报警。** 这条线 21:00 之外还有
+    22:30 / 23:45 两次补射，「21:00 失败、22:30 成功」是**正常且预期**的形态。
+    按「当天有过失败」报警的话，每次补射生效都会收到一条假警报 —— 而假警报多了
+    这个 section 就会被跳过，那就绕回「没人看」，白做。
+
+    日志契约（跨仓，ximalaya 侧要改会先知会，见对方 docs/20260818-定时任务恢复核查.md）：
+        ▶ 2026-08-18 16:33:56 EDT  daily --no-make
+        ◀ 退出码 0 · 16:33:56
+    """
+    t, code = None, None
+    for line in log.read_text(encoding="utf-8", errors="ignore").splitlines():
+        if line.startswith("▶"):
+            f = line.split()
+            t, code = datetime.strptime(f"{f[1]} {f[2]}", "%Y-%m-%d %H:%M:%S"), None
+        elif line.startswith("◀"):
+            f = line.split()
+            code = int(f[2]) if len(f) > 2 and f[2].lstrip("-").isdigit() else -1
+    return t, code
+
+
 def section_heartbeat():
     """定时任务「本该跑却没跑」的检查 —— 花钱看板看不出这个。"""
     lines, ok = ["## 定时任务心跳"], True
@@ -419,20 +447,26 @@ def section_heartbeat():
             ok = False
             continue
         try:
-            marks = [l for l in log.read_text(encoding="utf-8", errors="ignore").splitlines()
-                     if l.startswith("▶")]
-            last = datetime.strptime(marks[-1].split("  ")[0][2:].rsplit(" ", 1)[0].strip(),
-                                     "%Y-%m-%d %H:%M:%S")
-        except (OSError, IndexError, ValueError) as e:
+            last, code = _last_run(log)
+            assert last is not None
+        except (OSError, IndexError, ValueError, AssertionError) as e:
             lines.append(f"　　· {name}：读不到运行记录（{type(e).__name__}），跳过")
             continue
         hours = (datetime.now() - last).total_seconds() / 3600
+        when = f"{last:%m-%d %H:%M}"
         if hours > max_h:
-            lines.append(f"　　⛔ {name} 已 {hours:.0f} 小时没运行（上次 {last:%m-%d %H:%M}，"
-                         f"阈值 {max_h}h）—— 排期是排未来的，漏掉的档追不回来")
+            lines.append(f"　　⛔ {name} 已 {hours:.0f} 小时没运行（上次 {when}，阈值 {max_h}h）"
+                         f"—— 排期是排未来的，漏掉的档追不回来")
+            ok = False
+        elif code is None:
+            lines.append(f"　　⛔ {name} {when} 那轮**没跑完就死了**（有 ▶ 无 ◀）")
+            ok = False
+        elif code != 0:
+            lines.append(f"　　⛔ {name} {when} 那轮**失败**（退出码 {code}）—— "
+                         f"这条线的典型失败是 Chrome 没起 / 登录态掉了 / 页面改版")
             ok = False
         else:
-            lines.append(f"　　✅ {name} {hours:.0f} 小时前跑过（{last:%m-%d %H:%M}）")
+            lines.append(f"　　✅ {name} {hours:.0f} 小时前跑过并正常退出（{when}）")
     return (lines, ok)
 
 
