@@ -1088,9 +1088,25 @@ def rework_one(item, args, lane="搜索流"):
               f"与本轮新卡分数不可比 —— 不拿它当门槛，本轮以新卡结果为准")
     base_score = -1 if item.get("stale") else item["score"]
     best = {"score": base_score, "md": draft.read_text(encoding="utf-8"), "cards": None}
+
+    # 分档：局部问题只重写正文节（prompt 约 1/4 大小），结构性问题才重建整篇。
+    # 判据刻意保守，见 classify_rework 上方那段注释。
+    mode, why = classify_rework(item["score"], args.threshold, report)
+    use_fix = mode == "局部"
+    print(f"   返工档位：{mode}（{why}）→ {'定向修订正文节' if use_fix else '全量重写'}")
+    prev_score = item["score"]
+
     for rnd in range(1, args.rounds + 1):
-        print(f"\n--- 返工第 {rnd}/{args.rounds} 轮 ---")
-        new_slug, md, cards = write_draft(row, feedback, rnd, lane=lane)
+        print(f"\n--- 返工第 {rnd}/{args.rounds} 轮（{'定向修订' if use_fix else '全量重写'}）---")
+        md = cards = None
+        if use_fix:
+            md = rework_fix_body(draft, prev_score, args.threshold, report, lane)
+            if not md:
+                # 找不到正文节 / 模型没吐内容 —— 不在这一档硬扛，交回全量重写。
+                print("   ⚠️ 定向修订没拿到正文，本轮改走全量重写")
+                use_fix = False
+        if not use_fix:
+            new_slug, md, cards = write_draft(row, feedback, rnd, lane=lane)
         if not md:
             print("⛔ 返工输出解析失败（原始输出见 loop日志/）")
             break
@@ -1107,6 +1123,12 @@ def rework_one(item, args, lane="搜索流"):
         print(f"独立审核：{score} 分 · 红线：{redline or '无'} · 处置：{disposition or '?'}")
         if score > best["score"]:
             best = {"score": score, "md": md, "cards": cards}
+        # 定向修订没把分提上去 = 这篇的问题不是局部的，判档判错了。
+        # 立刻切回全量重写，别在这一档上耗完剩下的轮次。
+        if use_fix and score <= prev_score:
+            print(f"   · 定向修订未提分（{prev_score} → {score}），下一轮改走全量重写")
+            use_fix = False
+        prev_score = score
         if score >= args.threshold and redline in ("", "无") and disposition == "发布":
             print(f"\n✅ 返工过线（{item['score']} → {score}）")
             render_cards(slug)
@@ -1198,6 +1220,117 @@ def mech_fix_queue() -> list:
     if skipped:
         print(f"   · 跳过 {len(skipped)} 篇：配额已满，修好也过不了闸门")
     return sorted(out, key=lambda x: -x["score"])
+
+
+# ── 返工分档（2026-08-18）────────────────────────────────────────────────
+#
+# 在此之前，分数返工一律走 write_draft() —— 把 50k 字的完整 prompt（知识框架 14.4k +
+# 必须命中清单 11k + 全套红线 + 料包 + 格式范例）重新灌一遍，让模型「带着审核意见
+# 重写一遍全文」。而本文件第 1041 行的注释早就写着：
+#
+#     真正的教训不是阈值调多少 —— 是**模型在返工时根本没做定向修改，而是重写**。
+#
+# 之前的对策全是 prompt 措辞层面的（加「字数守恒」、加「这是定向返工，不要重写」）——
+# 靠说服模型，而不是靠**不给它重写的材料**。既然已经知道它会重写，就不该继续
+# 把整套写作规则和全部料包递到它手上。
+#
+# 机修档（只差机械项）2026-08-16 已经这么改过，实测单次 $0.38 vs 全量写稿 $0.98。
+# 这里把同一套做法推广到「差几分」这一档。
+#
+# ⛔ 但不能一刀切。分档判据刻意保守 —— **只有明确是局部问题才走定向修订，
+#    任何不确定都走全量重写**（白名单，不是黑名单）。误判的代价是不对称的：
+#    把局部当结构，只是多花 $0.5；把结构当局部，改不动、分数不涨、白烧一轮还占配额。
+
+# 审核报告的逐维打分是结构化的：**1. 搜索意图匹配　26/32**
+# 直接解析它，按「失分最大的是哪个维度」判档 —— 比在报告正文里搜关键词可靠得多。
+#
+# ⛔ 第一版就是搜关键词的，10 份真实报告全判「结构」、定向修订一次都触发不了 ——
+#    因为「开头」「首图」「标题」本来就是**维度名**，每份报告必然出现。
+#    教训：判据要读结构化字段，别读散文。
+_DIM_RE = re.compile(r"\*\*\d+\.\s*(.+?)[　\s]+(\d+)\s*/\s*(\d+)\s*\*\*")
+
+# 定向修订只重写「## 正文」节，所以只有失分落在这两个维度上才修得动。
+# 「开头」不算 —— 它虽然物理上在正文节里，但改开头往往要动全篇的论述顺序。
+_LOCAL_DIMS = ("正文", "CTA")
+
+
+def classify_rework(score, threshold, report: str) -> tuple:
+    """判断这篇该走定向修订还是全量重写。返回 (档位, 理由)。
+
+    判据是**目标导向**的：把正文节能碰到的两个维度（正文、CTA）都修满，
+    够不够补上到线的差距？够 → 定向修订划得来；不够 → 再怎么改正文也过不了线，
+    必须动标题/选题，那是全量重写的事。
+
+    ⛔ 前两版判据都错了，记下来免得再走一遍：
+      v1「在报告里搜结构性关键词」—— 10 份真实报告全判结构。因为「开头」「首图」
+         「标题」本来就是**维度名**，每份报告必然出现。判据要读结构化字段，别读散文。
+      v2「失分最大的维度是不是正文/CTA」—— 14 份真实报告仍全判结构。因为选题(32)
+         和标题(35)满分最高，绝对失分天然最大，正文(10)/CTA(5)永远赢不了这个比较。
+    """
+    gap = threshold - score
+    if gap <= 0:
+        # 分数已过线还进返工队列 = 卡的是红线（编造/冒充/选题绕弯），
+        # 那不是「哪个维度差几分」的问题，改正文节碰不到它。
+        return "结构", f"分数已过线（{score}≥{threshold}），卡的是红线不是分数"
+    if gap > 3:
+        return "结构", f"差 {gap} 分（>3），不是改几句话的事"
+    dims = {n.strip(): (int(g), int(f)) for n, g, f in _DIM_RE.findall(report)}
+    if not dims:
+        return "结构", "报告里解析不出逐维打分"
+    local = {k: v for k, v in dims.items() if any(d in k for d in _LOCAL_DIMS)}
+    if not local:
+        return "结构", "报告里没有正文/CTA 维度"
+    headroom = sum(f - g for g, f in local.values())
+    detail = "、".join(f"{k} {g}/{f}" for k, (g, f) in local.items())
+    if headroom >= gap:
+        return "局部", f"差 {gap} 分，{detail}，修满够补 {headroom} 分"
+    return "结构", f"差 {gap} 分，但{detail}最多只能补 {headroom} 分，必须动标题/选题"
+
+
+REWORK_FIX_PROMPT = """你在做一篇小红书成稿的**定向返工**。它离发布线只差 {gap} 分，
+问题是局部的 —— 不要重写，只改审核点到的那几处。
+
+⛔ 硬约束：标题、首图、卡片、话题标签、结构、观点、案例、引语，凡是审核没点到的
+   一个字都别动。**改动范围仅限正文节内部的若干句子。**
+⛔ 你没有工具，也不需要工具。素材已经全部在下面，别去找文件。
+
+【上一次独立审核 {score} 分（需 ≥{threshold}），报告如下】
+{report}
+
+【字数预算 —— 硬约束】
+当前正文节 {cur} 字，规格 {lo}-{hi} 字。{budget}
+
+【可以引用的原话（只有这些，逐字照抄，一个语气词都不许改）】
+{quotes}
+
+【当前正文节全文】
+{body}
+
+只输出修改后的**正文节内容**（不含「## 正文」这行标题本身），
+前后不要加任何解释、不要加代码块围栏。"""
+
+
+def rework_fix_body(draft: Path, score, threshold, report, lane, quotes_block=""):
+    """定向修订：只重写正文节，不重建整篇 prompt。返回新正文或 None。"""
+    text = draft.read_text(encoding="utf-8")
+    m = BODY_SEC_RE.search(text)
+    if not m:
+        return None                      # 找不到正文节 → 交回全量重写路径
+    body = m.group(2).strip()
+    cur = len(re.sub(r"\s", "", body))
+    lo, hi = 100, 560
+    room = hi - cur
+    budget = (f"还剩 {room} 字余量，可以补内容。" if room >= 60
+              else f"只剩 {room} 字余量，要补内容就得先压掉最啰嗦的一两句，改完总字数必须 ≤{hi}。")
+    prompt = REWORK_FIX_PROMPT.format(
+        gap=threshold - score, score=score, threshold=threshold, report=report[:4000],
+        cur=cur, lo=lo, hi=hi, budget=budget, body=body,
+        quotes=quotes_block or "（本轮不新增引语，沿用正文里已有的）")
+    out = run_model(prompt, "reworkfix", first_pass=False)
+    new_body = re.sub(r"^```[a-z]*\n?|\n?```$", "", (out or "").strip(), flags=re.M).strip()
+    if not new_body or len(new_body) < 80:
+        return None
+    return text[:m.start(2)] + new_body + "\n" + text[m.end(2):]
 
 
 MECH_FIX_PROMPT = """你在修一篇已经通过内容审核的小红书成稿。它的内容质量没有问题
