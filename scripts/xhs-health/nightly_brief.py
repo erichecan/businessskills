@@ -399,6 +399,17 @@ FOREIGN_HEARTBEATS = {
 }
 
 
+# 跨仓契约（ximalaya 侧 commit 8860f9f 定义，要改会先知会本项目）：
+#   0 = 正常排上期 / 未来 1 天档满 / --publish 0（档满返 0 是**故意**的 ——
+#       每天恰好 2 集的保证不是故障，这样补射才不会误报）
+#   2 = 库存空，一集没排上 → 「发布必保」今天没做到
+# 2 这个码值得单独说人话：它以前是静默的 —— 跑得完完整整、退出码 0、日志漂漂亮亮，
+# 就是没发东西，在外面和正常轮次完全同形。
+FOREIGN_EXIT_CODES = {
+    2: "那轮**库存空、一集没排上**（退出码 2）—— 「发布必保」今天没做到，去看补库存那条线",
+}
+
+
 def _last_run(log: Path):
     """读日志里**最后一对** ▶/◀，返回 (启动时间, 退出码)。退出码 None = 有 ▶ 没 ◀。
 
@@ -462,8 +473,8 @@ def section_heartbeat():
             lines.append(f"　　⛔ {name} {when} 那轮**没跑完就死了**（有 ▶ 无 ◀）")
             ok = False
         elif code != 0:
-            lines.append(f"　　⛔ {name} {when} 那轮**失败**（退出码 {code}）—— "
-                         f"这条线的典型失败是 Chrome 没起 / 登录态掉了 / 页面改版")
+            lines.append(f"　　⛔ {name} {when} " + FOREIGN_EXIT_CODES.get(
+                code, f"那轮**失败**（退出码 {code}）—— 典型原因是 Chrome 没起 / 登录态掉了 / 页面改版"))
             ok = False
         else:
             lines.append(f"　　✅ {name} {hours:.0f} 小时前跑过并正常退出（{when}）")
