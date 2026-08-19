@@ -137,6 +137,60 @@ def draft_title(path):
         return ""
 
 
+def section_coverage(today):
+    """七种力 × 场景 的产出覆盖 —— S 组唯一的验收信号。
+
+    这一节回答的问题是「选题面到底有没有打开」。在它之前，偏斜是**看不见**的：
+    140 篇成稿里结构力 105 篇、示弱力 2 篇、37 个场景 15 个零产出，
+    而每天的 brief 只报「今天出了几篇」，报不出「一直在同一个格子里出」。
+
+    ⛔ 两周后这里还是结构力独大，说明 S3 的配额没生效，回去重新设计，
+    别改这一节的阈值把警报调没了。
+    """
+    sys.path.insert(0, str(REPO / "scripts"))
+    import scene_map
+    sys.path.insert(0, str(REPO / "scripts" / "xhs-loop"))
+    from refine_loop import QUOTA_DAYS, scene_output
+
+    terms = scene_map.load_terms()
+    scenes = scene_map.load_scenes()
+    m = scene_map.matrix()
+    recent = scene_output(QUOTA_DAYS)
+
+    # 近 N 天的概念分布要按场景反算 —— matrix() 是全历史的
+    tag_of = {r["场景"]: r["默认概念"] for r in scenes}
+    rc = {}
+    for sc, n in recent.items():
+        for c in tag_of.get(sc, "").split("/"):
+            if c:
+                rc[c] = rc.get(c, 0) + n
+
+    zero_recent = [t for t in terms if not rc.get(t)]
+    zero_scene = [r["场景"] for r in scenes if r["场景"] not in m["场景"]]
+    lines = [f"🎯 **选题覆盖**（近 {QUOTA_DAYS} 天 {sum(recent.values())} 篇 · 累计 {m['已打标']} 篇）"]
+    lines.append("　　七种力：" + " · ".join(
+        f"{t} {rc.get(t, 0)}/{m['概念'].get(t, 0)}" for t in terms) + "（近{}天/累计）".format(QUOTA_DAYS))
+    if zero_recent:
+        lines.append(f"　　⚠️ 近 {QUOTA_DAYS} 天**零产出**的概念 {len(zero_recent)} 个："
+                     + "、".join(zero_recent))
+    lines.append(f"　　零产出场景 {len(zero_scene)}/{len(scenes)}"
+                 + ("：" + "、".join(zero_scene[:8]) + ("…" if len(zero_scene) > 8 else "")
+                    if zero_scene else ""))
+
+    gaps = [r for r in read_csv(SUCAI / "缺词信号.csv")
+            if (r.get("日期") or "").strip() == today]
+    if gaps:
+        lines.append(f"　　今天记下 {len(gaps)} 条缺词信号（该做但词库里没词）："
+                     + "、".join(f"{r.get('场景')}" for r in gaps[:6]))
+        lines.append("　　　这些会在下一轮 daily_collect 里作为定向种子词投出去（占 2 个种子名额）")
+    # 告警判据两条，任一触发就进「今天需要你处理」：
+    #   · 近期零产出的概念 > 2 个
+    #   · 零产出场景**过半** —— 比例而不是绝对数，因为场景表还会继续加行
+    # ⛔ 别把阈值调松来消警报。这一节的存在意义就是让「一直在同一个格子里出稿」
+    #   这件事没法被忽略，调松等于把 S 组的验收信号关掉。
+    return lines, len(zero_recent) <= 2 and len(zero_scene) <= len(scenes) // 2
+
+
 def section_publish():
     sys.path.insert(0, str(REPO / "scripts" / "xhs-publish"))
     try:
@@ -612,6 +666,7 @@ def main():
 
     today = date.today().isoformat()
     blocks = [section_collect(today), section_keywords(today), section_drafts(today),
+              section_coverage(today),
               section_publish(), section_outcome(), section_calibrate(),
               section_launchd(), section_heartbeat(), section_usage()]
     body = [f"# 每日 brief · {today}", ""]
