@@ -182,6 +182,30 @@ LANE_SPEC = {
   不编造、不冒充降为**红线**（是/否，合规底线），不再计分 ——
   写的时候别再为了堆原话颗粒度而牺牲标题和首图，那 15 分已经不存在了。""",
     },
+    # ── 祝福流（系列二「祝福 + 锦囊」，2026-08-18 Eric 定）───────────────────
+    #
+    # 它为什么必须自成一条 lane：**不吃搜索流量**。搜索流那套判据
+    # （首图搜索原句、标题关键词最左、搜索位得有人在互动）对它全不适用，
+    # 强行套用的结果是它永远拿不到及格分 —— 就是 D11 那次「用推荐流口径审搜索流稿」
+    # 的镜像错误。选题也不查词库，直接从场景地图轮换（见 pick_blessing_topic）。
+    "祝福流": {
+        "words": "80-400",
+        "brief": "祝福流图文笔记（固定句式开头的祝福 + 一个具体场景的实用锦囊）",
+        "rules": """- **开头固定句式**：必须以「刷到这条，祝你」开头。这是系列识别符，
+  重复使用才建立得起记忆点 —— 不要每篇换个说法，那正好毁掉它存在的理由。
+- **祝福不能空**：祝福句后面必须跟一个**具体场景的锦囊**，锦囊要么是一句可直接
+  照抄的话术，要么是一个当场能用的判据。⛔ 纯祝福 = 这篇不成立。
+- **标题**：≤20 字，不需要把关键词塞最左（这条是搜索流的要求，本 lane 不适用），
+  但要让人一眼知道祝的是哪个场景的人。
+- **首图**：气质型，**不要**搜索原句大字。可以是祝福句本身。
+- **CTA**：仍然要「回一个字母/编号」型 —— 降低回复成本这条与 lane 无关。
+- ⛔ 红线：编造原话 / 承诺结果（保过、一定能）/ 出现身份头衔 / 出现「表达力」三字。
+- 【审核按祝福流口径，写的时候照这个用力】
+  · 识别符句式在不在 —— 缺了直接不成立
+  · 锦囊是否具体可照抄（不是「要自信一点」这种）
+  · 概念点名是否措辞逐字照术语库
+  · **不看**搜索意图、不看标题关键词密度、不看首图是否搜索原句""",
+    },
     "推荐流": {
         "words": "100-500",
         "brief": "推荐流图文笔记（7 张图承载内容 + 100-500 字正文）",
@@ -331,6 +355,71 @@ def _rank_in_scene(r):
     else:
         tier = 4
     return (tier, (r.get("竞争密度") or "").strip() in ("", "待探测"), -(s or 0))
+
+
+BLESSING_GAP_DAYS = 14      # 同一个场景多久之内不重复做祝福流
+BLESSING_PER_WEEK = 2       # 每周做几篇祝福流（Eric 2026-08-18 定，可改）
+
+
+def blessing_this_week() -> int:
+    """本周（周一起算）已出的祝福流篇数。判据是成稿头部的 `> 口径：祝福流`。"""
+    today = date.today()
+    monday = (today - timedelta(days=today.weekday())).isoformat()
+    n = 0
+    for d in list(SUCAI.glob("成稿_*.md")) + list((SUCAI / "归档稿").glob("成稿_*.md")):
+        m = re.match(r"成稿_(\d{4}-\d{2}-\d{2})_", d.name)
+        if m and m.group(1) >= monday and "口径：祝福流" in d.read_text(encoding="utf-8")[:400]:
+            n += 1
+    return n
+
+
+def next_lane(cli_lane: str, explicit: bool) -> str:
+    """本篇走哪条 lane。只在**没显式指定 --lane** 时才自动插祝福流。
+
+    ⛔ 不做成「按比例随机」：随机化会让「这周到底做了几篇祝福流」变成一个要事后
+    统计才知道的数，而配比本身就是要保证的东西。数着做，缺几篇补几篇。
+    """
+    if explicit or cli_lane != "搜索流":
+        return cli_lane
+    done = blessing_this_week()
+    if done < BLESSING_PER_WEEK:
+        print(f"   · 本周祝福流 {done}/{BLESSING_PER_WEEK} 篇，本篇走祝福流")
+        return "祝福流"
+    return cli_lane
+
+
+def pick_blessing_topic() -> dict | None:
+    """祝福流选题：从场景地图轮换，**不查词库、不过搜索位闸门**。
+
+    轮换判据是「这个场景上一次做祝福流是什么时候」，最久没做的先做。
+    ⛔ 不要复用 pick_topic 的缺口逻辑：那套算的是**全部** lane 的产出，
+    而祝福流每周只做 2 篇，混在一起算的话它永远抢不过搜索流的缺口。
+    """
+    scenes = scene_map.load_scenes()
+    tags = scene_map.ciku_tags()
+    last: dict = {}
+    for d in list(SUCAI.glob("成稿_*.md")) + list((SUCAI / "归档稿").glob("成稿_*.md")):
+        head = d.read_text(encoding="utf-8")[:400]
+        if "口径：祝福流" not in head:
+            continue
+        m = re.match(r"成稿_(\d{4}-\d{2}-\d{2})_", d.name)
+        t = scene_map.tag_draft(d, tags, scenes)
+        if m and t:
+            last[t["场景"]] = max(last.get(t["场景"], ""), m.group(1))
+    cutoff = (date.today() - timedelta(days=BLESSING_GAP_DAYS)).isoformat()
+    pool = [r for r in scenes if last.get(r["场景"], "") < cutoff]
+    if not pool:
+        print(f"   ⛔ 全部 {len(scenes)} 个场景都在 {BLESSING_GAP_DAYS} 天内做过祝福流")
+        return None
+    pool.sort(key=lambda r: (last.get(r["场景"], "0000-00-00"), r["场景"]))
+    best = pool[0]
+    ago = last.get(best["场景"])
+    print(f"   【{best['阶段']} · {best['场景']} · {best['默认概念']}】祝福流选题"
+          f"（上次做是 {ago or '从没做过'}）")
+    # 拼成 pick_topic 那样的 row，好让 run_one / build_prompt 原样吃
+    return {"关键词": best["关键词模板"], "阶段": best["阶段"], "场景": best["场景"],
+            "概念": best["默认概念"], "场景域": best["阶段"],
+            "竞争密度": "不适用", "意图强度": "不适用", "关联案例ID": "", "状态": "祝福流"}
 
 
 def _announce(best: dict, srow: dict | None, gap: float | None):
@@ -1810,7 +1899,7 @@ def main() -> int:
                          "机修 → 返工 → 写新稿；库存达标就停手，把额度省给明天")
     ap.add_argument("--rework-file", action="append", metavar="FILENAME",
                     help="指定返工哪几篇（可重复），不按分数自动排队")
-    ap.add_argument("--lane", default="搜索流", choices=["搜索流", "推荐流"])
+    ap.add_argument("--lane", default="搜索流", choices=["搜索流", "推荐流", "祝福流"])
     ap.add_argument("--title", default="", help="指定首选标题（人已挑定时用），正文须兑现它推翻的预设")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
@@ -1884,14 +1973,21 @@ def main() -> int:
         print(f"\n{'='*54}\n返工 {n_rework} 篇：过线 {tally['过线']} · 归档 {tally['归档']}")
         return 0
 
+    lane_explicit = "--lane" in sys.argv
     for i in range(args.count):
+        lane = next_lane(args.lane, lane_explicit)
         if args.topic and i == 0:
             rows = [r for r in csv.DictReader(CIKU.open(encoding="utf-8-sig"))
                     if (r.get("关键词") or "").strip() == args.topic]
             row = rows[0] if rows else {"关键词": args.topic}
+        elif lane == "祝福流":
+            row = pick_blessing_topic()
         else:
             row = pick_topic()
         if not row:
+            if lane == "祝福流":
+                print("⛔ 祝福流无题可做：所有场景都在冷却期内。")
+                return 1 if i == 0 else 0
             # 燃料耗尽不是「今天没事干」，是上游断供了：采集 → probe → auto_analyze。
             # 这条链停在哪一环，loop 就从哪一天起空转，说清楚该去补哪一环。
             print("⛔ 无题可做：词库里没有「状态=已验证 且 未写过」的词。")
@@ -1900,10 +1996,10 @@ def main() -> int:
             return 1 if i == 0 else 0
 
         if args.dry_run:
-            print(f"选题：{row['关键词']}（{args.lane}）")
-            write_draft(row, "", 1, dry_run=True, lane=args.lane, fixed_title=args.title)
+            print(f"选题：{row['关键词']}（{lane}）")
+            write_draft(row, "", 1, dry_run=True, lane=lane, fixed_title=args.title)
             return 0
-        tally[run_one(row, args, args.lane, args.title)] += 1
+        tally[run_one(row, args, lane, args.title)] += 1
 
     if args.count > 1:
         print(f"\n{'='*54}\n本轮 {args.count} 篇："

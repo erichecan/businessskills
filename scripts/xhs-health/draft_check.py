@@ -289,11 +289,20 @@ def drafts_sorted():
 #
 # 上限 560 保留容差（规格 500，卡在 501 字返工不值得）；
 # 下限不再加容差 —— 100 本身已经足够低，再放宽就失去意义了。
-BODY_RANGE = {"搜索流": (100, 560), "推荐流": (100, 560)}
+BODY_RANGE = {"搜索流": (100, 560), "推荐流": (100, 560),
+              # 祝福流是短内容：一句祝福 + 一个锦囊，撑到 500 字就注水了。
+              # 上限同样带容差（规格 400 / 实判 440）—— 卡在 434 字返工一轮不值得，
+              # 这和搜索流 500→560 是同一个理由。
+              "祝福流": (80, 440)}
+
+# 给模型看的规格（不含容差）。⛔ 别再把它写死在报错文案里：
+# 旧文案硬编码「规格 100-500」，于是祝福流稿被报成「祝福流规格 100-500，实判 80-400」，
+# 两个数互相打架，看的人不知道该信哪个。
+SPEC_WORDS = {"搜索流": "100-500", "推荐流": "100-500", "祝福流": "80-400"}
 
 # 口径标记：成稿头部的 `> 口径：搜索流`。draft_check 与 independent_audit 都靠它切规格 ——
 # health_check 批量跑时没法逐篇传参，只能让稿子自己说明。
-LANE_RE = re.compile(r"口径[:：]\s*\**\s*(搜索流|推荐流)")
+LANE_RE = re.compile(r"口径[:：]\s*\**\s*(搜索流|推荐流|祝福流)")
 
 
 def lane_of(text, override=None):
@@ -401,11 +410,16 @@ def check_one(d, f, all_drafts, lane_override=None):
     if body_sec:
         blen = len(re.sub(r"\s|（正文总字数[^）]*）", "", body_sec))
         if not lo <= blen <= hi:
-            issues.append(f"正文节 {blen} 字（{lane}规格 100-500，实判 {lo}-{hi}）")
+            issues.append(f"正文节 {blen} 字（{lane}规格 {SPEC_WORDS[lane]}，实判 {lo}-{hi}）")
     else:
+        # ⛔ 2026-08-18 改成硬报错。旧写法是「找不到正文节时退回 300-2000 兜底」，
+        # 于是「结构缺一整节」这件事在字数正常时**静默通过**，而且各 lane 的字数规格
+        # 一起失效 —— 祝福流那篇 400 字的稿被按 300-2000 判，规格 80-400 完全没生效。
+        # 搜索流稿一直都有正文节，所以这个洞一直没暴露，是新 lane 把它顶出来的。
+        # 影响面实测：108 篇历史稿只有 1 篇（成稿_2026-07-02_面试肢体语言.md）会新触发。
         clen = len(re.sub(r"\s", "", body))
-        if not 300 <= clen <= 2000:
-            issues.append(f"全文 {clen} 字且未找到正文节")
+        issues.append(f"找不到「## 正文」节（全文 {clen} 字）—— 结构不完整，"
+                      f"{lane}的字数规格 {lo}-{hi} 无从核对")
     if "五问启动检查" in text:
         issues.append("成稿文件包含「五问启动检查」章节（应只打印不落盘）")
     if "正文总字数" in text:
@@ -561,7 +575,7 @@ def main() -> int:
     ap.add_argument("--days", type=int, default=2)
     ap.add_argument("--file", metavar="FILENAME",
                     help="只检查指定成稿（refine_loop 单篇复检用）；退出码 2 = 文件不存在")
-    ap.add_argument("--lane", choices=["搜索流", "推荐流"],
+    ap.add_argument("--lane", choices=["搜索流", "推荐流", "祝福流"],
                     help="覆盖稿内口径标记（默认读成稿头部的「口径：X」，读不到按搜索流）")
     args = ap.parse_args()
 
