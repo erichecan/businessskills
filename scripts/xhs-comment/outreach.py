@@ -37,6 +37,7 @@ import difflib
 import json
 import random
 import re
+import time
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -339,6 +340,107 @@ def cmd_draft(args):
     return 0
 
 
+# ── 发送与存活校验 ──────────────────────────────────────────────────────────
+#
+# ⛔ 浏览器那一步**故意没有实现**。规矩写在 draft_comments.py 里：
+# 不先在真页面上 probe 就写选择器 = 抓到 0 条和「本来就没有新评论」长得一模一样，
+# 这正是这条链路反复出问题的方式。选择器要等 C0（www 主站登录态）之后现定。
+#
+# 但调度、台账、存活率、熔断判定都不依赖浏览器，先写完并测掉 ——
+# C0 一做完，剩下的工作量就只是把两个 NotImplementedError 换成真的页面操作。
+
+
+def post_comment(link: str, text: str):
+    """在 link 这条笔记下发一条评论。返回 (成功, 说明)。"""
+    raise NotImplementedError(
+        "评论发送的选择器还没在真页面上定过。先做 C0（在 cdp-proxy 的 Chrome 里"
+        "登录 www.xiaohongshu.com），再跑 `draft_comments.py watch --probe` 导出结构。")
+
+
+def fetch_alive(link: str, text: str):
+    """回查这条评论是否还在。返回 True/False/None（None = 读不到，不算数）。"""
+    raise NotImplementedError("同 post_comment：选择器待 C0 后现定。")
+
+
+def apply_verdicts(ledger, verdicts):
+    """把回查结果写回台账，返回 (存活率, 是否该熔断, 说明)。纯函数，可单测。
+
+    ⛔ 读不到（None）**不算「没了」**：网络抖动、页面改版都会读不到，
+    把它算成死亡会让存活率虚低，进而误熔断 —— 而熔断一次要停 24 小时。
+    """
+    for i, v in verdicts.items():
+        if v is None:
+            ledger[i]["存活校验"] = "读不到"
+        else:
+            ledger[i]["存活校验"] = "在" if v else "没了"
+    alive = sum(1 for r in ledger if r.get("存活校验") == "在")
+    dead = sum(1 for r in ledger if r.get("存活校验") == "没了")
+    if alive + dead == 0:
+        return None, False, "还没有可判定的样本"
+    rate = alive / (alive + dead)
+    if rate < ALIVE_FLOOR:
+        return rate, True, f"存活率 {rate:.0%} < {ALIVE_FLOOR:.0%}（在 {alive}·没了 {dead}）"
+    return rate, False, f"存活率 {rate:.0%}（在 {alive}·没了 {dead}）"
+
+
+def cmd_send(args):
+    ledger = read_ledger()
+    drafts = [i for i, r in enumerate(ledger)
+              if r.get("状态") == "草稿" and r.get("战场") == "外部"]
+    if not drafts:
+        print("没有待发的草稿。先跑 `draft`。")
+        return 0
+    sent = 0
+    for i in drafts:
+        can, why = can_send_now(ledger)
+        if not can:
+            print(f"⏸ 停在第 {sent} 条：{why}")
+            break
+        r = ledger[i]
+        try:
+            ok, note = post_comment(r["目标链接"], r["发出内容"])
+        except NotImplementedError as e:
+            print(f"⛔ {e}")
+            return 2
+        r["状态"] = "已发送" if ok else "发送失败"
+        r["时间"] = datetime.now().isoformat(timespec="seconds")
+        r["备注"] = note
+        write_ledger(ledger)
+        sent += ok
+        if sent >= args.limit:
+            break
+        gap = next_gap()
+        print(f"   已发 {sent} 条，等 {gap // 60} 分 {gap % 60} 秒")
+        time.sleep(gap)
+    print(f"本轮发出 {sent} 条")
+    return 0
+
+
+def cmd_verify(args):
+    ledger = read_ledger()
+    due = {i: r for i, r in enumerate(ledger)
+           if r.get("状态") == "已发送" and not r.get("存活校验")
+           and datetime.now() - datetime.fromisoformat(r["时间"]) > timedelta(hours=1)}
+    if not due:
+        print("没有到期（发出满 1 小时）且未校验的评论。")
+        return 0
+    verdicts = {}
+    for i, r in due.items():
+        try:
+            verdicts[i] = fetch_alive(r["目标链接"], r["发出内容"])
+        except NotImplementedError as e:
+            print(f"⛔ {e}")
+            return 2
+    rate, trip, why = apply_verdicts(ledger, verdicts)
+    write_ledger(ledger)
+    print(f"校验 {len(due)} 条 · {why}")
+    if trip:
+        trip_breaker(why)
+        print(f"⛔ 已熔断 {COOLDOWN_HOURS} 小时。**不要手动绕过** —— "
+              f"评论被折叠/删除是最早的风控信号，比封号早。先查为什么。")
+    return 0
+
+
 def cmd_gaps(args):
     """C6：评论区语料反哺选题。
 
@@ -423,8 +525,12 @@ def main():
     g = sub.add_parser("gaps", help="评论区语料反哺选题：匹配词缺口 + 读者在问却没写过的场景")
     g.add_argument("--limit", type=int, default=15)
     g.add_argument("--write", action="store_true", help="把零产出场景写进 缺词信号.csv")
+    sd = sub.add_parser("send", help="把草稿按频次调度发出去（需 C0：www 主站登录态）")
+    sd.add_argument("--limit", type=int, default=DAILY_CAP)
+    sub.add_parser("verify", help="回查已发评论是否还在，必要时熔断（需 C0）")
     a = ap.parse_args()
-    return {"draft": cmd_draft, "state": cmd_state, "gaps": cmd_gaps}[a.cmd](a)
+    return {"draft": cmd_draft, "state": cmd_state, "gaps": cmd_gaps,
+            "send": cmd_send, "verify": cmd_verify}[a.cmd](a)
 
 
 if __name__ == "__main__":
