@@ -243,6 +243,12 @@ REPLY_PROMPT = """给小红书评论写 3 个回复候选，供博主本人挑�
 2. 必须先**具体回应对方说的那件事**（引一个他提到的细节），再抛新问题。
    不许通用到换个评论也能用。
 3. 抛的新问题要**低成本**：能用一个词或一个选项回答，不要求对方再写一段。
+3b. ⛔ **不要顺着对方的做法往下聊**。如果他说的是明显不妥的路子（诅咒/报复同事、
+   简历造假、背后使绊子），既不评价也不追问细节 —— 追问细节等于表态认同。
+   把话拉回他真正的处境（他为什么走到这一步）和一句能用的说法。
+   实测踩过：读者说「偷偷做仪式扎他，他现在经常请病假」，模型回的是
+   「这招你还真敢用，他请假频率是每周还是隔阵子一次」—— 账号人设是职场表达，
+   不是陪聊诅咒同事。
 4. 不承诺结果（保过 / 一定能 / 肯定），不引流付费，不出现身份头衔。
 5. 三条要真的不同——不同的切入角度，不是同一句话换说法。
 
@@ -374,6 +380,70 @@ def scrape_comments(tid):
         return []
 
 
+REPLY_SELECTORS = {
+    "input": "textarea.comment-input",
+    "submit": "button.submit",
+}
+
+# React 受控组件：直接改 .value 不会触发 onChange，输入框看着有字、内部 state 还是空，
+# 点发送等于发了个空评论。必须用原型上的 setter 再手动派发 input 事件。
+FILL_JS = """(()=>{
+  const el=document.querySelector("%(input)s");
+  if(!el) return "no-input";
+  const setter=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,"value").set;
+  setter.call(el, %(text)s);
+  el.dispatchEvent(new Event("input",{bubbles:true}));
+  el.dispatchEvent(new Event("change",{bubbles:true}));
+  return JSON.stringify({placeholder:el.placeholder||"", value:el.value});
+})()"""
+
+
+def open_reply_box(tid, want_user):
+    """点开第 want_user 那条评论的回复框。返回 (成功, 说明)。
+
+    ⛔ 用 placeholder 回读校验是必须的：回复框的 placeholder 是「回复 <对方昵称>」，
+    对不上就说明点开的是**别人那条** —— 把话回到陌生人的评论下，比不回严重得多。
+    """
+    r = ev(tid, '''(()=>{const cs=[...document.querySelectorAll("div.container")]
+        .filter(e=>e.querySelector("div.interaction-content"));
+        const c=cs.find(e=>{const a=[...e.querySelectorAll('a[href^="/user/profile"]')]
+            .find(x=>x.textContent.trim()); return a&&a.textContent.trim()===%s;});
+        if(!c) return "no-item";
+        const b=[...c.querySelectorAll("div.action-text")].find(e=>e.textContent.trim()==="回复");
+        if(!b) return "no-button";
+        b.click(); return "ok";})()''' % json.dumps(want_user, ensure_ascii=False))
+    if r != "ok":
+        return False, f"找不到 {want_user} 那条评论的回复入口（{r}）"
+    time.sleep(2)
+    return True, ""
+
+
+def fill_reply(tid, text):
+    raw = ev(tid, FILL_JS % {"input": REPLY_SELECTORS["input"],
+                             "text": json.dumps(text, ensure_ascii=False)})
+    if raw == "no-input":
+        return False, "回复框没出现"
+    try:
+        d = json.loads(raw)
+    except (ValueError, TypeError):
+        return False, f"回读失败：{raw}"
+    return True, d
+
+
+def submit_reply(tid):
+    r = ev(tid, '''(()=>{const b=document.querySelector("%s");
+        if(!b) return "no-submit";
+        if(b.disabled) return "disabled";
+        b.click(); return "ok";})()''' % REPLY_SELECTORS["submit"])
+    time.sleep(3)
+    if r != "ok":
+        return False, r
+    # 发出去之后输入框会被清空 —— 这是唯一能在页面上验证「真的发了」的信号
+    left = ev(tid, '(()=>{const e=document.querySelector("%s");return e?e.value:"gone"})()'
+              % REPLY_SELECTORS["input"])
+    return (left in ("", "gone")), f"发送后输入框残留：{left!r}"
+
+
 def cmd_watch(args):
     tid = open_tab(NOTIF_URL)
     time.sleep(6)
@@ -453,6 +523,88 @@ def cmd_watch(args):
     return 0
 
 
+def cmd_reply(args):
+    """把台账里状态=草稿的「回复」发出去。
+
+    ⛔ 默认 --dry-run：点开回复框、填进去、**不点发送**，回读 placeholder 与 value。
+    第一次真发之前必须先看这一步对不对 —— 回复框认错人的代价是把话回到陌生人评论下。
+    """
+    sys.path.insert(0, str(Path(__file__).parent))
+    from outreach import read_ledger, write_ledger, breaker_on, next_gap
+
+    on, why = breaker_on()
+    if on:
+        print(f"⛔ 熔断中：{why}")
+        return 2
+
+    ledger = read_ledger()
+    todo = [(i, r) for i, r in enumerate(ledger)
+            if r.get("战场") == "回复" and r.get("状态") == "草稿" and r.get("发出内容")]
+    if not todo:
+        print("没有待发的回复草稿。先跑 `watch`。")
+        return 0
+
+    tid = open_tab(NOTIF_URL)
+    time.sleep(6)
+    if not logged_in(tid):
+        print(LOGIN_HINT)
+        return 2
+
+    def reload_notif():
+        """每条回复前重新加载通知页。
+
+        ⛔ 不能省。上一条的回复框不会自己关，第二条点「回复」时框还是上一个人的 ——
+        实测第一次 dry-run 就撞上了：要回给 👼 的话，placeholder 还写着「回复 不妄」。
+        靠 placeholder 回读能拦住，但拦住只是不发，链路仍然是断的。
+        重新加载慢 10 秒，而回复量本来就是每天几条，值。
+        """
+        api("/navigate?target=%s&url=%s" % (tid, up.quote(NOTIF_URL, safe="")))
+        time.sleep(4)
+        ev(tid, CLICK_TAB_JS)
+        for _ in range(15):
+            time.sleep(2)
+            if not ev(tid, 'document.querySelectorAll(".skeleton-item").length'):
+                return True
+        return False
+
+    sent = 0
+    for i, r in todo[:args.limit]:
+        reload_notif()
+        user = (r.get("备注") or "").split("|")[0]
+        text = r["发出内容"]
+        print(f"\n▶ 回复 {user}：{text[:50]}")
+        ok, err = open_reply_box(tid, user)
+        if not ok:
+            print(f"   ⛔ {err}")
+            continue
+        ok, d = fill_reply(tid, text)
+        if not ok:
+            print(f"   ⛔ {d}")
+            continue
+        ph = d.get("placeholder", "")
+        # 回读校验：placeholder 必须是「回复 <这个人>」
+        if user and user not in ph:
+            print(f"   ⛔ 回复对象对不上：placeholder={ph!r}，期望包含「{user}」—— 不发，跳过")
+            continue
+        print(f"   ✓ 已填入（placeholder={ph!r}，回读 {len(d.get('value',''))} 字）")
+        if args.dry_run:
+            print("   [dry-run] 不点发送")
+            continue
+        ok, note = submit_reply(tid)
+        r["状态"] = "已发送" if ok else "发送失败"
+        r["时间"] = datetime.now().isoformat(timespec="seconds")
+        r["备注"] = (r.get("备注") or "") + ("" if ok else f" · {note}")
+        write_ledger(ledger)
+        print(f"   {'✅ 已发送' if ok else '⛔ ' + note}")
+        sent += ok
+        if sent < len(todo[:args.limit]):
+            g = min(next_gap(), 300)      # 回复是被动响应，间隔比外部评论短，但仍不规律
+            print(f"   等 {g}s")
+            time.sleep(g)
+    print(f"\n本轮发出 {sent} 条")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -467,8 +619,14 @@ def main():
     w.add_argument("--probe", action="store_true", help="只检查登录态并导出页面结构")
     w.add_argument("--limit", type=int, default=5, help="最多为几条评论生成回复候选")
 
+    rp = sub.add_parser("reply", help="把台账里的回复草稿发出去（默认 dry-run）")
+    rp.add_argument("--limit", type=int, default=3)
+    rp.add_argument("--dry-run", action="store_true", default=True)
+    rp.add_argument("--send", dest="dry_run", action="store_false",
+                    help="真的点发送（默认只填不发）")
+
     a = ap.parse_args()
-    return cmd_first(a) if a.cmd == "first" else cmd_watch(a)
+    return {"first": cmd_first, "watch": cmd_watch, "reply": cmd_reply}[a.cmd](a)
 
 
 if __name__ == "__main__":
