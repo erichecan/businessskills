@@ -191,6 +191,51 @@ def section_coverage(today):
     return lines, len(zero_recent) <= 2 and len(zero_scene) <= len(scenes) // 2
 
 
+def section_comments(today):
+    """评论三战场：首评 / 读者回复 / 外部评论。
+
+    ⛔ 这一节最该显眼的不是「今天发了几条」，是**存活率和熔断** ——
+    评论被折叠或删除是最早的风控信号，比封号早。花钱看板看不出这个。
+    """
+    sys.path.insert(0, str(REPO / "scripts" / "xhs-comment"))
+    try:
+        import outreach as O
+    except Exception as e:                                  # noqa: BLE001
+        return [f"💬 **评论**：读不出台账（{e}）"], True
+    from collections import Counter
+    from datetime import datetime
+
+    ledger = O.read_ledger()
+    if not ledger:
+        return ["💬 **评论**：台账还是空的（C0 未完成：www 主站没登录态，发送链路没通）"], True
+
+    now = datetime.now()
+    st = Counter(r.get("状态", "") for r in ledger)
+    sent_today = [r for r in ledger if r.get("状态") == "已发送"
+                  and (r.get("时间") or "").startswith(today)]
+    alive = sum(1 for r in ledger if r.get("存活校验") == "在")
+    dead = sum(1 for r in ledger if r.get("存活校验") == "没了")
+    on, why = O.breaker_on(now)
+
+    lines = [f"💬 **评论**：台账 {len(ledger)} 条 · "
+             + " · ".join(f"{k} {v}" for k, v in st.most_common())]
+    lines.append(f"　　今日已发 {len(sent_today)}/{O.DAILY_CAP} 条")
+    if alive or dead:
+        rate = alive / (alive + dead)
+        flag = "  ⛔ 低于下限，该熔断了" if rate < O.ALIVE_FLOOR else ""
+        lines.append(f"　　存活率 **{rate:.0%}**（在 {alive} · 没了 {dead}）{flag}")
+    else:
+        lines.append("　　存活率：还没有已校验的样本")
+    if on:
+        lines.append(f"　　⛔⛔ **熔断中**：{why} —— 不要手动绕过，先查为什么被折叠")
+    by_concept = Counter(c for r in ledger for c in (r.get("概念") or "").split("/") if c)
+    if by_concept:
+        lines.append("　　打在哪些概念的场景上：" + " · ".join(
+            f"{k} {v}" for k, v in by_concept.most_common(5)))
+    ok = not on and (not (alive or dead) or alive / (alive + dead) >= O.ALIVE_FLOOR)
+    return lines, ok
+
+
 def section_publish():
     sys.path.insert(0, str(REPO / "scripts" / "xhs-publish"))
     try:
@@ -666,7 +711,7 @@ def main():
 
     today = date.today().isoformat()
     blocks = [section_collect(today), section_keywords(today), section_drafts(today),
-              section_coverage(today),
+              section_coverage(today), section_comments(today),
               section_publish(), section_outcome(), section_calibrate(),
               section_launchd(), section_heartbeat(), section_usage()]
     body = [f"# 每日 brief · {today}", ""]
