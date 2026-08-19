@@ -257,6 +257,52 @@ REPLY_PROMPT = """给小红书评论写 3 个回复候选，供博主本人挑�
 读者评论：{comment}
 """
 
+LETTER_RE = re.compile(r"^\s*([A-Za-z]|[1-9]|[①②③④])\s*[.。、]?\s*$")
+
+LETTER_PROMPT = """有位读者在你的小红书笔记下回了一个字母「{letter}」。
+
+## 这不是一条普通评论，是**在兑现你的承诺**
+
+你的笔记结尾放的是选项型 CTA：「回 A 我发你……回 B 我发你……」。
+他回了字母，说明他认了其中一种处境，而且**在等你给出你答应过的那个东西**。
+回一句「谢谢支持」等于当场失信，比不回更糟。
+
+## 下面是你在那篇笔记的首评里给过的选项
+
+{options}
+
+## 硬要求
+
+1. **先兑现**：直接给出「{letter}」那一类对应的那句话术或判据 —— 可以照抄着用的，
+   不是「你可以试试更自信一点」这种。这是回复的主体。
+2. 如果上面的选项里认不出「{letter}」对应哪一类（比如没找到对应的首评），
+   就只回一句话：用一个具体问题请他补一句他的处境，好对上号。
+   ⛔ 这种情况下**不要瞎编**一个 A 类答案。
+3. ≤60 字，口语，像人随手回的。
+4. 不承诺结果，不出现身份头衔，不引流。
+
+## 输出格式
+
+严格三行，每行一个候选，行首不要编号、不要引号。
+"""
+
+
+def first_comment_options():
+    """把已生成的首评草稿里的选项汇总成一段，喂给 LETTER_PROMPT。
+
+    ⚠️ 通知页拿不到笔记链接（条目里的 a 全指向评论者主页），所以**没法确知**
+    这个字母是哪一篇笔记下的。折中：把所有首评草稿的选项都给模型，让它按字母对号；
+    对不上就按第 2 条要求追问，而不是瞎编一个答案。
+    """
+    d = SUCAI / "首评草稿"
+    if not d.exists():
+        return "（没有已生成的首评草稿）"
+    out = []
+    for f in sorted(d.glob("*.txt"))[-8:]:
+        out.append(f"— {f.stem.removeprefix('成稿_')}\n{f.read_text(encoding='utf-8').strip()}")
+    return "\n\n".join(out) if out else "（没有已生成的首评草稿）"
+
+
 LOGIN_HINT = """
 ⛔ www.xiaohongshu.com 没有登录态，读不到评论正文。
 
@@ -279,9 +325,58 @@ def logged_in(tid):
     return not bool(ev(tid, '(()=>/\\/login/.test(location.href))()'))
 
 
+# 2026-08-18 在真页面上定的（登录后 probe 出来的，不是凭空写的）。
+#
+# ⛔ 旧代码写的是 /notification/comments —— **那个路径已经不存在了**，
+# 实测直接跳 404（errorCode=-510000，把 comments 当成 noteId 去解析）。
+# 现在的入口是 /notification，评论在「评论和@」这个 tab 下。
+#
+# ⚠️ 通知页**拿不到笔记链接**，条目里的 a 全指向评论者主页。
+# 所以回复只能走条目自带的「回复」按钮就地回，不能靠拼 URL 跳到笔记页。
+NOTIF_URL = "https://www.xiaohongshu.com/notification"
+COMMENT_SELECTORS = {
+    "tab": "评论和@",
+    "item": "div.container",
+    "user": 'a[href^="/user/profile"]',
+    "time": "span.interaction-time",
+    "text": "div.interaction-content",
+    "reply_btn": "div.action-text",
+}
+
+CLICK_TAB_JS = ('(()=>{const el=[...document.querySelectorAll("span,div,li")]'
+                '.find(e=>e.textContent.trim()==="%(tab)s"&&(e.offsetWidth||e.offsetHeight));'
+                'if(el){(el.closest("li,div[class*=tab],a")||el).click();return "ok"}'
+                'return "notfound"})()') % COMMENT_SELECTORS
+
+SCRAPE_JS = ('(()=>{const out=[];'
+             'document.querySelectorAll("%(item)s").forEach((c,i)=>{'
+             'const t=c.querySelector("%(text)s"); if(!t) return;'
+             'const u=[...c.querySelectorAll(\'%(user)s\')].find(a=>a.textContent.trim()), tm=c.querySelector("%(time)s");'
+             'const hint=[...c.querySelectorAll("span")].map(e=>e.textContent.trim())'
+             '.find(x=>/评论了你的笔记|回复了你的评论/.test(x))||"";'
+             'out.push({idx:i,user:(u&&u.textContent.trim())||"",'
+             'profile:(u&&u.getAttribute("href"))||"",'
+             'time:(tm&&tm.textContent.trim())||"",kind:hint,text:t.textContent.trim()});});'
+             'return JSON.stringify(out);})()') % COMMENT_SELECTORS
+
+
+def scrape_comments(tid):
+    """抓「评论和@」tab 下的评论。返回 list。"""
+    ev(tid, CLICK_TAB_JS)
+    for _ in range(15):
+        time.sleep(2)
+        if not ev(tid, 'document.querySelectorAll(".skeleton-item").length'):
+            break
+    raw = ev(tid, SCRAPE_JS)
+    try:
+        return json.loads(raw) if raw else []
+    except ValueError:
+        return []
+
+
 def cmd_watch(args):
-    tid = open_tab("https://www.xiaohongshu.com/notification/comments")
-    time.sleep(9)
+    tid = open_tab(NOTIF_URL)
+    time.sleep(6)
     if not logged_in(tid):
         print(LOGIN_HINT)
         return 2
@@ -301,11 +396,61 @@ def cmd_watch(args):
         print(f"\ntid={tid}（选择器定好后填进 COMMENT_SELECTORS 再跑不带 --probe 的）")
         return 0
 
-    print("⛔ 抓取选择器还没在真页面上定过。先跑 --probe，"
-          "把结构贴给我，我据此填 COMMENT_SELECTORS，再跑这条。")
-    print("   （不先定就写选择器 = 抓到 0 条和「没有新评论」长得一样，"
-          "正是这条链路反复出问题的方式。）")
-    return 1
+    items = scrape_comments(tid)
+    # ⛔ 抓到 0 条要当**故障**报，不能当「今天没有新评论」。这两种在日志里长得一模一样，
+    # 而页面改版正是这么静默失效的 —— /notification/comments 那次就是（路径没了、跳 404）。
+    if not items:
+        print("⛔ 抓到 0 条。页面结构可能又变了 —— 跑 `watch --probe` 重新定选择器。"
+              "不要当成「没有新评论」放过去。")
+        return 1
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from outreach import read_ledger, append_ledger
+    import scene_map
+
+    ledger = read_ledger()
+    seen = {(r.get("备注") or "") for r in ledger if r.get("战场") == "回复"}
+
+    def key(x):
+        return f"{x['user']}|{x['time']}|{x['text'][:30]}"
+
+    fresh = [x for x in items if key(x) not in seen
+             and x["text"] and x["text"] != "该评论已删除"]
+    print(f"抓到 {len(items)} 条，新的 {len(fresh)} 条")
+    if not fresh:
+        return 0
+
+    scenes = scene_map.load_scenes()
+    for x in fresh[:args.limit]:
+        print(f"\n▶ {x['user']}（{x['time']} · {x['kind']}）：{x['text'][:60]}")
+        m_letter = LETTER_RE.match(x["text"])
+        if m_letter:
+            # 读者回了字母 = 在等你兑现首评里的承诺。走另一套 prompt，
+            # 普通回复 prompt 遇到「A」只会说「没有具体信息，没法引用细节」。
+            print("   （字母型回复 —— 读者在等首评承诺的那个东西）")
+            prompt = LETTER_PROMPT.format(letter=m_letter.group(1),
+                                          options=first_comment_options())
+        else:
+            prompt = REPLY_PROMPT.format(title=x["kind"], comment=x["text"][:400])
+        out, err = run_claude(prompt)
+        if not out:
+            print(f"   ⛔ {err}")
+            continue
+        cands = [normalize_punct(l.strip().lstrip("123.、 "))
+                 for l in out.strip().splitlines() if l.strip()][:3]
+        for i, c in enumerate(cands, 1):
+            print(f"   {i}. {c}")
+        t = scene_map.tag(x["text"][:150], scenes)
+        append_ledger({"时间": datetime.now().isoformat(timespec="seconds"),
+                       "战场": "回复", "目标链接": x.get("profile", ""),
+                       "对方原话": x["text"][:120],
+                       "发出内容": cands[0] if cands else "",
+                       "场景": (t or {}).get("场景", ""),
+                       "概念": (t or {}).get("概念", ""),
+                       "正文术语": "", "状态": "草稿", "存活校验": "",
+                       "备注": key(x)})
+    print("\n已写进评论台账（战场=回复）。发送走 C3 的「回复」按钮链路。")
+    return 0
 
 
 def main():
@@ -320,6 +465,7 @@ def main():
 
     w = sub.add_parser("watch", help="监测新评论并生成回复草稿")
     w.add_argument("--probe", action="store_true", help="只检查登录态并导出页面结构")
+    w.add_argument("--limit", type=int, default=5, help="最多为几条评论生成回复候选")
 
     a = ap.parse_args()
     return cmd_first(a) if a.cmd == "first" else cmd_watch(a)
