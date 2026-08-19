@@ -589,10 +589,38 @@ def relevant_cases(kw, row):
     return _as_block(sel, cols), len(sel), len(rows), n_rel
 
 
+def terms_table() -> str:
+    """术语库渲染成表 —— 每篇都一样，所以必须留在 SPLIT_MARK 之前的静态段里。
+
+    ⛔ 这里不许出现日期、随机采样、dict 无序遍历：静态段有一个字节不同，
+    整个缓存前缀就废了（见 headless_cli 第二节）。JSON 数组顺序是固定的，安全。
+    """
+    rows = ["| 概念 | 一句话定义 | 典型场景 |", "|---|---|---|"]
+    for c in scene_map.term_defs():
+        rows.append(f"| {c['name']} | {c['definition']} | {'、'.join(c['scenarios'])} |")
+    return "\n".join(rows)
+
+
+def concept_hint(row: dict) -> str:
+    """本篇的场景与概念 —— 每篇不同，必须留在 SPLIT_MARK 之后的动态段里。
+
+    词库没打上标时返回空串：宁可这一篇不点名，也不要瞎指一个概念让模型硬套。
+    """
+    scene, concept = (row.get("场景") or "").strip(), (row.get("概念") or "").strip()
+    if not concept:
+        return ""
+    n = len(concept.split("/"))
+    return (f"【本篇概念】场景「{scene}」（{row.get('阶段','')}）· 概念 **{concept}**\n"
+            f"正文结尾必须显性点名{'其中一个' if n > 1 else '它'}，措辞逐字照术语库那张表。"
+            f"{'两个都提也可以，但不能再多。' if n > 1 else ''}")
+
+
 def build_prompt(row: dict, feedback: str, round_no: int, lane: str = "搜索流",
                  fixed_title: str = "") -> str:
     kw = row["关键词"]
     spec = LANE_SPEC[lane]
+    terms_table_ = terms_table()
+    concept_block = concept_hint(row)
     title_block = ""
     if fixed_title:
         # 标题已由人挑定时，正文必须兑现它推翻的那个预设 —— 否则标题许诺了反转、
@@ -737,6 +765,21 @@ draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，�
 
 装不下就拆成两张卡，别硬塞进一张。
 
+## 七种力（术语库 —— 措辞不许改）
+
+这个账号讲的所有内容都落在下面 7 个概念上。每篇必须对应其中 1 个，最多 2 个：
+
+{terms_table_}
+
+⛔ 三条硬规则，`draft_check.py` 会机械核对，不是自觉遵守：
+
+1. **措辞逐字照上表**。不许近义词替换或意译改写
+   （✅ 示弱力　⛔ 展示脆弱的能力 / 示弱的本事 / 会示弱）。
+2. **正文结尾必须显性点名概念**。句式参考「这背后其实是____的问题」/
+   「本质上考验的是____」。只把道理讲对、不说出概念名字 = 不算数 ——
+   读者记住的是概念，不是某一次的话术。
+3. **单篇不超过 2 个概念**。超过就是记忆点分散，三个都提等于一个都没记住。
+
 【pose 字段 —— 每张卡必须给，按这张卡讲的内容选人物姿势】
 可选姿势（文件名自带语义，照抄名字，不要加 .png）：
 {pose_library()}
@@ -759,6 +802,7 @@ draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，�
 
 【选题】关键词：{kw}
 场景域 {row.get('场景域','')} · 意图强度 {row.get('意图强度','')} · 竞争密度 {row.get('竞争密度','')} · 关联案例 {row.get('关联案例ID','')}
+{concept_block}
 {title_block}{rework}
 【案例库（{n_case}/{tot_case} 行，按本篇选题筛过；正文引用的原话必须能追溯到这里的某一行；注意「来源」列决定人称）】
 {case_block}

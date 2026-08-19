@@ -303,6 +303,83 @@ def lane_of(text, override=None):
     return m.group(1) if m else "搜索流"
 
 
+# ── 七种力规则（2026-08-18 加，见 20260818-选题拓宽与评论自动化-tasks.md G2）──
+#
+# ⛔ 有日期门，且这是本条最重要的设计。
+# 机械项每收紧一次就会静默废掉一批存量稿 —— 08-15 那次「积压 55 篇达标稿发不出去」
+# 就是这么来的（换 CTA 口径没做存量迁移）。现在库存 108 篇、闸门刚放行 16 篇，
+# 拿一条今天才定的规则去追溯判它们，等于把库存清零。
+# 存量稿写的时候没有这条要求，判它们不公平也无意义。
+CONCEPT_RULES_FROM = date(2026, 8, 19)
+
+# 近义词/意译：把概念名的前缀接上「能力/本事/技巧…」就是最典型的跑偏写法。
+# 「示弱力」→「示弱的能力」读起来没差，但读者记不住一个每次换个说法的东西，
+# 而记住概念正是这套术语库存在的全部理由。
+_NEAR_MISS = re.compile(r"(结构|说服|示弱|边界|反馈|化解|破冰)\s*(?:的)?\s*(能力|本事|技巧|水平|力量)")
+# 「结尾」的口径 = **正文后半部分**，不是物理末尾的 N 字。
+# ⛔ 别改回「末 150 字」：那块地方被 CTA 占着。必须命中清单第 3 条要求 CTA 是
+# 「回一个字母/编号」型（依据是评论率 0.30% —— 让读者写一段话的成本太高），
+# 于是正文最后一定是「你是哪一种？回个字母：A…B…C…」。
+# 两条规则争同一块空间时，让有数据支撑的那条赢。实测：新稿正文里确实点了「结构力」，
+# 只是被 CTA 挤到了 150 字窗口之外 —— 判它不合格是规则自己的问题。
+_TAIL_RATIO = 0.5          # 概念名必须出现在正文后 50% 内
+_MAX_CONCEPTS = 2
+
+
+def _concept_names():
+    import json
+    d = json.loads((SUCAI / "概念术语库.json").read_text(encoding="utf-8"))
+    return [c["name"] for c in d["concepts"]]
+
+
+def concept_issues(text, d):
+    """七种力三条硬规则。只对 CONCEPT_RULES_FROM 起的新稿生效。"""
+    if d < CONCEPT_RULES_FROM:
+        return []
+    names = _concept_names()
+    body = _body_section(text) or text
+    issues = []
+
+    for m in set(_NEAR_MISS.findall(body)):
+        issues.append(f"概念措辞跑偏：「{m[0]}{m[1]}」应写作「{m[0]}力」"
+                      f"（术语库措辞不许意译改写）")
+
+    hit = [n for n in names if n in body]
+    if len(hit) > _MAX_CONCEPTS:
+        issues.append(f"涉及 {len(hit)} 个概念（>{_MAX_CONCEPTS}）：{'、'.join(hit)}"
+                      f" —— 记忆点分散，聚焦到 1-2 个")
+
+    flat = re.sub(r"\s", "", body)
+    tail = flat[int(len(flat) * (1 - _TAIL_RATIO)):]
+    if not any(n in tail for n in names):
+        where = "全篇都没提" if not hit else f"只在前半段提了{'、'.join(hit)}"
+        issues.append(f"正文后半段没有显性点名概念（{where}）"
+                      f" —— 句式参考「这背后其实是____的问题」")
+    return issues
+
+
+# ── 下面两条只统计不拦（2026-08-18）──────────────────────────────────────
+#
+# 四段式和「结果是否编造」都判不准：前者要认出「诊断」「解法」是不是真的分开了，
+# 后者要区分「转述真实反馈」和「编一个对方反应」。拿正则去判，误报率下不来。
+# 台账 G2 的验收写着「误报率 0 才能上闸门」，所以先跑报告、看触发分布，
+# 确认判据站得住再挪进 concept_issues。
+# ⛔ 别因为「先上着看看」就把它们直接加进 issues —— 一条误报就是一篇达标稿发不出去。
+_QUOTE_MARK = re.compile(r"(评论区有人|有人在评论区|读者(说|留言)|私信(里|说))")
+_RESULT_REAL = re.compile(r"(后来|结果)(他|她|对方|领导|hr|HR)")
+_RESULT_INFER = re.compile(r"(大概率|多半会|通常会|一般会).{0,40}(因为|原因是)")
+
+
+def concept_report(text):
+    body = _body_section(text) or text
+    quoted = bool(_QUOTE_MARK.search(body))
+    return {
+        "引用了读者原话": quoted,
+        "写了对方后续反应": bool(_RESULT_REAL.search(body)),
+        "标了推理型结果": bool(_RESULT_INFER.search(body)),
+    }
+
+
 def check_one(d, f, all_drafts, lane_override=None):
     """单篇机械检查，返回违规条目列表（空 = 通过）。
 
@@ -406,6 +483,8 @@ def check_one(d, f, all_drafts, lane_override=None):
                       f" —— 把读者归进第三方群体，视角该对着读者说")
 
     issues.extend(style_issues(text))
+
+    issues.extend(concept_issues(text, d))
 
     prev5 = [pf.read_text(encoding="utf-8") for pd, pf in all_drafts if pd < d][-5:]
     for sig in SIGNATURES:
