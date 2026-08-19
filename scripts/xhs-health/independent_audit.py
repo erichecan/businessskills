@@ -395,6 +395,48 @@ LANE_HINT = {
 }
 
 
+CONCEPT_AUDIT_FROM = date(2026, 8, 19)
+
+_CONCEPT_RULES = """
+【七种力检查（Eric 2026-08-18 定）】
+
+这个账号的所有内容都落在七种力上：{names}。术语库定义见
+`xhs/素材库/概念术语库.json`。以下 3 条是**独立于六个维度的检查项**，
+任一不满足 → 在报告里**指名缺失的是哪一条**，并把处置降为「返工」：
+
+1. **选题落在具体场景上**，不是泛泛而谈的大道理。
+   ✅「绩效被打低分时第一句话怎么说」　⛔「职场沟通的三个底层逻辑」
+2. **若正文引用了读者原话/评论**，必须具备完整的「情境 → 诊断 → 解法 → 结果」四段：
+   诊断要明确指出这属于七种力里的哪一种没处理好；解法要给出至少一句**可直接照抄**的话术。
+   停在「引用原话 + 讲道理」不算。
+3. **「结果」不得编造**。二选一：据实写明真实后续反馈；或写成推理型
+   （「这样调整后，对方大概率会……，因为……」）并讲清逻辑。
+   凭空写一句对方的反应 = 红线，直接判红。
+
+⛔ 下面两条**已由 `draft_check.py` 机械核过**，你不要重复扣分，也不要因为
+「我没看到术语库」而降级：概念措辞是否逐字照术语库、单篇概念数是否 ≤2。
+"""
+
+
+def concept_audit_rules(draft: Path) -> str:
+    """七种力检查项。**只对 CONCEPT_AUDIT_FROM 起的新稿注入。**
+
+    ⛔ 老稿的 prompt 必须逐字保持原样，两个理由：
+    ① 库存 108 篇写的时候没有这套要求，拿新标准追溯判它们会集体掉档
+       —— 而分数一掉档，处置就从「发布」变「返工」，等于把库存清零；
+    ② 审核分要跨时间可比。改了标准还用同一个分数栏，等于把尺子换了却不告诉读数的人。
+
+    副作用要认：静态前缀因此有**两个变体**（带 / 不带这一节），混跑的批次里
+    缓存命中会分成两组。这个代价是明知故犯的 —— 比起把库存判死，多付一次前缀写入便宜得多。
+    """
+    m = re.search(r"成稿_(\d{4}-\d{2}-\d{2})_", draft.name)
+    if not m or date.fromisoformat(m.group(1)) < CONCEPT_AUDIT_FROM:
+        return ""
+    sys.path.insert(0, str(REPO / "scripts"))
+    import scene_map
+    return _CONCEPT_RULES.format(names="、".join(scene_map.load_terms()))
+
+
 def build_audit_prompt(draft: Path, lane: str = None):
     """拼审核 prompt。抽出来是为了能在不调模型的前提下测字数（--dry-run）。
 
@@ -426,6 +468,7 @@ def build_audit_prompt(draft: Path, lane: str = None):
     # 首图/七卡内容在单独的 cards.json 里。不喂进来，审核员看不到首图，
     # 只能把维度 3 按未知降级给半分——2026-08-02 三篇稿都栽在这。
     # 2026-08-12 T7 后该维度问的是「第 3 秒手指停不停」，更依赖看到首图本身。
+    concept_rules = concept_audit_rules(draft)
     stem = draft.name.removeprefix("成稿_").removesuffix(".md")
     cards = _read_or(SUCAI / f"图文_{stem}_cards.json", "（本稿无卡片 JSON，首图无法核验）")
     text = draft.read_text(encoding="utf-8")
@@ -442,6 +485,7 @@ def build_audit_prompt(draft: Path, lane: str = None):
 
 【关于标杆/先例参照】
 {benchmark_note}
+{concept_rules}
 
 ⛔ 关于下面三个库：给你的**不是整库，是按本篇正文反查出来的子集**。
 筛法：把正文和库里每一行做最长公共子串比对，≥{STRONG_N} 字连续相同的（＝正文照抄了它）
