@@ -43,7 +43,7 @@ import random
 import re
 import sys
 import time
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[1]
@@ -62,6 +62,12 @@ RUN_LOG = SUCAI / "运行日志.csv"
 PER_KEYWORD = 20      # 每词抓几条。手工流程一直是 20，改了命中率就没法跟历史比
 KEYWORDS_PER_RUN = 8  # 4 种子 + 2 长空档活跃 + 2 候选
 SEED_N, AGED_N, CAND_N = 4, 2, 2
+# 缺口定向词占 GAP_N 个名额，从 SEED_N 里挪（4 → 4−GAP_N），**总投放量不变**。
+# 采集是有成本的（每词一次搜索抓取），补场景不该靠加量，该靠把名额从饱和的种子上挪走。
+GAP_N = 2
+GAP_SIGNAL = SUCAI / "缺词信号.csv"
+GAP_FRESH_DAYS = 7        # 只认最近 7 天的缺口信号，更早的当已过期
+GAP_MIN_RATE = 40.0       # 连续 3 轮命中率都低于这个数的定向词，停投
 PROMOTE_RATE = 0.40   # 候选词命中率达标即升活跃。手工流程用的就是 40%
 # ⛔ 2026-08-16 从「2.5 秒固定」改成随机区间（Eric：调时间和频率，避开风控）。
 #
@@ -133,6 +139,54 @@ def memory_keys(rows):
     return ids, titles
 
 
+def recent_rates(row, n=3) -> list:
+    """从命中率字段里取最近 n 次的百分比。新记录是 prepend 的，所以取前 n 个。"""
+    return [float(x) for x in re.findall(r"=(\d+(?:\.\d+)?)%",
+                                         (row.get("命中率") or ""))[:n]]
+
+
+def gap_keywords(pool, n=GAP_N):
+    """把 pick_topic 记下的缺词信号翻成定向种子词。
+
+    这是「选题缺口 → 采集行动」的闭环那一环。在此之前缺口只存在于选题端：
+    pick_topic 发现「边界力零产出、拒绝不合理任务 0 个可写词」，然后……什么也不会发生，
+    因为采集端按自己的轮换表投词，从不知道下游缺什么。
+
+    ⛔ 不替换现有排序，只占 GAP_N 个名额。缺口驱动如果变成主排序，
+    同一个空场景会被反复投到饱和 —— 而它之所以空，往往正是因为这个词本身搜不出东西。
+    """
+    if not GAP_SIGNAL.exists():
+        return []
+    cutoff = (date.today() - timedelta(days=GAP_FRESH_DAYS)).isoformat()
+    sig = [r for r in read_csv(GAP_SIGNAL) if (r.get("日期") or "") >= cutoff]
+    sig.reverse()                                   # 新的在后，反过来让最新的先看到
+    by_kw = {(r.get("关键词") or "").strip(): r for r in pool}
+    out, seen_scene = [], set()
+    for r in sig:
+        scene, kw = (r.get("场景") or "").strip(), (r.get("关键词模板") or "").strip()
+        if not kw or scene in seen_scene:
+            continue
+        seen_scene.add(scene)
+        row = by_kw.get(kw)
+        if row:
+            rates = recent_rates(row)
+            if len(rates) >= 3 and all(x < GAP_MIN_RATE for x in rates):
+                print(f"   · 缺口词「{kw}」近 3 轮命中率 {rates} 全部 <{GAP_MIN_RATE}%，停投")
+                continue
+        else:
+            # 池里没有 → 新建一行并**加进 pool**，这样 update_pool 能记它的成绩、
+            # write_csv 能把它落盘。只 return 不 append 的话，这个词跑完什么都不留。
+            row = {k: "" for k in pool[0]}
+            row.update({"关键词": kw, "类型": "种子", "来源": f"缺口驱动·{scene}",
+                        "运行次数": "0", "首次发现": date.today().isoformat()})
+            pool.append(row)
+            print(f"   · 缺口词「{kw}」是新词（{scene}），已加入关键词池")
+        out.append(row)
+        if len(out) >= n:
+            break
+    return out
+
+
 def pick_keywords(pool, limit):
     """选词：4 固定种子 + 2 长空档活跃复查 + 2 候选。
 
@@ -161,7 +215,10 @@ def pick_keywords(pool, limit):
     cands = sorted([r for r in pool if (r.get("类型") or "").strip() == "候选"],
                    key=last_run)
 
-    picked = seeds[:SEED_N] + active[:AGED_N] + cands[:CAND_N]
+    gaps = gap_keywords(pool)
+    # 缺口词占的是种子名额：总投放量不变，饱和种子往后排
+    picked = gaps + [r for r in seeds if r not in gaps][:max(SEED_N - len(gaps), 0)] \
+        + active[:AGED_N] + cands[:CAND_N]
     # 池子里某一类不够时，用活跃词补满 —— 空转一轮比少跑几个词更亏
     if len(picked) < limit:
         rest = [r for r in active[AGED_N:] if r not in picked]
