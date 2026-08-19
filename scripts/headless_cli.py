@@ -89,6 +89,30 @@ HEADLESS_FLAGS = [
     "--effort", "medium",
 ]
 
+# ── 模型分档（2026-08-18 Eric 定，见 20260818-token优化二轮-tasks.md T8）─────────
+#
+# 起因是查出来 Claude 侧 **100% 走 Opus 5** —— 代码里从不传 --model，全部吃
+# settings.json 的默认 opus[1m]。近 8 天按 message.id 去重：写稿 $105.87、审核 $75.47、
+# **首评 $35.01 / 251 次请求**。
+#
+# 分档判据是「这一步要不要理解力」，不是「这一步重不重要」：
+#   Opus   独立审核（Sonnet 实测 79 vs 86，把话术模板的场景预演误判成编造原话）
+#          写稿正文、正文返工（改错地方比不改更糟，见 refine_loop.run_model）
+#   Sonnet 机修、标题档（定点改一处的机械活）
+#          评论链路（首评/回复/外部评论 —— 照 6 条硬要求写 80 字）
+#
+# ⚠️ Sonnet 的已知缺陷是**格式遵循**，不是判断力：同样 effort medium，它在审核 CSV 上
+# 会静默多插一列，还能通过「逗号 ≥14」的解析判据。所以降档到 Sonnet 的链路，
+# 验收必须显式查结构（字段数 / 行数 / 三处是否同改），不能只看内容像不像话。
+#
+# ⛔ **两侧都要显式传，不许靠默认值**（2026-08-18 19:16 踩到）：
+# `~/.claude/settings.json` 的 `model` 当天从 `opus[1m]` 改成了 `sonnet`。
+# 默认值是会变的、而且改它的人不会想到审核链路 —— 靠默认等于把「审核用什么模型」
+# 这个已经用 A/B 定过案的决定，交给一个随时可能被顺手改掉的全局配置。
+# 所以 Opus 链路照样传 --model，哪怕今天的默认恰好就是它。
+SONNET = "claude-sonnet-5"
+OPUS = "claude-opus-5"
+
 # 静态/动态切分标记。写稿 prompt 里本来就有这一行（2026-08-12 前缀重排时加的），
 # 审核 prompt 由 build_audit_prompt 插入同一行。没有这个标记的 prompt
 # （采集/分诊/probe/预测复盘）会安全降级成「整体走用户 prompt」，行为不变。
@@ -124,14 +148,20 @@ def split_prompt(prompt: str) -> tuple[str, str]:
     return prompt[:j], prompt[j + 2:]
 
 
-def build_argv(claude_bin, prompt: str, extra=()) -> list:
+def build_argv(claude_bin, prompt: str, extra=(), model: str | None = None) -> list:
     """拼出 subprocess 用的完整 argv，自动把静态前缀挪进 --append-system-prompt。
 
     六个调用点（写稿/审核/probe/采集/分诊/预测复盘）统一走这里，
     省得每处各拼一遍 —— 上一版就是因为拼在六个地方，加一个 flag 要改六处。
+
+    `model=None`（默认）= 不传 `--model`，走 settings.json 的默认模型，行为不变。
+    ⛔ 别把模型写进 HEADLESS_FLAGS —— 那份 flags 是六个调用点共用的，
+    写死等于全链路一起改档，而分档的全部意义就在于逐链路不同（见 SONNET 注释）。
     """
     static, dynamic = split_prompt(prompt)
     argv = [str(claude_bin), *HEADLESS_FLAGS]
+    if model:
+        argv += ["--model", model]
     if static:
         argv += ["--append-system-prompt", static]
     return argv + [*extra, "-p", dynamic]

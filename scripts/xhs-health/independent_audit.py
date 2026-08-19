@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from claude_limits import WEEKLY, classify_limit, limit_banner  # noqa: E402
-from headless_cli import build_argv, ensure_cwd  # noqa: E402
+from headless_cli import OPUS, build_argv, ensure_cwd  # noqa: E402
 
 BARE_CWD = ensure_cwd()
 
@@ -145,7 +145,7 @@ def run_claude_waiting_out_limits(prompt):
     """
     waited = 0
     while True:
-        r = subprocess.run(build_argv(CLAUDE, prompt),
+        r = subprocess.run(build_argv(CLAUDE, prompt, model=OPUS),
                            cwd=str(BARE_CWD), capture_output=True, text=True, timeout=600)
         out = (r.stdout or "").strip()
         kind = classify_limit(out, r.stderr or "")

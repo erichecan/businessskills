@@ -31,7 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import gemini_cli  # noqa: E402
 from claude_limits import WEEKLY, classify_limit, is_limit, limit_banner  # noqa: E402
-from headless_cli import build_argv, ensure_cwd  # noqa: E402
+from headless_cli import OPUS, SONNET, build_argv, ensure_cwd  # noqa: E402
 
 BARE_CWD = ensure_cwd()
 
@@ -715,7 +715,7 @@ def parse_output(out: str):
     return slug, md, cards
 
 
-def run_claude(prompt: str, tag: str) -> str:
+def run_claude(prompt: str, tag: str, model: str | None = None) -> str:
     """调 headless claude，失败重试并把原始输出留档。
 
     一轮 loop 最多要调 6 次 claude -p，每次 60k+ token，连续调用撞限流是常态。
@@ -740,7 +740,7 @@ def run_claude(prompt: str, tag: str) -> str:
     while True:
         attempt += 1
         try:
-            r = subprocess.run(build_argv(CLAUDE, prompt),
+            r = subprocess.run(build_argv(CLAUDE, prompt, model=model),
                                cwd=str(BARE_CWD), capture_output=True, text=True,
                                timeout=WRITE_TIMEOUT)
             out = (r.stdout or "").strip()
@@ -778,7 +778,7 @@ def run_claude(prompt: str, tag: str) -> str:
         time.sleep(RETRY_WAIT * attempt)
 
 
-def run_model(prompt: str, tag: str, first_pass: bool) -> str:
+def run_model(prompt: str, tag: str, first_pass: bool, model: str | None = None) -> str:
     """首轮初稿走 Gemini（免费），返工走 Claude。
 
     分工是 Eric 定的（2026-08-12）：「写稿、探词、搜索评估用 Gemini 做初步，
@@ -791,6 +791,10 @@ def run_model(prompt: str, tag: str, first_pass: bool) -> str:
 
     每轮 claude -p 有 38.7k 固定开销 + 33.8k 内容 ≈ 72.5k；首轮换掉即省这一整块。
     撞额度静默回退 Claude，不让稿子因为 Gemini 不可用就写不出来。
+
+    `model` 透传给 run_claude：机修和标题档传 SONNET（定点改一处的机械活），
+    正文返工（reworkfix）**不降档** —— 它要读懂扣分点再只改那几处，
+    正是上一段说的「最吃理解力的一环」。见 headless_cli.SONNET 的分档判据。
     """
     if (first_pass and os.environ.get("XHS_ENGINE", "gemini").lower() != "claude"
             and gemini_cli.available()):
@@ -804,7 +808,7 @@ def run_model(prompt: str, tag: str, first_pass: bool) -> str:
             print(f"   ⏬ Gemini 免费额度已满，回退 Claude：{e}", flush=True)
         except Exception as e:                        # noqa: BLE001
             print(f"   ⏬ Gemini 出稿失败，回退 Claude：{e}", flush=True)
-    return run_claude(prompt, tag)
+    return run_claude(prompt, tag, model)
 
 
 def write_draft(row, feedback, round_no, dry_run=False, lane="搜索流", fixed_title=""):
@@ -812,7 +816,8 @@ def write_draft(row, feedback, round_no, dry_run=False, lane="搜索流", fixed_
     if dry_run:
         print(f"--- [dry-run] 第 {round_no} 轮 prompt 共 {len(prompt)} 字，前 600 字：\n{prompt[:600]}\n---")
         return None, None, None
-    return parse_output(run_model(prompt, f"write_r{round_no}", first_pass=not feedback))
+    return parse_output(run_model(prompt, f"write_r{round_no}",
+                                  first_pass=not feedback, model=OPUS))
 
 
 def save(slug, md, cards):
@@ -1383,7 +1388,7 @@ def title_fix_one(draft: Path, score, threshold, report, kw=""):
         report=report[:2500], titles=m_sec.group(2).strip()[:600],
         cover_title=cover.get("title", ""), cover_body=cover.get("body", ""),
         body_gist=gist)
-    out = run_model(prompt, "titlefix", first_pass=False)
+    out = run_model(prompt, "titlefix", first_pass=False, model=SONNET)
     raw = re.sub(r"^```(?:json)?\n?|\n?```$", "", (out or "").strip(), flags=re.M).strip()
     try:
         d = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
@@ -1451,7 +1456,7 @@ def rework_fix_body(draft: Path, score, threshold, report, lane, quotes_block=""
         gap=threshold - score, score=score, threshold=threshold, report=report[:4000],
         cur=cur, lo=lo, hi=hi, budget=budget, body=body,
         quotes=quotes_block or "（本轮不新增引语，沿用正文里已有的）")
-    out = run_model(prompt, "reworkfix", first_pass=False)
+    out = run_model(prompt, "reworkfix", first_pass=False, model=OPUS)
     new_body = re.sub(r"^```[a-z]*\n?|\n?```$", "", (out or "").strip(), flags=re.M).strip()
     if not new_body or len(new_body) < 80:
         return None
@@ -1518,7 +1523,7 @@ def mech_fix_one(item, dry_run=False) -> str:
         return "未修好"
 
     for attempt in (1, 2):
-        out = run_model(prompt, f"mechfix_{attempt}", first_pass=False)
+        out = run_model(prompt, f"mechfix_{attempt}", first_pass=False, model=SONNET)
         new_body = re.sub(r"^```[a-z]*\n?|\n?```$", "", (out or "").strip(), flags=re.M).strip()
         if not new_body:
             print(f"   ⚠️ 第 {attempt} 次模型没输出正文，重试")

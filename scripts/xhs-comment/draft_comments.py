@@ -66,11 +66,22 @@ def ev(tid, js):
 
 def run_claude(prompt, timeout=300):
     """调 headless claude。这里不做 refine_loop 那套额度熬夜重试 ——
-    首评/回复草稿都是小请求，撞额度就直接说，等下一次跑就行，没必要占着进程五小时。"""
+    首评/回复草稿都是小请求，撞额度就直接说，等下一次跑就行，没必要占着进程五小时。
+
+    2026-08-18 改两处（T8）：
+    ① 走 headless_cli.build_argv —— 此前这里自己拼 `[claude, "-p", prompt]`，
+       吃不到 safe-mode / 禁工具那批 flag，等于每次白付 23.4k 新写缓存。
+    ② 降档 Sonnet 5。评论链路是照 6 条硬要求写 80 字，判断难度与审核不在一个量级，
+       而 C 组要把评论量放大一个数量级（每天 12 条外部 + 首评 + 读者回复）。
+       ⚠️ Sonnet 弱在格式遵循：首评是纯文本、回复是严格三行，调用方的格式校验一条不能减。
+    """
     if not CLAUDE.exists():
         return None, f"找不到 claude CLI：{CLAUDE}"
+    sys.path.insert(0, str(REPO / "scripts"))
+    from headless_cli import SONNET, build_argv, ensure_cwd
     try:
-        r = subprocess.run([str(CLAUDE), "-p", prompt],
+        r = subprocess.run(build_argv(CLAUDE, prompt, model=SONNET),
+                           cwd=str(ensure_cwd()),
                            capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return None, "claude 超时"
@@ -80,6 +91,30 @@ def run_claude(prompt, timeout=300):
     if r.returncode != 0 or not out:
         return None, f"claude 失败：{(r.stderr or '')[:200]}"
     return out, ""
+
+
+# 中文里夹半角标点，读着就像机器写的。实测 Sonnet 比 Opus 明显更爱用 `:` `,` `?`
+# （2026-08-18 三篇复测，3/3 出现）。这种事不靠模型自觉 —— 落盘前机械归一化，
+# 判据是「前一个字符是中文」，避免误伤 A/B、3:00 这类。
+_HALF2FULL = {",": "，", ":": "：", ";": "；", "?": "？", "!": "！"}
+_CJK = re.compile(r"[\u4e00-\u9fff]")
+
+
+def normalize_punct(text: str) -> str:
+    """半角标点转全角 —— 只在**紧邻中文**时转，且两侧都是数字时一律不动。
+
+    只看前一个字符不够：「还是C:讲得清」的冒号前是 ASCII 字母、后面才是中文，
+    照样是中文句子里的半角标点。两侧都是数字的（3:00、1,000）必须放过。
+    """
+    out = []
+    for i, ch in enumerate(text):
+        prev, nxt = text[i - 1] if i else "", text[i + 1] if i + 1 < len(text) else ""
+        if (ch in _HALF2FULL and (_CJK.match(prev) or _CJK.match(nxt))
+                and not (prev.isdigit() and nxt.isdigit())):
+            out.append(_HALF2FULL[ch])
+        else:
+            out.append(ch)
+    return "".join(out)
 
 
 def read_ledger():
@@ -124,6 +159,11 @@ FIRST_PROMPT = """你在给一条已发布的小红书笔记写「首评」—�
 1. 给出 2–4 个**编号选项**，让读者只需回一个字母或数字。
    选项必须来自这篇笔记正文里真实出现过的分类，不许现编。
 2. 选项之间要真的互斥、且都像自己——读者能一眼认出「我是 B」。
+   ⛔ 选项描述的是**读者的处境**，不是你打算给他的东西。回报只在第 3 条那句里说一次，
+   不许拆进选项里。（2026-08-18 实测：Sonnet 两次都在这里偏，两次都把选项写成了回报，
+   结果读者根本认不出自己是哪个字母。）
+   ✅「A 抢着表忠心、B 他压你价、C 他全程在说你插不进话」
+   ⛔「A 他追问期望薪资你怎么接、B 压价那刻怎么把范围推回去」
 3. 承诺一个**具体回报**：回了这个字母能得到什么（对应那一种的第一句话怎么说 / 判据是什么）。
    不许承诺结果（「保过」「一定能」），不许引流付费。
 4. 全长 ≤ 80 字。这是评论不是正文。
@@ -177,6 +217,7 @@ def cmd_first(args):
         # 后面跟着 A/B/C 三个选项，只取第一行等于把选项全扔了，剩下一句没头没尾的话。
         # （2026-08-08 第一版就是这么错的。）只剥掉代码围栏和整体引号。
         first = re.sub(r"^```[a-z]*\n|\n```$", "", out.strip()).strip().strip('"“”')
+        first = normalize_punct(first)
         n = len(first.replace("\n", ""))
         print(f"  首评草稿（{n} 字）：")
         print("".join(f"  │ {l}\n" for l in first.split("\n")), end="")
