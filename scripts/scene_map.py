@@ -62,12 +62,29 @@ def tag(text: str, scenes: list[dict] | None = None) -> dict | None:
     for r in scenes:
         for w in r["匹配词"].split("|"):
             w = w.strip()
-            if w and w.lower() in low and len(w) > best_len:
+            if not w or w.lower() not in low:
+                continue
+            # 同长度时按场景名字典序定胜负 —— 规则任意但**确定**。
+            # 靠遍历顺序（= CSV 行序）的话，往表里插一行就可能悄悄改掉一批词的归属。
+            if len(w) > best_len or (len(w) == best_len and best and r["场景"] < best[0]["场景"]):
                 best, best_len = (r, w), len(w)
     if not best:
         return None
     r, w = best
     return {"阶段": r["阶段"], "场景": r["场景"], "概念": r["默认概念"], "命中词": w}
+
+
+def ties(text: str, scenes: list[dict] | None = None) -> list[tuple]:
+    """列出同长度并列命中的场景 —— tie 说明匹配词不够特异，该去消歧。"""
+    scenes = scenes if scenes is not None else load_scenes()
+    low = text.lower()
+    hits = [(len(w.strip()), r["场景"], w.strip()) for r in scenes
+            for w in r["匹配词"].split("|") if w.strip() and w.strip().lower() in low]
+    if not hits:
+        return []
+    top = max(h[0] for h in hits)
+    win = sorted({(h[1], h[2]) for h in hits if h[0] == top})
+    return win if len(win) > 1 else []
 
 
 def scene_of(name: str, scenes: list[dict] | None = None) -> dict | None:

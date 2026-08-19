@@ -25,13 +25,14 @@ import re
 import subprocess
 import sys
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import gemini_cli  # noqa: E402
 from claude_limits import WEEKLY, classify_limit, is_limit, limit_banner  # noqa: E402
 from headless_cli import OPUS, SONNET, build_argv, ensure_cwd  # noqa: E402
+import scene_map  # noqa: E402
 
 BARE_CWD = ensure_cwd()
 
@@ -253,22 +254,123 @@ def slot_strength(keyword: str) -> float | None:
     return search_slot_evidence(f"关键词来源：`词库.csv`「{keyword}」")["日均赞中位"]
 
 
+GAP_SIGNAL = SUCAI / "缺词信号.csv"
+QUOTA_DAYS = 14                 # 配额窗口。与「周目标篇数 × 2」配套
+
+# 本进程内已选中的场景。一次 loop 触发可能连写多篇（--stock N），而 scene_output()
+# 靠扫成稿文件算产出 —— 写盘之前的那几秒里缺口没变，于是连选同一格子。
+# ⛔ 别指望「save() 写完盘下次就对了」：dry-run 不写盘、写稿失败也不写盘，
+# 那两种情况下缺口永远不减，会把一整轮全砸在同一个场景上。
+_PICKED_THIS_RUN: dict = {}
+
+
+def scene_output(days: int = QUOTA_DAYS) -> dict:
+    """近 N 天各场景的成稿数。日期取自文件名，标签走 scene_map（从词库派生）。"""
+    from collections import Counter
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    tags, scenes = scene_map.ciku_tags(), scene_map.load_scenes()
+    c = Counter()
+    for d in list(SUCAI.glob("成稿_*.md")) + list((SUCAI / "归档稿").glob("成稿_*.md")):
+        m = re.match(r"成稿_(\d{4}-\d{2}-\d{2})_", d.name)
+        if not m or m.group(1) < cutoff:
+            continue
+        t = scene_map.tag_draft(d, tags, scenes)
+        if t:
+            c[t["场景"]] += 1
+    return c
+
+
+GAP_COLS = ["日期", "阶段", "场景", "概念", "关键词模板", "原因"]
+
+
+def log_gap(scene_row: dict, reason: str):
+    """记一条缺词信号 —— 这个场景该做但没词可做。S4 的定向种子词读它。
+
+    ⛔ 只打印不落盘是没用的：loop 跑在 launchd 里，日志没人看。
+    缺口要变成采集端的行动，必须落进一个另一条链路会读的文件。
+
+    ⛔ 按（日期 × 场景）去重。pick_topic 每次调用都会遍历**全部**缺口场景，
+    无词的每个都记一条 —— 一轮写 8 篇就是 8 份同样的记录。第一版就是这样，
+    5 次调用写出 15 行、其中 8 行一模一样。S4 照着投放的话，
+    等于把定向种子词的配额全砸在同一个场景上。
+    """
+    today = date.today().isoformat()
+    rows = []
+    if GAP_SIGNAL.exists():
+        with GAP_SIGNAL.open(encoding="utf-8-sig") as f:
+            rows = [r for r in csv.DictReader(f)
+                    if not (r.get("日期") == today and r.get("场景") == scene_row["场景"])]
+    rows.append({"日期": today, "阶段": scene_row["阶段"], "场景": scene_row["场景"],
+                 "概念": scene_row["默认概念"], "关键词模板": scene_row["关键词模板"],
+                 "原因": reason})
+    tmp = GAP_SIGNAL.with_suffix(".csv.tmp")
+    with tmp.open("w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=GAP_COLS)
+        w.writeheader()
+        for r in rows:
+            w.writerow({k: r.get(k, "") for k in GAP_COLS})
+    tmp.replace(GAP_SIGNAL)
+
+
+def _rank_in_scene(r):
+    """格子内排序 —— 强度分四档（五项爆款规律 §二）。
+
+    ⛔ 不是「强度越高越好」：5-20 甜区（有人看，前排又没强到碰不动）> 1-5（能写，
+    天花板低）> 未知（无 probe）> >20 红海（要明确角度差异才进）> <1（没人互动）。
+    初版按 -strength 排序，选出来第一个是 28.8 —— 正好是要谨慎进的红海。
+    """
+    s = r["_strength"]
+    if s is None:
+        tier = 2
+    elif 5 <= s <= 20:
+        tier = 0
+    elif MIN_SLOT_STRENGTH <= s < 5:
+        tier = 1
+    elif s > 20:
+        tier = 3
+    else:
+        tier = 4
+    return (tier, (r.get("竞争密度") or "").strip() in ("", "待探测"), -(s or 0))
+
+
+def _announce(best: dict, srow: dict | None, gap: float | None):
+    st = best["_strength"]
+    where = f"【{srow['阶段']} · {srow['场景']} · {srow['默认概念']}】缺口 {gap:.1f} 篇 → " if srow else "（配额未命中，全局兜底）"
+    if st is None:
+        print(f"   {where}选题「{best['关键词']}」无 probe 数据，搜索位强度未知"
+              f"（清单第 8 条第②判据无法核）")
+    elif st > 20:
+        print(f"   {where}选题「{best['关键词']}」= {st} 日均赞，>20 属红海。"
+              f"前排已被高赞占满，没有明确的角度差异就别硬进")
+    else:
+        print(f"   {where}选题「{best['关键词']}」搜索位日均赞中位 {st}"
+              f"（{'甜区' if st >= 5 else '可写但天花板低'}）")
+
+
 def pick_topic() -> dict | None:
-    """选一个搜索位已验证、没写过、且**前排确实有人互动**的词。
+    """按【场景 × 概念】的**产出缺口**选题，缺口内再按搜索位强度排。
 
-    状态=已验证 是硬条件——它代表人工核过这个词的搜索位确实有空缺，没验过就写容易撞饱和赛道。
-    密度「待探测」不是硬条件：必须命中清单第 8 条允许「两者皆无时在备注说明为什么值得赌」，
-    只排后面。初版把它也当硬条件，结果 9 个已验证词里 7 个已写过、剩 2 个全是待探测，
-    loop 直接无题可做 —— 比清单本身还严，把自己饿死了。
+    ## 为什么从「挑最强的词」改成「先看哪个格子缺」（2026-08-18）
 
-    ⚡ 2026-08-12 加前排强度过滤（清单第 8 条的第二个判据）。在此之前这个函数
-    **只看「已验证」和「竞争密度」**，而 probe 早就把 top_notes 的 likes+published_at
-    采下来了，从没用于选词 —— 于是一直在优化「如何在一个没人看的搜索位上排第一」。
-    这是整条链路上最贵的一个问题：稿子写得再好，那个位上本来就没人。
+    旧版是纯贪心：全池按搜索位强度排序，取第一个。它有两个后果，实测都发生了：
 
-    过滤是**软的**：达标词优先，全都不达标时仍返回最强的那个并告警，不让 loop 饿死
-    （同上，把自己饿死过一次了）。算不出强度的（无 probe 数据）排在达标词之后、
-    已知弱词之前 —— 未知不等于差，但也不该优先于已证明有人看的。
+    1. **偏斜自我强化**。强的词都在面试赛道（历史采集 75% 入口是面试词），
+       于是永远选面试 —— 140 篇成稿里结构力 105 篇、说服力 58，而示弱力 2、
+       边界力 3、破冰力 5；37 个场景 15 个零产出。
+    2. **去重拦不住同话题**。闸门是「同**关键词**最多 2 篇」，而
+       「HR问"你的缺点"该怎么回答」有 4 个变体词都在已验证里，换个词串就绕过去了。
+
+    现在：先算每个场景近 QUOTA_DAYS 天的产出 vs 目标（周目标 × 2），缺口大的先做；
+    格子内仍按强度四档排序。**强度从全局门槛降级成格子内排序键** ——
+    这是冲着「已回填的搜索来源占比除一篇外都在 1–3%」这个事实去的：
+    流量基本不是搜来的，用搜索位强度当全局硬门槛，正在拦掉整片非面试场景。
+
+    配额是**软约束**，三重不饿死保护（这个函数已经把自己饿死过两次，见 git log）：
+      · 某场景没词 → 记缺词信号给采集，跳到下一个缺口场景，不是整轮放弃
+      · 某场景只剩弱词 → 同上跳过
+      · 所有缺口场景都没词 → 退回旧的全局最强逻辑
+    只有「全局最强也 < MIN_SLOT_STRENGTH」时才真的不写 —— 那条 2026-08-14 的停手
+    仍然有效：63 条独立审核里 46% 的扣分理由是「该词前排几乎无人互动」。
     """
     if not CIKU.exists():
         return None
@@ -280,56 +382,52 @@ def pick_topic() -> dict | None:
     if not pool:
         return None
 
+    scenes = scene_map.load_scenes()
+    produced = scene_output()
+
+    def gap_of(r):
+        return (int(r["周目标篇数"]) * QUOTA_DAYS / 7
+                - produced.get(r["场景"], 0) - _PICKED_THIS_RUN.get(r["场景"], 0))
+
+    for srow in sorted(scenes, key=lambda r: -gap_of(r)):
+        gap = gap_of(srow)
+        if gap <= 0:
+            continue                      # 这个格子已经做够了 —— 这就是新的去重闸
+        cand = [r for r in pool if (r.get("场景") or "").strip() == srow["场景"]]
+        if not cand:
+            log_gap(srow, f"缺口 {gap:.1f} 篇，词库里该场景 0 个可写词")
+            continue
+        for r in cand:
+            r["_strength"] = slot_strength(r["关键词"].strip())
+        cand.sort(key=_rank_in_scene)
+        best = cand[0]
+        st = best["_strength"]
+        if st is not None and st < MIN_SLOT_STRENGTH:
+            log_gap(srow, f"缺口 {gap:.1f} 篇，但该场景 {len(cand)} 个候选词"
+                          f"搜索位都没人互动（最强 {st} < {MIN_SLOT_STRENGTH}）")
+            continue
+        _PICKED_THIS_RUN[srow["场景"]] = _PICKED_THIS_RUN.get(srow["场景"], 0) + 1
+        _announce(best, srow, gap)
+        return best
+
+    # ── 兜底：所有有缺口的格子都没词可写 ────────────────────────────────────
     for r in pool:
-        r["_strength"] = slot_strength((r["关键词"]).strip())
-
-    def rank(r):
-        # ⛔ 不是「强度越高越好」。判据分四档（五项爆款规律 §二）：
-        #   5-20 甜区（有人看，前排又没强到碰不动）> 1-5（能写，天花板低）
-        #   > 未知（无 probe） > >20 红海（要明确角度差异才进） > <1（没人互动）
-        # 初版写成 -strength 排序，选出来的第一个词是 28.8 —— 正好是要谨慎进的红海。
-        s = r["_strength"]
-        if s is None:
-            tier = 2
-        elif 5 <= s <= 20:
-            tier = 0
-        elif MIN_SLOT_STRENGTH <= s < 5:
-            tier = 1
-        elif s > 20:
-            tier = 3
-        else:
-            tier = 4
-        # 同档内：密度已探测的优先；甜区内再按越接近 20 越靠前（有量的一侧）
-        return (tier, (r.get("竞争密度") or "").strip() in ("", "待探测"), -(s or 0))
-
-    pool.sort(key=rank)
+        if "_strength" not in r:
+            r["_strength"] = slot_strength(r["关键词"].strip())
+    pool.sort(key=_rank_in_scene)
     best = pool[0]
-    s = best["_strength"]
-    if s is None:
-        print(f"   ⚠️ 选题「{best['关键词']}」无 probe 数据，搜索位强度未知（清单第 8 条第②判据无法核）")
-    elif s < MIN_SLOT_STRENGTH:
-        # ⛔ 2026-08-14 改：以前这里只打印一句「真正该做的是补选词，不是写这篇」，
-        # 然后**照写不误**。代价在审核端结算 —— 08-11 之后 63 条独立审核里
-        # **46% 的扣分理由是「该词前排日均赞中位 0.14/0.53，几乎无人互动」**，
-        # 稿子本身没毛病，是这个位上排第一也没人看。
-        # 让写稿去背选词的锅，跟当初「人群错配」判成稿归档是同一类错误。
-        #
-        # 现在真的停手：宁可这一轮不出新稿，也不烧一次 claude -p 去写注定被扣分的稿。
-        # 额度转去返工（队列里 18 篇 80+ 分，离过线只差一处定点修改），产出效率高得多。
-        # 这也把压力放回该承受的地方：要写新稿，先让采集/probe 补出有人互动的词。
+    st = best["_strength"]
+    if st is not None and st < MIN_SLOT_STRENGTH:
         print(f"   ⛔ {len(pool)} 个候选词**没有一个**搜索位上有人互动"
-              f"（最强的「{best['关键词']}」也只有 {s} 日均赞 < {MIN_SLOT_STRENGTH}）。")
+              f"（最强的「{best['关键词']}」也只有 {st} 日均赞 < {MIN_SLOT_STRENGTH}）。")
         print("      本轮不写新稿 —— 写出来也会因为「搜索位没人互动」被扣分，"
               "这是选词的问题不是写稿的问题。")
         print("      去补词：python3 scripts/xhs-collect/daily_collect.py"
               " && python3 scripts/xhs-probe/probe_opencli.py --from-cikuku --limit 5")
         return None
-    elif s > 20:
-        print(f"   ⚠️ 选题「{best['关键词']}」= {s} 日均赞，>20 属红海（无甜区词可选）。"
-              f"前排已被高赞占满，没有明确的角度差异就别硬进")
-    else:
-        tag = "甜区" if s >= 5 else "可写但天花板低"
-        print(f"   选题「{best['关键词']}」搜索位日均赞中位 {s}（{tag}）")
+    print("   ⚠️ 所有有缺口的场景都没有可写的词 —— 缺口已记进 缺词信号.csv，"
+          "本轮退回全局最强")
+    _announce(best, None, None)
     return best
 
 
