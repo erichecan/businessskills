@@ -360,6 +360,10 @@ def _rank_in_scene(r):
 BLESSING_GAP_DAYS = 14      # 同一个场景多久之内不重复做祝福流
 BLESSING_PER_WEEK = 2       # 每周做几篇祝福流（Eric 2026-08-18 定，可改）
 
+# 标题档用哪个模型。抽成模块级常量是为了能做 A/B（T8 验收要比 Opus 与 Sonnet）——
+# 写死在调用处的话，测一次就得改一次源码。
+TITLE_MODEL = SONNET
+
 
 def blessing_this_week() -> int:
     """本周（周一起算）已出的祝福流篇数。判据是成稿头部的 `> 口径：祝福流`。"""
@@ -1619,7 +1623,7 @@ def title_fix_one(draft: Path, score, threshold, report, kw=""):
         report=report[:2500], titles=m_sec.group(2).strip()[:600],
         cover_title=cover.get("title", ""), cover_body=cover.get("body", ""),
         body_gist=gist)
-    out = run_model(prompt, "titlefix", first_pass=False, model=SONNET)
+    out = run_model(prompt, "titlefix", first_pass=False, model=TITLE_MODEL)
     raw = re.sub(r"^```(?:json)?\n?|\n?```$", "", (out or "").strip(), flags=re.M).strip()
     try:
         d = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
@@ -1634,6 +1638,15 @@ def title_fix_one(draft: Path, score, threshold, report, kw=""):
         core = re.sub(r"[\s·、，,]", "", kw)
         if not any(c in re.sub(r"[\s·、，,]", "", titles[0]) for c in [core[:6]] if c):
             print(f"   ⚠️ 新标题可能丢了关键词「{kw[:12]}」，仍写入但下一轮会被审核抓出来")
+
+    # ⛔ 模型有时会原样吐回旧标题（实测 Opus 在「离职原因不想编」那篇就是这样）。
+    # 这时如果照常往下走，H1 和【首选】写回去等于没变、而首图大字**被换掉了** ——
+    # 正好制造出这一档最该避免的那种不一致：标题说 A、首图大字说 B。
+    # 判据用「三处里 H1 没变」而不是「输出为空」：模型是有输出的，只是没改。
+    cur_h1 = (text.splitlines()[0] if text else "").lstrip("# ").strip()
+    if titles[0].strip() == cur_h1:
+        print(f"   ⛔ 模型返回的标题与原标题相同（「{cur_h1[:24]}」），未做任何改动，交回全量重写")
+        return False
 
     body_new = "\n".join(
         [f"{i}. {'**【首选】' + tt + '**' if i == 1 else tt}"
