@@ -19,14 +19,19 @@
 | 单条间隔 | 随机 3–20 分钟 | 固定间隔是最容易被识别的机器特征 |
 | 时段 | 避开 0–7 点 | 这个账号的人设不会凌晨三点在评论区答疑 |
 | 去同质 | difflib 相似度 > 0.65 拒发 | 同质文本批量投放正是公告点名的「评论区配合」 |
-| 存活校验 | 发出 1 小时后回查 | **被折叠/删除是最早的风控信号，比封号早** |
-| 熔断 | 存活率 < 70% 或出验证码 → 停 24h | 触发后不要「再试一次看看」 |
+| 熔断 | 出验证码/操作频繁，或当日连续失败 2 次 → 停 24h | 触发后不要「再试一次看看」 |
+
+⚠️ **存活校验（发出 1 小时后回查还在不在）已按 Eric 2026-08-19 的决定取消。**
+它原本是熔断的主要触发条件——被折叠/删除是最早的风控信号，比封号早。
+取消的代价必须认下来：**评论被静默折叠现在发现不了**，只有等到发送本身开始失败
+（撞验证码、连续失败）才会停。想恢复的话，缺的是一个 `fetch_alive(link, text)`：
+打开笔记页、在评论区里找自己那条还在不在，读不到要单列一档（不能算「没了」，
+网络抖动会让存活率虚低进而误熔断）。
 
 ## 分两段：生成不需要登录态，发送需要
 
 `draft`  从评论区原话.csv 选目标 → 生成评论 → 过风控 → 写台账（状态=草稿）
 `send`   把草稿按频次调度发出去（**需要 www 主站登录态**，见 draft_comments.py 的 C0）
-`verify` 回查已发评论是否还在，更新存活率，必要时熔断
 
 ⛔ 生成和发送**故意分开**：生成随时能跑、能人工抽查，发送受频次和熔断约束。
 合在一起的话，「今天生成了 12 条」会不知不觉变成「今天发了 12 条」。
@@ -72,7 +77,6 @@ QUIET_HOURS = range(0, 7)
 # ⚠️ 0.43 的「同套路换场景」是放行的。单条看没问题，但**同一个句式模板刷十条**
 # 仍然是公告点名的那种模式 —— 这一层现在拦不住，靠每日 12 条的上限兜着。
 SIM_THRESHOLD = 0.65
-ALIVE_FLOOR = 0.70
 COOLDOWN_HOURS = 24
 
 
@@ -339,18 +343,16 @@ def cmd_draft(args):
         sent_texts.append(txt)
         ok += status == "草稿"
     print(f"\n生成 {ok} 条草稿 → {LEDGER.relative_to(REPO)}")
-    print("⚠️ 发送要等 C0（www 主站登录态）+ `send` 子命令")
+    print("发送是另一个子命令：`send`（受每日上限、间隔、静默时段、熔断约束）")
     return 0
 
 
-# ── 发送与存活校验 ──────────────────────────────────────────────────────────
+# ── 发送 ────────────────────────────────────────────────────────────────────
 #
-# ⛔ 浏览器那一步**故意没有实现**。规矩写在 draft_comments.py 里：
-# 不先在真页面上 probe 就写选择器 = 抓到 0 条和「本来就没有新评论」长得一模一样，
-# 这正是这条链路反复出问题的方式。选择器要等 C0（www 主站登录态）之后现定。
-#
-# 但调度、台账、存活率、熔断判定都不依赖浏览器，先写完并测掉 ——
-# C0 一做完，剩下的工作量就只是把两个 NotImplementedError 换成真的页面操作。
+# 选择器全部是 2026-08-19 在真页面上 probe 出来的，不是凭空写的。规矩在
+# draft_comments.py 里：不先 probe 就写选择器 = 抓到 0 条和「本来就没有新评论」
+# 长得一模一样，这正是这条链路反复出问题的方式。页面改版后要重新 probe，
+# 不要在这里猜着改。
 
 
 # 笔记页的评论框和通知页**不是同一套**（2026-08-19 在真页面上定的）：
@@ -432,6 +434,14 @@ def post_comment(link: str, text: str):
         hit = [p for p in RISK_PATTERNS if p in page[:600]]
         if "验证码" in page[:600] or "操作频繁" in page[:600] or "频繁操作" in page[:600]:
             return False, f"RISK:页面出现风控提示 {hit}"
+        # ⛔ 登录墙和风控提示必须分开：登录态掉了该去重新扫码，**不该熔断 24 小时**。
+        # 实测 2026-08-19：登录态部分失效时 `/explore` 首页照常打开、笔记页却盖一层
+        # 扫码框，而 URL 仍然是 `/explore/<id>` —— 只看 URL 判断不出来，
+        # 后果是报成「评论框没出现」这种查不到根因的错。
+        if "扫码" in page[:400] and "登录" in page[:400]:
+            return False, ("LOGIN:笔记页盖了登录墙 —— cdp profile"
+                           "（~/.xhs-chrome-profile 那个 Chrome）的登录态掉了，"
+                           "在那个窗口里重新扫码即可，不要当成风控")
 
         # ⛔ 发送前先记下评论总数 —— 这是唯一可靠的成功判据。
         # 第一版用「发送后输入框清空」判，结果实测第一条**明明发出去了**
@@ -481,27 +491,6 @@ def post_comment(link: str, text: str):
             pass
 
 
-def apply_verdicts(ledger, verdicts):
-    """把回查结果写回台账，返回 (存活率, 是否该熔断, 说明)。纯函数，可单测。
-
-    ⛔ 读不到（None）**不算「没了」**：网络抖动、页面改版都会读不到，
-    把它算成死亡会让存活率虚低，进而误熔断 —— 而熔断一次要停 24 小时。
-    """
-    for i, v in verdicts.items():
-        if v is None:
-            ledger[i]["存活校验"] = "读不到"
-        else:
-            ledger[i]["存活校验"] = "在" if v else "没了"
-    alive = sum(1 for r in ledger if r.get("存活校验") == "在")
-    dead = sum(1 for r in ledger if r.get("存活校验") == "没了")
-    if alive + dead == 0:
-        return None, False, "还没有可判定的样本"
-    rate = alive / (alive + dead)
-    if rate < ALIVE_FLOOR:
-        return rate, True, f"存活率 {rate:.0%} < {ALIVE_FLOOR:.0%}（在 {alive}·没了 {dead}）"
-    return rate, False, f"存活率 {rate:.0%}（在 {alive}·没了 {dead}）"
-
-
 def cmd_send(args):
     ledger = read_ledger()
     drafts = [i for i, r in enumerate(ledger)
@@ -529,6 +518,11 @@ def cmd_send(args):
         # 存活校验取消后，熔断只剩发送侧这两条信号：
         #   ① 页面出现风控提示（验证码/操作频繁）→ 立刻停，这是最硬的
         #   ② 连续失败 2 次 → 多半是登录态掉了或页面又改了，继续试只会更像机器
+        if not ok and note.startswith("LOGIN:"):
+            print(f"   ⛔ {note}")
+            print("   停在这里但**不熔断** —— 登录态问题重新扫码就能继续，"
+                  "熔断 24 小时是给风控信号留的")
+            break
         if not ok and note.startswith("RISK:"):
             trip_breaker(note)
             print(f"   ⛔⛔ 撞到风控提示，已熔断 {COOLDOWN_HOURS} 小时：{note}")
@@ -546,31 +540,6 @@ def cmd_send(args):
         print(f"   已发 {sent} 条，等 {gap // 60} 分 {gap % 60} 秒")
         time.sleep(gap)
     print(f"本轮发出 {sent} 条")
-    return 0
-
-
-def cmd_verify(args):
-    ledger = read_ledger()
-    due = {i: r for i, r in enumerate(ledger)
-           if r.get("状态") == "已发送" and not r.get("存活校验")
-           and datetime.now() - datetime.fromisoformat(r["时间"]) > timedelta(hours=1)}
-    if not due:
-        print("没有到期（发出满 1 小时）且未校验的评论。")
-        return 0
-    verdicts = {}
-    for i, r in due.items():
-        try:
-            verdicts[i] = fetch_alive(r["目标链接"], r["发出内容"])
-        except NotImplementedError as e:
-            print(f"⛔ {e}")
-            return 2
-    rate, trip, why = apply_verdicts(ledger, verdicts)
-    write_ledger(ledger)
-    print(f"校验 {len(due)} 条 · {why}")
-    if trip:
-        trip_breaker(why)
-        print(f"⛔ 已熔断 {COOLDOWN_HOURS} 小时。**不要手动绕过** —— "
-              f"评论被折叠/删除是最早的风控信号，比封号早。先查为什么。")
     return 0
 
 
@@ -634,15 +603,10 @@ def cmd_state(args):
     today = now.date().isoformat()
     sent_today = [r for r in ledger if r.get("状态") == "已发送"
                   and (r.get("时间") or "").startswith(today)]
-    alive = [r for r in ledger if r.get("存活校验") == "在"]
-    dead = [r for r in ledger if r.get("存活校验") == "没了"]
     print(f"台账 {len(ledger)} 条 · 今日已发 {len(sent_today)}/{DAILY_CAP}")
     print(f"熔断：{'⛔ ' + bwhy if on else '正常'}")
     print(f"现在能发：{'✅' if can else '❌ ' + why}")
-    if alive or dead:
-        rate = len(alive) / (len(alive) + len(dead))
-        print(f"存活率 {rate:.0%}（在 {len(alive)} · 没了 {len(dead)}）"
-              + ("  ⛔ 低于下限" if rate < ALIVE_FLOOR else ""))
+    print("存活校验：已取消（Eric 2026-08-19）—— 评论被静默折叠现在发现不了")
     from collections import Counter
     print("状态分布：", dict(Counter(r.get("状态", "") for r in ledger)))
     return 0
@@ -654,16 +618,15 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     d = sub.add_parser("draft", help="生成外部评论草稿（不发送，不需要登录态）")
     d.add_argument("--limit", type=int, default=DAILY_CAP)
-    sub.add_parser("state", help="看风控状态：今日额度、熔断、存活率")
+    sub.add_parser("state", help="看风控状态：今日额度、间隔、熔断")
     g = sub.add_parser("gaps", help="评论区语料反哺选题：匹配词缺口 + 读者在问却没写过的场景")
     g.add_argument("--limit", type=int, default=15)
     g.add_argument("--write", action="store_true", help="把零产出场景写进 缺词信号.csv")
     sd = sub.add_parser("send", help="把草稿按频次调度发出去（需 C0：www 主站登录态）")
     sd.add_argument("--limit", type=int, default=DAILY_CAP)
-    sub.add_parser("verify", help="回查已发评论是否还在，必要时熔断（需 C0）")
     a = ap.parse_args()
     return {"draft": cmd_draft, "state": cmd_state, "gaps": cmd_gaps,
-            "send": cmd_send, "verify": cmd_verify}[a.cmd](a)
+            "send": cmd_send}[a.cmd](a)
 
 
 if __name__ == "__main__":

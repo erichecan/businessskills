@@ -194,8 +194,12 @@ def section_coverage(today):
 def section_comments(today):
     """评论三战场：首评 / 读者回复 / 外部评论。
 
-    ⛔ 这一节最该显眼的不是「今天发了几条」，是**存活率和熔断** ——
-    评论被折叠或删除是最早的风控信号，比封号早。花钱看板看不出这个。
+    ⛔ 这一节最该显眼的不是「今天发了几条」，是**风控信号**。
+
+    ⚠️ 原本最硬的那个信号（存活率——评论被折叠/删除比封号更早）已随
+    存活校验一起取消（Eric 2026-08-19）。**剩下的信号都晚一步**：只有等
+    发送本身开始失败才看得见。所以这里报「今日发送失败」而不是存活率，
+    并且失败一次就点名 —— 不能让它混在状态分布里被当成正常波动。
     """
     sys.path.insert(0, str(REPO / "scripts" / "xhs-comment"))
     try:
@@ -207,32 +211,29 @@ def section_comments(today):
 
     ledger = O.read_ledger()
     if not ledger:
-        return ["💬 **评论**：台账还是空的（C0 未完成：www 主站没登录态，发送链路没通）"], True
+        return ["💬 **评论**：台账还是空的 —— 先跑 `outreach.py draft` 生成草稿"], True
 
     now = datetime.now()
     st = Counter(r.get("状态", "") for r in ledger)
     sent_today = [r for r in ledger if r.get("状态") == "已发送"
                   and (r.get("时间") or "").startswith(today)]
-    alive = sum(1 for r in ledger if r.get("存活校验") == "在")
-    dead = sum(1 for r in ledger if r.get("存活校验") == "没了")
+    failed_today = [r for r in ledger if r.get("状态") == "发送失败"
+                    and (r.get("时间") or "").startswith(today)]
     on, why = O.breaker_on(now)
 
     lines = [f"💬 **评论**：台账 {len(ledger)} 条 · "
              + " · ".join(f"{k} {v}" for k, v in st.most_common())]
     lines.append(f"　　今日已发 {len(sent_today)}/{O.DAILY_CAP} 条")
-    if alive or dead:
-        rate = alive / (alive + dead)
-        flag = "  ⛔ 低于下限，该熔断了" if rate < O.ALIVE_FLOOR else ""
-        lines.append(f"　　存活率 **{rate:.0%}**（在 {alive} · 没了 {dead}）{flag}")
-    else:
-        lines.append("　　存活率：还没有已校验的样本")
+    if failed_today:
+        lines.append(f"　　⚠️ **今日发送失败 {len(failed_today)} 条** —— "
+                     + " / ".join((r.get("备注") or "无备注")[:40] for r in failed_today[:3]))
     if on:
-        lines.append(f"　　⛔⛔ **熔断中**：{why} —— 不要手动绕过，先查为什么被折叠")
+        lines.append(f"　　⛔⛔ **熔断中**：{why} —— 不要手动绕过，先查为什么失败")
     by_concept = Counter(c for r in ledger for c in (r.get("概念") or "").split("/") if c)
     if by_concept:
         lines.append("　　打在哪些概念的场景上：" + " · ".join(
             f"{k} {v}" for k, v in by_concept.most_common(5)))
-    ok = not on and (not (alive or dead) or alive / (alive + dead) >= O.ALIVE_FLOOR)
+    ok = not on and not failed_today
     return lines, ok
 
 
