@@ -606,25 +606,60 @@ def cmd_reply(args):
     return 0
 
 
-SELF_PROFILE = "https://www.xiaohongshu.com/user/profile/64cc5138000000002b009107"
-
-# 从自己主页拿 (笔记链接, 标题)。
-# ⛔ 不走创作者中心：`/publish/notes-manager` 已 404，`/new/note-manager` 那页的卡片
-# 既没有 href、Vue 实例也被生产构建剥掉了，点击还不跳转 —— 拿不到 noteId。
-# 主站主页的卡片天然带 /explore/<id> 链接，这是现成的路。
-MY_NOTES_JS = r"""(()=>{const out=[];
-document.querySelectorAll('a[href*="/explore/"]').forEach(a=>{
-  let box=a; for(let i=0;i<4&&box.parentElement;i++){box=box.parentElement;
-    if((box.innerText||"").trim().length>6) break;}
-  const t=(box.innerText||"").replace(/\s+/g," ").trim();
-  if(t) out.push({href:a.getAttribute("href"), title:t});});
-const seen=new Set();
-return JSON.stringify(out.filter(o=>!seen.has(o.href)&&seen.add(o.href)));})()"""
+SELF_UID = "64cc5138000000002b009107"
+SELF_PROFILE = f"https://www.xiaohongshu.com/user/profile/{SELF_UID}"
 
 
-def _clean_title(t):
-    """主页卡片的文本是「标题 Eric | 职场潜台词翻译官 赞」，把作者和计数削掉。"""
-    return re.split(r"\s+Eric\s*\|", t)[0].strip()
+def my_notes(limit=80):
+    """自己已发布的笔记：[{id, title, url}]，**url 带 xsec_token**。
+
+    ⛔ 不要退回去扫主页 DOM。那条路 2026-08-19 试过，结论是死路：
+    主页卡片的 `a.href` **不带 xsec_token**（`getAttribute` 和 `.href` 一样），
+    拿到的 `/explore/<id>` 直接访问会被安全校验拒掉跳 404，笔记页根本打不开。
+    同期一并试过、全部不通的还有：点击卡片（跳回 `/explore` 首页而不是笔记页）、
+    `__INITIAL_STATE__`（有循环引用，且实测只有 1 处 xsec 字段、不是笔记 token）、
+    创作者中心（`/publish/notes-manager` 已 404，`/new/note-manager` 的卡片既没
+    href、Vue 实例也被生产构建剥掉）。
+
+    opencli 走接口，一次给齐带 token 的 url + 干净标题 + noteId。
+    ⚠️ 它吃的是**日常 Chrome** 的登录态，和 cdp profile（发评论用的那个）是两套，
+    可能一个通一个不通 —— 所以下面发送那步还要单独验 cdp 侧的登录态。
+
+    ⛔ 拿不到就抛，**绝不返回空列表**：空列表和「今天没有新笔记」在日志里长得
+    一模一样，而这正是这条链路反复静默失效的方式。
+    """
+    cmd = ["opencli", "xiaohongshu", "user", SELF_UID,
+           "--limit", str(limit), "-f", "json"]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("opencli 拉笔记列表超时（180s）")
+    if r.returncode != 0:
+        tail = (r.stdout + r.stderr).strip()[-300:]
+        raise RuntimeError(f"opencli 退出码 {r.returncode}：{tail}\n"
+                           f"→ 登录态多半掉了，跑 `opencli xiaohongshu login` 让 Eric 扫码")
+    try:
+        notes = json.loads(r.stdout)
+    except ValueError:
+        raise RuntimeError(f"opencli 输出不是 JSON：{r.stdout[:200]}")
+    if not notes:
+        raise RuntimeError("opencli 返回 0 篇笔记 —— 按故障处理，不当成「没有新笔记」")
+    bad = [n for n in notes if "xsec_token" not in (n.get("url") or "")]
+    if bad:
+        raise RuntimeError(f"{len(bad)}/{len(notes)} 篇的 url 不带 xsec_token —— "
+                           f"不带 token 的链接打不开笔记页，发出去必然失败")
+    return notes
+
+
+def _note_id(url: str) -> str:
+    """从任意一种 URL 形式里抠出 noteId（24 位十六进制）。
+
+    台账里历史记录有两种形式：早期的 `/explore/<id>` 和现在 opencli 给的
+    `/user/profile/<uid>/<id>?xsec_token=`。⛔ 去重必须按 id，按整条 URL 去重
+    会把同一篇认成两篇 → **重复发首评**，而重复评论正是「评论区配合」最像机器的特征。
+    """
+    ids = re.findall(r"[0-9a-f]{24}", url or "")
+    return ids[-1] if ids else ""
 
 
 def drafts_by_title():
@@ -654,32 +689,25 @@ def cmd_first_send(args):
         print(f"⛔ 熔断中：{why}")
         return 2
 
-    tid = open_tab(SELF_PROFILE)
-    time.sleep(8)
-    if not logged_in(tid):
-        print(LOGIN_HINT)
-        return 2
     try:
-        notes = json.loads(ev(tid, MY_NOTES_JS) or "[]")
-    except ValueError:
-        notes = []
-    if not notes:
-        print("⛔ 主页上一条笔记都没抓到 —— 页面结构可能变了，别当成「没有新笔记」")
-        return 1
+        notes = my_notes()
+    except RuntimeError as e:
+        print(f"⛔ 拿不到笔记列表：{e}")
+        return 2
 
     ledger = read_ledger()
-    done = {r.get("目标链接", "").split("?")[0] for r in ledger if r.get("战场") == "首评"}
+    done = {_note_id(r.get("目标链接", "")) for r in ledger if r.get("战场") == "首评"}
+    done.discard("")
     by_title = drafts_by_title()
 
     todo = []
     for n in notes:
-        link = "https://www.xiaohongshu.com" + n["href"]
-        if link.split("?")[0] in done:
+        if n["id"] in done:
             continue
-        title = _clean_title(n["title"])
+        title = (n.get("title") or "").strip()
         d = by_title.get(title)
         if d:
-            todo.append((link, title, d))
+            todo.append((n["url"], title, d))
     print(f"主页 {len(notes)} 篇 · 能对上成稿且没发过首评的 {len(todo)} 篇")
     if not todo:
         return 0
@@ -717,6 +745,9 @@ def cmd_first_send(args):
                        "存活校验": "", "备注": note})
         print(f"   {'✅ ' if ok else '⛔ '}{note}")
         sent += ok
+        if not ok and note.startswith("LOGIN:"):
+            print("   ⛔ 停在这里但**不熔断** —— 登录态问题，重新扫码就能继续")
+            break
         if not ok and note.startswith("RISK:"):
             trip_breaker(note)
             print(f"   ⛔⛔ 撞风控，熔断 {COOLDOWN_HOURS} 小时")
