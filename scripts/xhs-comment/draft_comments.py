@@ -30,6 +30,7 @@
 """
 import argparse
 import csv
+import random
 import json
 import re
 import subprocess
@@ -605,6 +606,125 @@ def cmd_reply(args):
     return 0
 
 
+SELF_PROFILE = "https://www.xiaohongshu.com/user/profile/64cc5138000000002b009107"
+
+# 从自己主页拿 (笔记链接, 标题)。
+# ⛔ 不走创作者中心：`/publish/notes-manager` 已 404，`/new/note-manager` 那页的卡片
+# 既没有 href、Vue 实例也被生产构建剥掉了，点击还不跳转 —— 拿不到 noteId。
+# 主站主页的卡片天然带 /explore/<id> 链接，这是现成的路。
+MY_NOTES_JS = r"""(()=>{const out=[];
+document.querySelectorAll('a[href*="/explore/"]').forEach(a=>{
+  let box=a; for(let i=0;i<4&&box.parentElement;i++){box=box.parentElement;
+    if((box.innerText||"").trim().length>6) break;}
+  const t=(box.innerText||"").replace(/\s+/g," ").trim();
+  if(t) out.push({href:a.getAttribute("href"), title:t});});
+const seen=new Set();
+return JSON.stringify(out.filter(o=>!seen.has(o.href)&&seen.add(o.href)));})()"""
+
+
+def _clean_title(t):
+    """主页卡片的文本是「标题 Eric | 职场潜台词翻译官 赞」，把作者和计数削掉。"""
+    return re.split(r"\s+Eric\s*\|", t)[0].strip()
+
+
+def drafts_by_title():
+    """成稿 H1 → 成稿路径。首评要发给哪篇笔记，靠标题对上号。"""
+    out = {}
+    for f in list(SUCAI.glob("成稿_*.md")) + list((SUCAI / "归档稿").glob("成稿_*.md")):
+        first = f.read_text(encoding="utf-8").splitlines()[0] if f.stat().st_size else ""
+        h1 = first.lstrip("# ").strip()
+        if h1:
+            out.setdefault(h1, f)
+    return out
+
+
+def cmd_first_send(args):
+    """给已发布、还没发过首评的笔记自动发首评。
+
+    ⛔ 时机上不能挂在 auto_publish 后面：那条链路是**定时发布**（排到未来 17:00/20:00），
+    发布动作完成时笔记还不存在，评论无从发起。所以这里改成扫自己主页，
+    看哪篇已经真的挂出去了、且台账里没记过首评。
+    """
+    sys.path.insert(0, str(Path(__file__).parent))
+    from outreach import (read_ledger, append_ledger, post_comment,
+                          breaker_on, trip_breaker, COOLDOWN_HOURS)
+
+    on, why = breaker_on()
+    if on:
+        print(f"⛔ 熔断中：{why}")
+        return 2
+
+    tid = open_tab(SELF_PROFILE)
+    time.sleep(8)
+    if not logged_in(tid):
+        print(LOGIN_HINT)
+        return 2
+    try:
+        notes = json.loads(ev(tid, MY_NOTES_JS) or "[]")
+    except ValueError:
+        notes = []
+    if not notes:
+        print("⛔ 主页上一条笔记都没抓到 —— 页面结构可能变了，别当成「没有新笔记」")
+        return 1
+
+    ledger = read_ledger()
+    done = {r.get("目标链接", "").split("?")[0] for r in ledger if r.get("战场") == "首评"}
+    by_title = drafts_by_title()
+
+    todo = []
+    for n in notes:
+        link = "https://www.xiaohongshu.com" + n["href"]
+        if link.split("?")[0] in done:
+            continue
+        title = _clean_title(n["title"])
+        d = by_title.get(title)
+        if d:
+            todo.append((link, title, d))
+    print(f"主页 {len(notes)} 篇 · 能对上成稿且没发过首评的 {len(todo)} 篇")
+    if not todo:
+        return 0
+
+    sent = 0
+    for link, title, draft in todo[:args.limit]:
+        print(f"\n▶ {title[:34]}")
+        txt_path = SUCAI / "首评草稿" / f"{draft.stem}.txt"
+        if not txt_path.exists():
+            print("   · 没有首评草稿，现生成")
+            from case_entry import parse_draft
+            d = parse_draft(draft.read_text(encoding="utf-8"))
+            out, err = run_claude(FIRST_PROMPT.format(title=d.get("title", ""),
+                                                      body=(d.get("body") or "")[:2500]))
+            if not out:
+                print(f"   ⛔ {err}")
+                continue
+            first = normalize_punct(re.sub(r"^```[a-z]*\n|\n```$", "", out.strip()).strip())
+            txt_path.parent.mkdir(exist_ok=True)
+            txt_path.write_text(first + "\n", encoding="utf-8")
+        text = txt_path.read_text(encoding="utf-8").strip()
+        print(f"   首评（{len(text.replace(chr(10),''))} 字）：{text[:60]}")
+        if args.dry_run:
+            print("   [dry-run] 不发送")
+            continue
+        # 发布后隔一会儿再评论 —— 「发布即首评」是很显眼的机器特征
+        wait = random.randint(args.delay_min, args.delay_max)
+        print(f"   等 {wait}s 再发（避开发布即评论的特征）")
+        time.sleep(wait)
+        ok, note = post_comment(link, text)
+        append_ledger({"时间": datetime.now().isoformat(timespec="seconds"),
+                       "战场": "首评", "目标链接": link, "对方原话": "",
+                       "发出内容": text, "场景": "", "概念": "", "正文术语": "",
+                       "状态": "已发送" if ok else "发送失败",
+                       "存活校验": "", "备注": note})
+        print(f"   {'✅ ' if ok else '⛔ '}{note}")
+        sent += ok
+        if not ok and note.startswith("RISK:"):
+            trip_breaker(note)
+            print(f"   ⛔⛔ 撞风控，熔断 {COOLDOWN_HOURS} 小时")
+            break
+    print(f"\n发出 {sent} 条首评")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -619,6 +739,13 @@ def main():
     w.add_argument("--probe", action="store_true", help="只检查登录态并导出页面结构")
     w.add_argument("--limit", type=int, default=5, help="最多为几条评论生成回复候选")
 
+    fs = sub.add_parser("first-send", help="给已发布、还没发过首评的笔记自动发首评")
+    fs.add_argument("--limit", type=int, default=2)
+    fs.add_argument("--dry-run", action="store_true", default=True)
+    fs.add_argument("--send", dest="dry_run", action="store_false")
+    fs.add_argument("--delay-min", type=int, default=180)
+    fs.add_argument("--delay-max", type=int, default=900)
+
     rp = sub.add_parser("reply", help="把台账里的回复草稿发出去（默认 dry-run）")
     rp.add_argument("--limit", type=int, default=3)
     rp.add_argument("--dry-run", action="store_true", default=True)
@@ -626,7 +753,8 @@ def main():
                     help="真的点发送（默认只填不发）")
 
     a = ap.parse_args()
-    return {"first": cmd_first, "watch": cmd_watch, "reply": cmd_reply}[a.cmd](a)
+    return {"first": cmd_first, "watch": cmd_watch, "reply": cmd_reply,
+            "first-send": cmd_first_send}[a.cmd](a)
 
 
 if __name__ == "__main__":
