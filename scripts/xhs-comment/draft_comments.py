@@ -610,45 +610,68 @@ SELF_UID = "64cc5138000000002b009107"
 SELF_PROFILE = f"https://www.xiaohongshu.com/user/profile/{SELF_UID}"
 
 
+# 自己主页的 __INITIAL_STATE__ 里，每篇笔记是这个形状（2026-08-19 在真页面上确认）：
+#   外层    {id, noteCard, index, exposed, ssrRendered, xsecToken}
+#   noteCard {displayTitle, interactInfo, cover, noteId, time, xsecToken, type, user}
+# 两层都带 xsecToken，取哪层都行。
+MY_NOTES_JS = r"""(()=>{const st=window.__INITIAL_STATE__; if(!st) return "no-state";
+  const seen=new Set(); const out=[]; const ids=new Set();
+  const walk=(o,d)=>{ if(!o||typeof o!=="object"||d>10||seen.has(o)) return;
+    seen.add(o);
+    const nc = o.noteCard || (o.displayTitle ? o : null);
+    const id = o.id || o.noteId || (nc && nc.noteId);
+    const tok = o.xsecToken || (nc && nc.xsecToken);
+    const title = nc && nc.displayTitle;
+    if(id && tok && title && !ids.has(id)){ ids.add(id);
+      out.push({id:String(id), title:String(title), token:String(tok)}); }
+    for(const k of Object.keys(o)){ try{ walk(o[k],d+1);}catch(e){} } };
+  walk(st,0);
+  return JSON.stringify(out);})()"""
+
+
 def my_notes(limit=80):
     """自己已发布的笔记：[{id, title, url}]，**url 带 xsec_token**。
 
-    ⛔ 不要退回去扫主页 DOM。那条路 2026-08-19 试过，结论是死路：
-    主页卡片的 `a.href` **不带 xsec_token**（`getAttribute` 和 `.href` 一样），
-    拿到的 `/explore/<id>` 直接访问会被安全校验拒掉跳 404，笔记页根本打不开。
-    同期一并试过、全部不通的还有：点击卡片（跳回 `/explore` 首页而不是笔记页）、
-    `__INITIAL_STATE__`（有循环引用，且实测只有 1 处 xsec 字段、不是笔记 token）、
-    创作者中心（`/publish/notes-manager` 已 404，`/new/note-manager` 的卡片既没
-    href、Vue 实例也被生产构建剥掉）。
+    ⛔ 走 cdp 浏览器的主页 `__INITIAL_STATE__`，**不要改回 opencli**。
+    不是因为 opencli 不好用（它能拿到同样的数据），是因为**同一账号的网页会话互斥**：
+    opencli 吃日常 Chrome 的登录态，发评论吃 cdp profile 的，2026-08-19 实测在
+    cdp 里扫码登录后日常 Chrome 当场被踢下线（主站和创作者中心一起掉）。
+    「拿链接」和「发评论」分在两个浏览器里，就永远凑不齐同时在线的时刻。
+    走这条路，取链接和发评论共用一个登录态，这个问题根本不存在。
 
-    opencli 走接口，一次给齐带 token 的 url + 干净标题 + noteId。
-    ⚠️ 它吃的是**日常 Chrome** 的登录态，和 cdp profile（发评论用的那个）是两套，
-    可能一个通一个不通 —— 所以下面发送那步还要单独验 cdp 侧的登录态。
+    ⚠️ 台账里「`__INITIAL_STATE__` 有循环引用、拿不到 token」那条旧结论是**错的**，
+    它是在**未登录**状态下扫出来的（那时全树只有 1 处 xsec 字段）。登录之后同一
+    棵树上有 308 处，id 和 token 与 opencli 返回的逐字一致。循环引用不是问题 ——
+    用 Set 记访问过的对象即可，别用 JSON.stringify 整棵树。
 
     ⛔ 拿不到就抛，**绝不返回空列表**：空列表和「今天没有新笔记」在日志里长得
-    一模一样，而这正是这条链路反复静默失效的方式。
+    一模一样，这正是这条链路反复静默失效的方式。
     """
-    cmd = ["opencli", "xiaohongshu", "user", SELF_UID,
-           "--limit", str(limit), "-f", "json"]
+    tid = open_tab(SELF_PROFILE)
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("opencli 拉笔记列表超时（180s）")
-    if r.returncode != 0:
-        tail = (r.stdout + r.stderr).strip()[-300:]
-        raise RuntimeError(f"opencli 退出码 {r.returncode}：{tail}\n"
-                           f"→ 登录态多半掉了，跑 `opencli xiaohongshu login` 让 Eric 扫码")
-    try:
-        notes = json.loads(r.stdout)
-    except ValueError:
-        raise RuntimeError(f"opencli 输出不是 JSON：{r.stdout[:200]}")
+        time.sleep(12)
+        url = ev(tid, "location.href") or ""
+        if "/login" in url:
+            raise RuntimeError("主页跳了登录页 —— cdp profile 的登录态掉了，"
+                               "在那个 Chrome 窗口重新扫码（scripts/xhs-comment/show_login.py）")
+        raw = ev(tid, MY_NOTES_JS)
+        if raw == "no-state":
+            raise RuntimeError("主页没有 __INITIAL_STATE__ —— 页面结构变了，重新 probe")
+        try:
+            notes = json.loads(raw or "[]")
+        except ValueError:
+            raise RuntimeError(f"__INITIAL_STATE__ 提取结果不是 JSON：{str(raw)[:200]}")
+    finally:
+        try:
+            api("/close?target=" + tid)
+        except Exception:                                   # noqa: BLE001
+            pass
     if not notes:
-        raise RuntimeError("opencli 返回 0 篇笔记 —— 按故障处理，不当成「没有新笔记」")
-    bad = [n for n in notes if "xsec_token" not in (n.get("url") or "")]
-    if bad:
-        raise RuntimeError(f"{len(bad)}/{len(notes)} 篇的 url 不带 xsec_token —— "
-                           f"不带 token 的链接打不开笔记页，发出去必然失败")
-    return notes
+        raise RuntimeError("主页一篇笔记都没抓到 —— 按故障处理，不当成「没有新笔记」")
+    for n in notes:
+        n["url"] = (f"https://www.xiaohongshu.com/explore/{n['id']}"
+                    f"?xsec_token={up.quote(n['token'])}&xsec_source=pc_user")
+    return notes[:limit]
 
 
 def _note_id(url: str) -> str:

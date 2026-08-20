@@ -407,7 +407,14 @@ def _ev(tid, js):
 
 
 def _count_comments(tid):
-    """读「共 N 条评论」。读不到返回 None（不能当成 0，那会把失败判成成功）。"""
+    """读「共 N 条评论」。读不到返回 None（不能当成 0，那会把失败判成成功）。
+
+    ⚠️ 例外：**0 条评论时页面根本不显示「共 N 条评论」**，显示的是空态文案
+    「这是一片荒地」（2026-08-19 在真页面上确认）。这种情况必须返回 0 —— 首评
+    场景每一篇都是 0 评论，返回 None 会让每一条首评都退到「正文检索」那条弱判据上。
+    """
+    if _ev(tid, '(document.body.innerText||"").includes("这是一片荒地")'):
+        return 0
     raw = _ev(tid, r"""(()=>{const e=[...document.querySelectorAll("div,span")]
      .find(x=>/^共\s*[\d.,万]+\s*条评论$/.test((x.textContent||"").trim()));
      return e?e.textContent.trim():"";})()""")
