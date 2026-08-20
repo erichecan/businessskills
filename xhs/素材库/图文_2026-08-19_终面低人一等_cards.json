@@ -1,0 +1,58 @@
+[
+ {
+  "type": "cover",
+  "tag": "终面",
+  "title": "终面怎么说话才不显得低人一等",
+  "quote": "",
+  "body": "他判的不是你客气不客气<br>是你有多需要这份工作",
+  "pose": ""
+ },
+ {
+  "type": "scene",
+  "tag": "他那一侧",
+  "title": "他坐那侧只算一件事",
+  "quote": "",
+  "body": "你走了，他损失多大<br>你越说什么都能接受<br>这个损失越接近零",
+  "pose": "pose7_面试对坐"
+ },
+ {
+  "type": "contrast",
+  "tag": "自查",
+  "title": "姿态从三个口子漏出去",
+  "quote": "",
+  "body": "A 只会表忠心<br>B 先把价格交出去<br>C 全程听他说<br>你是 A 还是 C",
+  "pose": "pose3_摊手"
+ },
+ {
+  "type": "quote",
+  "tag": "评论区",
+  "title": "热情给满，offer低5k",
+  "quote": "姿态更低了",
+  "body": "有人在评论区说<br>自己大方热情又积极<br>拿到比JD低5k的offer",
+  "pose": "pose6_叹气"
+ },
+ {
+  "type": "why",
+  "tag": "机制",
+  "title": "他读的是替换成本",
+  "quote": "",
+  "body": "从头听到尾的<br>换掉你他没有损失<br>接得住难处的<br>他得重新找一个",
+  "pose": "pose22_听潜台词"
+ },
+ {
+  "type": "formula",
+  "tag": "话术",
+  "title": "C类：他全程在说时",
+  "quote": "",
+  "body": "等他讲到具体难处<br>接：您刚说的这块<br>我上一家踩过<br>再问他最想解决什么",
+  "pose": "pose21_反问时刻"
+ },
+ {
+  "type": "boundary",
+  "tag": "边界",
+  "title": "话术救不了急切",
+  "quote": "",
+  "body": "语气再稳也没用<br>只要你表现出什么都行<br>他照样按最低价给<br>先把选择权留一半",
+  "pose": "pose26_优缺点天平"
+ }
+]

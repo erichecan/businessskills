@@ -38,6 +38,8 @@ import json
 import random
 import re
 import time
+import urllib.parse as up
+import urllib.request as rq
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -47,6 +49,7 @@ SUCAI = REPO / "xhs" / "素材库"
 QUOTES = SUCAI / "评论区原话.csv"
 LEDGER = SUCAI / "评论台账.csv"
 STATE = SUCAI / "评论风控状态.json"
+PROXY = "http://localhost:3456"
 
 sys.path.insert(0, str(REPO / "scripts"))
 sys.path.insert(0, str(Path(__file__).parent))
@@ -350,16 +353,132 @@ def cmd_draft(args):
 # C0 一做完，剩下的工作量就只是把两个 NotImplementedError 换成真的页面操作。
 
 
+# 笔记页的评论框和通知页**不是同一套**（2026-08-19 在真页面上定的）：
+#   通知页  textarea.comment-input  → React 受控，用 prototype setter + input 事件
+#   笔记页  p.content-input（contenteditable）→ 自定义编辑器，只有 execCommand 有效
+# ⛔ 别把两套混用。给 contenteditable 赋 .value 什么也不会发生，
+#    而且失败得很安静：框里没字、点发送没反应，日志里看不出区别。
+NOTE_SELECTORS = {
+    "activate": "div.not-active, div.inner-when-not-active",
+    "input": "p.content-input",
+    "submit": "button.btn.submit",
+    "cancel": "button.btn.cancel",
+}
+
+ACTIVATE_JS = """(()=>{const el=[...document.querySelectorAll("div")]
+ .find(e=>/not-active|inner-when-not-active/.test(String(e.className))&&(e.offsetWidth||e.offsetHeight));
+ if(!el) return "notfound"; el.click(); return "ok";})()"""
+
+INSERT_JS = """(()=>{const e=document.querySelector("p.content-input");
+ if(!e) return "no-input"; e.focus();
+ document.execCommand("selectAll",false,null);
+ document.execCommand("delete",false,null);
+ const ok=document.execCommand("insertText",false,%s);
+ return JSON.stringify({ok:ok, text:e.textContent});})()"""
+
+CLEAR_JS = """(()=>{const e=document.querySelector("p.content-input");
+ if(!e) return "gone"; e.focus();
+ document.execCommand("selectAll",false,null);
+ document.execCommand("delete",false,null);
+ return e.textContent;})()"""
+
+SUBMIT_JS = """(()=>{const b=document.querySelector("button.btn.submit");
+ if(!b) return "no-submit";
+ if(b.disabled) return "disabled";
+ b.click(); return "ok";})()"""
+
+# 撞上这些就熔断：验证码、频繁操作提示、登录失效。
+# ⚠️ 存活校验（发出 1 小时后回查还在不在）**已按 Eric 2026-08-19 的决定取消**。
+# 它原本是熔断的主要触发条件，取消后熔断只剩下发送侧这些**当场可见**的信号。
+# 代价要认：评论被静默折叠这种情况现在发现不了，只有等到发送本身开始失败才会停。
+RISK_PATTERNS = ("验证码", "操作频繁", "频繁操作", "请稍后再试", "登录", "异常")
+
+
+def _cdp(path, data=None, timeout=60):
+    req = rq.Request(PROXY + path, data=data.encode() if data else None,
+                     method="POST" if data else "GET")
+    return json.loads(rq.urlopen(req, timeout=timeout).read())
+
+
+def _ev(tid, js):
+    return _cdp(f"/eval?target={tid}", js).get("value")
+
+
+def _count_comments(tid):
+    """读「共 N 条评论」。读不到返回 None（不能当成 0，那会把失败判成成功）。"""
+    raw = _ev(tid, r"""(()=>{const e=[...document.querySelectorAll("div,span")]
+     .find(x=>/^共\s*[\d.,万]+\s*条评论$/.test((x.textContent||"").trim()));
+     return e?e.textContent.trim():"";})()""")
+    if not raw:
+        return None
+    m = re.search(r"([\d.]+)\s*(万?)", raw)
+    if not m:
+        return None
+    n = float(m.group(1))
+    return int(n * 10000) if m.group(2) else int(n)
+
+
 def post_comment(link: str, text: str):
     """在 link 这条笔记下发一条评论。返回 (成功, 说明)。"""
-    raise NotImplementedError(
-        "评论发送的选择器还没在真页面上定过。先做 C0（在 cdp-proxy 的 Chrome 里"
-        "登录 www.xiaohongshu.com），再跑 `draft_comments.py watch --probe` 导出结构。")
+    if not link:
+        return False, "没有目标链接"
+    tid = _cdp("/new?url=" + up.quote(link, safe=":/?&=%"))["targetId"]
+    try:
+        time.sleep(9)
+        url = _ev(tid, "location.href") or ""
+        if "/explore/" not in url and "/discovery/" not in url:
+            return False, f"没打开笔记页（当前 {url[:60]}）"
+        page = (_ev(tid, '(document.body.innerText||"").slice(0,3000)') or "")
+        hit = [p for p in RISK_PATTERNS if p in page[:600]]
+        if "验证码" in page[:600] or "操作频繁" in page[:600] or "频繁操作" in page[:600]:
+            return False, f"RISK:页面出现风控提示 {hit}"
 
+        # ⛔ 发送前先记下评论总数 —— 这是唯一可靠的成功判据。
+        # 第一版用「发送后输入框清空」判，结果实测第一条**明明发出去了**
+        # （评论数 977→978）却被判成失败：这条笔记的编辑器发完不清空。
+        # 判据说失败、实际成功是最危险的一类 bug —— 台账记错、重试还会重复评论，
+        # 而重复评论正是「评论区配合」最像机器的特征。
+        before = _count_comments(tid)
 
-def fetch_alive(link: str, text: str):
-    """回查这条评论是否还在。返回 True/False/None（None = 读不到，不算数）。"""
-    raise NotImplementedError("同 post_comment：选择器待 C0 后现定。")
+        if _ev(tid, ACTIVATE_JS) != "ok":
+            return False, "找不到评论激活区"
+        time.sleep(2)
+        raw = _ev(tid, INSERT_JS % json.dumps(text, ensure_ascii=False))
+        if raw == "no-input":
+            return False, "评论框没出现"
+        try:
+            d = json.loads(raw)
+        except (ValueError, TypeError):
+            return False, f"填入回读失败：{raw}"
+        # ⛔ 回读必须逐字比对。contenteditable 会吞掉部分字符（换行、表情），
+        # 只看「非空」的话，发出去的可能是半句话。
+        if d.get("text", "").strip() != text.strip():
+            _ev(tid, CLEAR_JS)
+            return False, f"回读对不上（框里是 {d.get('text','')[:30]!r}），已清空不发"
+
+        r = _ev(tid, SUBMIT_JS)
+        if r != "ok":
+            _ev(tid, CLEAR_JS)
+            return False, f"发送按钮不可用（{r}）"
+        time.sleep(5)
+        after_txt = (_ev(tid, '(document.body.innerText||"").slice(0,600)') or "")
+        if any(p in after_txt for p in ("验证码", "操作频繁", "频繁操作")):
+            return False, "RISK:发送后出现风控提示"
+        after = _count_comments(tid)
+        _ev(tid, CLEAR_JS)          # 不管成没成，都别把文本留在框里
+        if before is not None and after is not None:
+            if after > before:
+                return True, f"评论数 {before}→{after}"
+            return False, f"评论数没涨（{before}→{after}），判定未发出"
+        # 读不到计数时退回文本检索：清空输入框之后再找，避免把框里的字当成已发出
+        hit = _ev(tid, '(document.body.innerText||"").includes(%s)'
+                  % json.dumps(text[:14], ensure_ascii=False))
+        return (bool(hit), "按正文检索判定" if hit else "读不到评论数且正文检索不到")
+    finally:
+        try:
+            _cdp("/close?target=" + tid)
+        except Exception:                                   # noqa: BLE001
+            pass
 
 
 def apply_verdicts(ledger, verdicts):
@@ -407,6 +526,20 @@ def cmd_send(args):
         r["备注"] = note
         write_ledger(ledger)
         sent += ok
+        # 存活校验取消后，熔断只剩发送侧这两条信号：
+        #   ① 页面出现风控提示（验证码/操作频繁）→ 立刻停，这是最硬的
+        #   ② 连续失败 2 次 → 多半是登录态掉了或页面又改了，继续试只会更像机器
+        if not ok and note.startswith("RISK:"):
+            trip_breaker(note)
+            print(f"   ⛔⛔ 撞到风控提示，已熔断 {COOLDOWN_HOURS} 小时：{note}")
+            break
+        fails = [x for x in ledger if x.get("状态") == "发送失败"
+                 and (x.get("时间") or "").startswith(datetime.now().date().isoformat())]
+        if len(fails) >= 2:
+            trip_breaker(f"今日连续发送失败 {len(fails)} 次")
+            print(f"   ⛔⛔ 今日已失败 {len(fails)} 次，熔断 {COOLDOWN_HOURS} 小时 —— "
+                  f"先查登录态和页面结构，别再试")
+            break
         if sent >= args.limit:
             break
         gap = next_gap()
