@@ -569,8 +569,12 @@ def load_pending(limit, skip_probed=False):
     off = [w for w in words if is_off_topic(w)]
     if off:
         words = [w for w in words if not is_off_topic(w)]
+        # 写 stderr，不写 stdout：daily_probe.sh 用 `queue=$(... print(len(...)) ...)`
+        # 捕获这个函数的返回值长度，混进 stdout 会把 queue 变量污染成非数字，
+        # 导致后面 `[ "$queue" -lt "$QUEUE_FLOOR" ]` 每轮都报 integer expression expected。
         print(f"   · 账号定位过滤挡下 {len(off)} 个非职场词："
-              f"{'、'.join(w[:18] for w in off[:5])}{' 等' if len(off) > 5 else ''}")
+              f"{'、'.join(w[:18] for w in off[:5])}{' 等' if len(off) > 5 else ''}",
+              file=sys.stderr)
     if skip_probed:
         done = probed_slugs()
         words = [w for w in words if slug(w) not in done]
