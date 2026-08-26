@@ -83,7 +83,7 @@ MAX_ROUNDS = 3
 #     ② 返工   —— 把 79 分推到 80，prompt 几万字
 #     ③ 写新稿 —— 最贵，还要占用一个新关键词
 # 同样一份额度，先做 ① 能多放出好几篇。
-STOCK_TARGET = 30
+STOCK_TARGET = 50  # 2026-08-26 由 30 提到 50（配合发布配额 3→5，Eric 决定）
 WRITE_TIMEOUT = 900
 RETRIES = 2          # claude -p 普通失败（格式跑偏/超时）的重试次数
 RETRY_WAIT = 45      # 普通失败重试前等待秒数
