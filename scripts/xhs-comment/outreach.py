@@ -431,7 +431,7 @@ def post_comment(link: str, text: str):
     """在 link 这条笔记下发一条评论。返回 (成功, 说明)。"""
     if not link:
         return False, "没有目标链接"
-    tid = _cdp("/new?url=" + up.quote(link, safe=":/?&=%"))["targetId"]
+    tid = _cdp("/new", link)["targetId"]  # v2.5.3 起 /new 改 POST body 传 URL
     try:
         time.sleep(9)
         url = _ev(tid, "location.href") or ""

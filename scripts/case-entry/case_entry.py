@@ -1020,7 +1020,9 @@ def prefill_xhs(name, archived):
     if not files:
         return {"ok": False, "log": "没有已渲染的卡片图，先等封面生成或本机渲染图文 JSON"}
     try:
-        t = api("/new?url=" + up.quote("https://creator.xiaohongshu.com/publish/publish?source=official", safe=""))
+        # web-access v2.5.3 起 /new 改为 POST body 传 URL（见插件 references/migration-2.5.3.md），
+        # 旧的 GET ?url= 写法会被硬拒 400。
+        t = api("/new", "https://creator.xiaohongshu.com/publish/publish?source=official")
         tid = t.get("targetId")
         log.append(f"已打开创作平台（tab {tid[:8]}…）")
         time.sleep(4)

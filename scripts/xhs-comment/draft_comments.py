@@ -325,7 +325,7 @@ LOGIN_HINT = """
 
 
 def open_tab(url):
-    return api("/new?url=" + up.quote(url, safe=""))["targetId"]
+    return api("/new", url)["targetId"]  # v2.5.3 起 /new 改 POST body 传 URL
 
 
 def logged_in(tid):
@@ -559,7 +559,7 @@ def cmd_reply(args):
         靠 placeholder 回读能拦住，但拦住只是不发，链路仍然是断的。
         重新加载慢 10 秒，而回复量本来就是每天几条，值。
         """
-        api("/navigate?target=%s&url=%s" % (tid, up.quote(NOTIF_URL, safe="")))
+        api(f"/navigate?target={tid}", NOTIF_URL)  # v2.5.3 起 /navigate 改 POST body 传 URL
         time.sleep(4)
         ev(tid, CLICK_TAB_JS)
         for _ in range(15):

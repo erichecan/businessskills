@@ -62,6 +62,14 @@ def proxy_get(path, timeout=30):
         return json.loads(r.read().decode())
 
 
+def proxy_new(url, timeout=30):
+    """打开新 tab。web-access v2.5.3 起 /new 改为 POST body 传 URL
+    （旧 GET ?url= 写法会被硬拒 400，见插件 references/migration-2.5.3.md）。"""
+    req = urllib.request.Request(f"{PROXY}/new", data=url.encode(), method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode())
+
+
 def proxy_eval(target, js, timeout=30):
     """eval 走 POST。proxy 按表达式求值，多语句必须自己包 IIFE。"""
     req = urllib.request.Request(
@@ -355,7 +363,7 @@ def probe_keyword(keyword):
     }
 
     kw_enc = urllib.parse.quote(keyword)
-    target = proxy_get(f"/new?url={urllib.parse.quote(SEARCH_URL.format(kw=kw_enc), safe=':/?=&%')}")["targetId"]
+    target = proxy_new(SEARCH_URL.format(kw=kw_enc))["targetId"]
 
     try:
         time.sleep(PAGE_LOAD_WAIT)

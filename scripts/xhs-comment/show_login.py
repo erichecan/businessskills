@@ -34,7 +34,7 @@ import urllib.request as rq
 
 PROXY = "http://localhost:3456"
 DEVTOOLS = "http://127.0.0.1:9333"
-PROFILE = "/Users/eric/.xhs-chrome-profile"
+PROFILE = "/Users/eric/.xhs-chromium-profile"
 LOGIN_URL = "https://www.xiaohongshu.com/login"
 PROBE_URL = "https://www.xiaohongshu.com/user/profile/64cc5138000000002b009107"
 
@@ -55,7 +55,7 @@ def logged_in():
     ⛔ 别用「首页能不能打开」当判据：实测登录态部分失效时 `/explore` 首页照常打开、
     需要登录的页面才跳 `/login`。判据要用真正要访问的那类页面。
     """
-    tid = cdp("/new?url=" + up.quote(PROBE_URL, safe=":/?&=%"))["targetId"]
+    tid = cdp("/new", PROBE_URL)["targetId"]  # v2.5.3 起 /new 改 POST body 传 URL
     try:
         time.sleep(10)
         url = ev(tid, "location.href") or ""
@@ -72,7 +72,7 @@ def chrome_pid():
     out = subprocess.run(["ps", "-axo", "pid=,command="],
                          capture_output=True, text=True).stdout
     for line in out.splitlines():
-        if f"--user-data-dir={PROFILE}" in line and "Google Chrome.app/Contents/MacOS" in line \
+        if f"--user-data-dir={PROFILE}" in line and "Chromium.app/Contents/MacOS" in line \
                 and "--type=" not in line:
             m = re.match(r"\s*(\d+)", line)
             if m:
@@ -92,7 +92,7 @@ BANNER_JS = ('(function(){var o=document.getElementById("__xhs_banner__");if(o)o
 
 def raise_hand():
     """开登录页 → 把窗口提到最前 → 激活标签页 → 贴横幅。返回 targetId。"""
-    tid = cdp("/new?url=" + up.quote(LOGIN_URL, safe=":/?&=%"))["targetId"]
+    tid = cdp("/new", LOGIN_URL)["targetId"]  # v2.5.3 起 /new 改 POST body 传 URL
     time.sleep(6)
     pid = chrome_pid()
     if pid:

@@ -58,7 +58,7 @@ def ev(tid, js):
 
 def scheduled_notes(tid):
     """笔记管理里状态为「定时发布」的笔记。noteId 藏在卡片的 data-impression 里。"""
-    api(f"/navigate?target={tid}&url=" + up.quote(NOTE_MANAGER, safe=""))
+    api(f"/navigate?target={tid}", NOTE_MANAGER)  # v2.5.3 起 /navigate 改 POST body 传 URL
     time.sleep(7)
     raw = ev(tid, r'''(()=>JSON.stringify([...document.querySelectorAll(".note-card")]
       .filter(c=>c.querySelector(".note-card__schedule"))
@@ -143,7 +143,7 @@ def fix_one(tid, note, submit):
     from case_entry import pick_topic, undo_insert
 
     print(f"\n▶ {note['title']}  （{note['at']}）")
-    api(f"/navigate?target={tid}&url=" + up.quote(EDIT_URL.format(nid=note["id"]), safe=""))
+    api(f"/navigate?target={tid}", EDIT_URL.format(nid=note["id"]))  # v2.5.3 起 /navigate 改 POST body 传 URL
     for _ in range(20):
         time.sleep(1)
         if ev(tid, '(()=>{const e=document.querySelector("[contenteditable=true]");'
@@ -229,7 +229,7 @@ def fix_one(tid, note, submit):
     # 结果是两篇明明都保存成功却报「完成 0/2」。这和标签那个 bug 是同一类错误：
     # 数动作不算数，要数结果。重新加载这篇，看改动在不在。
     time.sleep(6)
-    api(f"/navigate?target={tid}&url=" + up.quote(EDIT_URL.format(nid=note["id"]), safe=""))
+    api(f"/navigate?target={tid}", EDIT_URL.format(nid=note["id"]))  # v2.5.3 起 /navigate 改 POST body 传 URL
     for _ in range(20):
         time.sleep(1)
         if ev(tid, '(()=>{const e=document.querySelector("[contenteditable=true]");'
@@ -254,7 +254,7 @@ def main():
     ap.add_argument("--submit", action="store_true", help="改完真的点「发布笔记」")
     a = ap.parse_args()
 
-    tid = api("/new?url=" + up.quote("about:blank", safe=""))["targetId"]
+    tid = api("/new", "about:blank")["targetId"]  # v2.5.3 起 /new 改 POST body 传 URL
     try:
         notes = scheduled_notes(tid)
         if not notes:
@@ -266,7 +266,7 @@ def main():
 
         if a.list:
             for n in notes:
-                api(f"/navigate?target={tid}&url=" + up.quote(EDIT_URL.format(nid=n["id"]), safe=""))
+                api(f"/navigate?target={tid}", EDIT_URL.format(nid=n["id"]))  # v2.5.3 起 /navigate 改 POST body 传 URL
                 for _ in range(20):
                     time.sleep(1)
                     if ev(tid, '(()=>{const e=document.querySelector("[contenteditable=true]");'
@@ -286,7 +286,7 @@ def main():
         # 的话，前面几篇会被后一篇的导航冲掉，人只剩最后一篇可点。
         ok = 0
         for n in targets:
-            t = tid if a.submit else api("/new?url=" + up.quote("about:blank", safe=""))["targetId"]
+            t = tid if a.submit else api("/new", "about:blank")["targetId"]  # v2.5.3 起 /new 改 POST body 传 URL
             if fix_one(t, n, a.submit):
                 ok += 1
         print(f"\n完成 {ok}/{len(targets)} 篇。")

@@ -49,7 +49,7 @@ JS_SOURCE = """(()=>{const t=document.body.innerText||"";
 
 def fetch_source_ratio(tid, nid):
     """取单篇的观看来源。拿不到就返回原因，不编数。"""
-    api(f"/navigate?target={tid}&url={DETAIL_URL.format(nid=nid)}")
+    api(f"/navigate?target={tid}", DETAIL_URL.format(nid=nid))  # v2.5.3 起 /navigate 改 POST body 传 URL
     time.sleep(9)
     r = ev(tid, JS_SOURCE)
     return r if isinstance(r, dict) else {"ok": False, "why": str(r)}
@@ -111,11 +111,11 @@ def read_csv(p):
 
 
 def fetch():
-    tid = api(f"/new?url={ANALYSIS_URL}")["targetId"]
+    tid = api("/new", ANALYSIS_URL)["targetId"]  # v2.5.3 起 /new 改 POST body 传 URL
     try:
         time.sleep(8)
         rows = ev(tid, JS_ROWS) or []
-        api(f"/navigate?target={tid}&url=https://creator.xiaohongshu.com/new/note-manager")
+        api(f"/navigate?target={tid}", "https://creator.xiaohongshu.com/new/note-manager")
         time.sleep(7)
         ids = ev(tid, JS_IDS) or {}
         # 只对近 30 天的笔记取来源，老笔记平台早已不更新该区块
@@ -214,7 +214,7 @@ def fetch_aged_stats(max_notes=5):
     cands = aged_candidates(max_notes)
     if not cands:
         return []
-    tid = api(f"/new?url={ANALYSIS_URL}")["targetId"]
+    tid = api("/new", ANALYSIS_URL)["targetId"]  # v2.5.3 起 /new 改 POST body 传 URL
     today = date.today()
     new_rows = []
     try:
