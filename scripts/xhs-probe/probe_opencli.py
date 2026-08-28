@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""probe 的 opencli 采集后端 —— 走日常 Chrome 的登录态。
+"""probe 的 opencli 采集后端 —— 走 XHS 专用 Chromium 的登录态。
 
 ## 为什么另起一个后端而不是修 probe.py
 
@@ -12,8 +12,10 @@
 「触发安全验证」—— 两条都是误报，真因就是没登录。CAPTCHA_RE 命中的是
 登录墙文案里的「验证码」三个字（手机号登录框那个），不是真的风控验证。
 
-opencli 走 Browser Bridge 附着日常 Chrome，用的就是平时刷网页那份 cookie，
-不存在这个问题。CLAUDE.md「联网抓取规则」已把 opencli 定为第 0 优先级。
+opencli 走 Browser Bridge 附着 XHS 专用 Chromium（`com.eric.xhschrome`，
+`~/.xhs-chromium-profile`，2026-08-21 起与日常 Chrome 分离），该 profile
+已登录主站+创作者中心，不存在这个问题。CLAUDE.md「联网抓取规则」已把
+opencli 定为第 0 优先级。
 
 ## 判断权边界（与 probe.py 一致，不得放宽）
 

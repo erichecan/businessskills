@@ -40,7 +40,8 @@ fi
 # 原因：CDP Proxy 连的是采集专用 profile（9333, ~/.xhs-chrome-profile），那个 profile 的
 # www.xiaohongshu.com **只有游客 cookie**（无 web_session），搜索页永远是登录墙。
 # 当天 18:30 和 22:01 两轮分别报「判定被限流」和「触发安全验证」，全是这个登录墙的误报。
-# opencli 走 Browser Bridge 附着日常 Chrome，用的就是平时刷网页那份 cookie。
+# opencli 走 Browser Bridge 附着 XHS 专用 Chromium（2026-08-21 起与日常 Chrome 分离，
+# ~/.xhs-chromium-profile，同样是 9333），该 profile 已登录。
 # 要退回旧路径：把下面这行的 probe_opencli.py 改回 probe.py（但先确认 9333 profile 已登录）。
 "$PY" "$DIR/probe_opencli.py" --from-cikuku --limit 5
 probe_rc=$?
