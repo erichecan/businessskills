@@ -32,7 +32,7 @@ STATS = SUCAI / "发布数据.csv"
 PROXY = "http://localhost:3456"
 
 STATS_COLS = ["抓取日", "笔记ID", "标题", "发布时间", "发布天数",
-              "观看", "点赞", "评论", "收藏", "分享", "搜索来源占比"]
+              "曝光", "观看", "封面点击率", "点赞", "评论", "收藏", "分享", "搜索来源占比"]
 
 ANALYSIS_URL = "https://creator.xiaohongshu.com/statistics/data-analysis"
 DETAIL_URL = "https://creator.xiaohongshu.com/statistics/note-detail?noteId={nid}"
@@ -156,8 +156,12 @@ def fetch_note_detail(tid, nid):
         return {"ok": False, "why": str(rows.get("error"))[:160]}, {}
 
     # 「观看数」→「观看」：CSV 列名不带「数」，这里对齐 fetch_aged_stats 用的 key。
+    # 封面点击率/曝光的 metric 标签名未经真机验证（写这段时 Browser Bridge 未连），
+    # 先按最可能的候选名兜底，取不到就留空，不编数——真机跑一次后按 print 的 _debug 校正。
     want = {"观看数": "观看", "点赞数": "点赞", "评论数": "评论",
-            "收藏数": "收藏", "分享数": "分享"}
+            "收藏数": "收藏", "分享数": "分享",
+            "曝光数": "曝光", "曝光": "曝光",
+            "封面点击率": "封面点击率", "点击率": "封面点击率"}
     metrics, ratio = {}, ""
     for row in rows:
         sec, met, val = row.get("section"), row.get("metric"), row.get("value")
@@ -230,7 +234,10 @@ def fetch_aged_stats(max_notes=5):
                 continue     # 一个字段都没取到，不写半行假数据
             new_rows.append({"抓取日": today.isoformat(), "笔记ID": nid, "标题": "",
                               "发布时间": pub, "发布天数": days,
-                              "观看": to_int(metrics.get("观看")), "点赞": to_int(metrics.get("点赞")),
+                              "曝光": to_int(metrics.get("曝光")),
+                              "观看": to_int(metrics.get("观看")),
+                              "封面点击率": metrics.get("封面点击率", ""),
+                              "点赞": to_int(metrics.get("点赞")),
                               "评论": to_int(metrics.get("评论")), "收藏": to_int(metrics.get("收藏")),
                               "分享": to_int(metrics.get("分享")), "搜索来源占比": ratio,
                               # 下划线前缀 = 只在进程内传递，写 CSV 时被 STATS_COLS 过滤掉。
@@ -345,10 +352,37 @@ def backfill_ciku_ratio(aged_rows):
           "、".join(f"{k}={v}" for k, v in have.items()))
 
 
+def migrate_stats_header():
+    """把旧表头（缺曝光/封面点击率两列）的 发布数据.csv 迁移到新列序。
+
+    2026-08-27 补：这两列此前一直被解析出来又被丢弃，现在开始落盘。
+    旧文件的表头还是老的，若不迁移就直接 append 新列，会导致 DictWriter
+    写出的新行比磁盘上的表头多两列，读取时全部错位。
+    """
+    if not STATS.exists():
+        return
+    with STATS.open(encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        old_cols = reader.fieldnames or []
+        rows = list(reader)
+    if old_cols == STATS_COLS:
+        return
+    tmp = STATS.with_suffix(".csv.tmp")
+    with tmp.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=STATS_COLS)
+        w.writeheader()
+        for r in rows:
+            w.writerow({c: r.get(c, "") for c in STATS_COLS})
+    os.replace(tmp, STATS)
+    print(f"已迁移 发布数据.csv 表头（补 曝光/封面点击率 两列，历史 {len(rows)} 行留空）")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
+    if not args.dry_run:
+        migrate_stats_header()
 
     try:
         rows, ids, sources = fetch()
@@ -364,11 +398,14 @@ def main():
     seen = {(r["抓取日"], r["笔记ID"]) for r in read_csv(STATS)}
     new = []
 
-    print(f"{'标题':<24}{'观看':>6}{'点赞':>5}{'收藏':>5}{'分享':>5}  发布天数")
+    print(f"{'标题':<24}{'观看':>6}{'点击率':>7}{'点赞':>5}{'收藏':>5}{'分享':>5}  发布天数")
     for r in rows:
         title = r["title"]
-        nums = [to_int(x) for x in r["nums"]]
+        raw = [x.strip() if isinstance(x, str) else x for x in r["nums"]]
+        nums = [to_int(x) for x in raw]
         # 列序：曝光 观看 封面点击率 点赞 评论 收藏 涨粉 分享 时长 弹幕
+        exposure = nums[0] if len(nums) > 0 else None
+        ctr = raw[2] if len(raw) > 2 and raw[2] not in ("", "-", "—") else ""
         views, likes, comments, collects, shares = (
             nums[1] if len(nums) > 1 else None, nums[3] if len(nums) > 3 else None,
             nums[4] if len(nums) > 4 else None, nums[5] if len(nums) > 5 else None,
@@ -379,7 +416,7 @@ def main():
         except ValueError:
             days = ""
         nid = ids.get(title, "")
-        print(f"{title[:22]:<24}{str(views or '-'):>6}{str(likes or '-'):>5}"
+        print(f"{title[:22]:<24}{str(views or '-'):>6}{ctr or '-':>7}{str(likes or '-'):>5}"
               f"{str(collects or '-'):>5}{str(shares or '-'):>5}  {days}")
         if (today.isoformat(), nid) in seen:
             continue
@@ -388,9 +425,9 @@ def main():
         if nid and not ratio and s.get("why"):
             print(f"    └ 观看来源：{s['why']}")
         new.append({"抓取日": today.isoformat(), "笔记ID": nid, "标题": title,
-                    "发布时间": r["published"], "发布天数": days, "观看": views,
-                    "点赞": likes, "评论": comments, "收藏": collects,
-                    "分享": shares, "搜索来源占比": ratio})
+                    "发布时间": r["published"], "发布天数": days, "曝光": exposure,
+                    "观看": views, "封面点击率": ctr, "点赞": likes, "评论": comments,
+                    "收藏": collects, "分享": shares, "搜索来源占比": ratio})
 
     if args.dry_run:
         print(f"\n[dry-run] 将写入 {len(new)} 行，未落盘")

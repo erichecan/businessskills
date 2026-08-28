@@ -46,6 +46,12 @@ xhs/素材库/.~lock*
 xhs/素材库/*_[0-9][0-9][0-9][0-9]run*
 xhs/素材库/_*
 xhs/素材库/scripts_tmp/
+# 2026-08-27：备份文件命名约定从 *.bak_* / *_NNNNrun* 换成了 *.bak-*（连字符），
+# 旧规则不再匹配，导致上百个跑批备份长期以未跟踪文件形式堆在 git status 里。
+xhs/素材库/*.bak-*
+xhs/素材库/.run*_work/
+xhs/素材库/.run_*/
+xhs/素材库/gen_outline_tmp.js
 xhs/素材库/职场面试_记忆库.csv
 xhs/素材库/关键词池.csv
 xhs/素材库/选题库.csv
