@@ -179,6 +179,20 @@ async function main() {
   const cdp = await attach();
   await cdp.send('Runtime.enable');
   await cdp.send('Page.enable');
+  // ⛔ 2026-09-04 加。这台自动化专用 Chromium（com.eric.xhschrome）跟随的是
+  // **宿主机真实系统时区** America/Toronto（EDT），不是 Asia/Shanghai —— 而创作
+  // 平台「定时发布」面板内部算「现在」直接用 `new Date()`，只是把结果标成
+  // 「北京时间」显示，并不真的做时区换算。两者相差 12 小时，实测后果：
+  // 面板默认预填值（「当前+1.5h」）读出来是 EDT 时间但被当成北京时间显示
+  // （比如 EDT 08:32 显示成"2026-09-04 09:32 北京时间"）；更隐蔽的是，选完
+  // 时/分之后，面板会用它内部这个跑偏的「现在」去做校验/纠偏，把已经选好
+  // 的日期/分钟悄悄拉回去（2026-09-04 实测：选好 "2026-09-05 09:00"，选完
+  // 时分后回读却变成了 "2026-09-04 09:35"——分钟被拉回接近 EDT 当前时刻）。
+  // 用 Emulation.setTimezoneOverride 把这个 tab 的时区钉死成 Asia/Shanghai，
+  // 消掉这个偏差源头。必须在 cdp（本文件自己的 session）关闭前一直有效——
+  // 实测这个 override 挂在**发起它的那个 CDP session** 上，session 一断就还原，
+  // 所以不能用完即关的一次性连接去设置，得跟 set_schedule 主流程共用同一个 cdp。
+  await cdp.send('Emulation.setTimezoneOverride', { timezoneId: 'Asia/Shanghai' });
   // 原来这里还开了 DOM 域，专为 DOM.getDocument({pierce:true}) 穿透 shadow root
   // 找发布按钮。发布改走事件派发后就不需要了 —— 日历那几步的坐标是
   // getBoundingClientRect 拿的，走 Runtime 域即可。
@@ -211,16 +225,44 @@ async function main() {
 
   // 2. 翻到目标月份。用「显示的年月 vs 目标年月」的差值决定点哪个箭头、点几次，
   //    不靠猜箭头顺序 —— 先试点一次看年月往哪边动，再决定方向。
+  //
+  // ⛔ 2026-08-31 修：老正则 \d{4}\D+\d{1,2} 太松，日历被连续点击点飞进「年份
+  //    区间」视图（header 文本变成"2037-2048"这种十年跨度）时，它照样能解析出
+  //    一个（非法的）年月值——"2048"里取前两位当月份=20。循环于是一直判断
+  //    「不相等」却又不报错，硬跑满 24 次守卫后仍往下走，到选日期那步才因为
+  //    面板根本没有日期格子而报「没找到元素」，看起来像是完全不相关的 bug。
+  //    现在只认「YYYY年M月」这一种月视图格式；一旦跑出这个格式（不管是刚打开
+  //    时就不对，还是翻页途中被点飞），立刻停止翻月并报错，不再继续瞎点，也不
+  //    再放任它跑到猜不到出错原因的下一步。
   const headText = () => evaluate(cdp, `(${POP}.querySelector('.d-datepicker-header-main')||{}).textContent||''`);
-  const parseHead = s => { const m = String(s).match(/(\d{4})\D+(\d{1,2})/); return m ? Number(m[1]) * 12 + Number(m[2]) : null; };
+  const parseHead = s => {
+    const m = String(s).replace(/\s+/g, '').match(/^(\d{4})年(\d{1,2})月$/);
+    if (!m) return null;
+    const month = Number(m[2]);
+    return (month >= 1 && month <= 12) ? Number(m[1]) * 12 + month : null;
+  };
   const want = Y * 12 + MO;
   for (let guard = 0; guard < 24; guard++) {
-    const cur = parseHead(await headText());
-    if (cur === null) throw new Error('读不出面板上的年月');
+    const raw = await headText();
+    const cur = parseHead(raw);
+    if (cur === null) throw new Error(`日历不在月视图（面板文本「${raw}」）—— 可能被连续点击点飞进了年份/年代选择视图，停止翻月`);
     if (cur === want) break;
-    // 四个 .--space-p-extra-small 依次是：上一年 / 上一月 / 下一月 / 下一年
+    if (guard === 23) throw new Error(`翻月 24 次仍没翻到目标月份，当前停在「${raw}」`);
+    // 四个 .--space-p-extra-small 依次是：上一年 / 上一月 / 下一月 / 下一年。
+    //
+    // ⛔ 2026-08-31 查明真正根因：这四个箭头不是 header 的前 4 个 children ——
+    // 标题文字（.d-datepicker-header-main）夹在正中间，实测十年视图下 header 是
+    // [上一屏箭头, 标题, 下一屏箭头] 3 个 children，标题在 index 1；月视图同理应是
+    // [上一年, 上一月, 标题, 下一月, 下一年] 5 个 children，标题在 index 2。
+    // 老代码 `.children[idx]` 把「箭头在 4 元素数组里的序号」直接当 children 下标用，
+    // idx=2（翻下一月）因此点到的其实是标题文字——点它会让面板"缩视图级别"跳成
+    // 年份/十年份选择视图，这正是本文件另一处 bug（面板跑出月视图）的成因。
+    // idx=1（翻上一月）因为在标题之前，位置没错位，所以往回翻从来没出过这个问题。
+    // 现在改成按 class 精确取 4 个箭头，不再用「所有 children」的位置去猜。
     const idx = cur < want ? 2 : 1;
-    await clickBy(cdp, `${POP}.querySelector('.d-datepicker-header').children[${idx}]`, '翻月');
+    await clickBy(cdp,
+      `[...${POP}.querySelector('.d-datepicker-header').querySelectorAll('.--space-p-extra-small')][${idx}]`,
+      '翻月');
   }
   console.log(`✅ 月份已到 ${await headText()}`);
 
@@ -249,14 +291,24 @@ async function main() {
   }
 
   // 4. 选时、分。两条 timebar 分别是 24 个时和 60 个分，单元要先滚进条内可视区
+  //
+  // ⛔ 2026-09-04 查明「选 XX 时/分：没找到元素」的真正根因：**当前已选中的那一格
+  // 文本会被拼上单位**——不是纯数字 "09"，而是 "09时"（分钟同理 "32分"）；其余未选中
+  // 的格子才是纯两位数字。老代码用严格相等 `textContent.trim() === '09'` 去匹配，
+  // 一旦目标时/分恰好等于面板打开时默认预选的那个值（默认是"当前时间+1.5h"，会随时间
+  // 漂移，撞上纯属运气），textContent 实际是 "09时" ≠ "09"，`.find()` 找不到任何元素、
+  // 直接报错——不是虚拟滚动、不是没渲染，元素其实一直都在 DOM 里，只是文本多了个字。
+  // （用 `curl localhost:3456/eval` 直接读两条 timebar 的 textContent 列表实测确认，
+  // 见 2026-09-04 debug session。）
+  // 修法：匹配前去掉末尾的 时/分 后缀，两种文本形态都能命中。
   await ensurePanel('选时分前');          // 选完日期面板常会自己收起
   const hh = String(H).padStart(2, '0'), mm = String(MI).padStart(2, '0');
   await clickBy(cdp,
     `[...${POP}.querySelectorAll('.d-timepicker-timebar')[0].querySelectorAll('.d-timepicker-time')]
-       .find(e => e.textContent.trim() === '${hh}')`, `选 ${hh} 时`);
+       .find(e => e.textContent.trim().replace(/[时分]$/, '') === '${hh}')`, `选 ${hh} 时`);
   await clickBy(cdp,
     `[...${POP}.querySelectorAll('.d-timepicker-timebar')[1].querySelectorAll('.d-timepicker-time')]
-       .find(e => e.textContent.trim() === '${mm}')`, `选 ${mm} 分`);
+       .find(e => e.textContent.trim().replace(/[时分]$/, '') === '${mm}')`, `选 ${mm} 分`);
   console.log(`✅ 已选 ${hh}:${mm}`);
 
   // 5. 回读校验 —— 点了不等于选上了，一定要看时间框真的变成了目标值
