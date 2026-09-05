@@ -28,6 +28,7 @@ build/
 # 编辑器 / OS
 .vscode/
 .idea/
+.qoder/
 *.swp
 Thumbs.db
 

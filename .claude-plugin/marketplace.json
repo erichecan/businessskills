@@ -336,8 +336,45 @@
       ]
     },
     {
+      "name": "eric-xhs-matrix",
+      "description": "小红书选题矩阵生成（CP0.5）。从核心理论辐射关联场景，用「主张类型×证据形态」2×2 矩阵展开候选选题，替代扒热点仿写。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": [
+        "xiaohongshu",
+        "topic-generation",
+        "matrix",
+        "theory",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-xhs-matrix"
+      ]
+    },
+    {
+      "name": "eric-xhs-rhetoric",
+      "description": "小红书传播设计（CP1.5）。用新闻价值理论、古典修辞学（三诉求/topoi/stasis）、STEPPS、框架理论给选题设计传播机制，产出喂给标题/开头的设计蓝图。",
+      "source": "./",
+      "strict": false,
+      "version": "1.0.0",
+      "category": "content-creation",
+      "keywords": [
+        "xiaohongshu",
+        "rhetoric",
+        "news-value",
+        "stepps",
+        "framing",
+        "chinese"
+      ],
+      "skills": [
+        "./skills/eric-xhs-rhetoric"
+      ]
+    },
+    {
       "name": "eric-xhs-coach",
-      "description": "小红书内容全流程教练（主入口）。串起 CP1→CP5 完整流程，协调所有诊断/创作 skill，支持任意 CP 之间跳转。",
+      "description": "小红书内容全流程教练（主入口）。串起 CP0→CP6 完整流程，协调所有诊断/创作 skill，支持任意 CP 之间跳转。",
       "source": "./",
       "strict": false,
       "version": "1.0.0",

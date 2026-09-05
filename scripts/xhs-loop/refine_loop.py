@@ -570,18 +570,20 @@ def knowledge_frame() -> str:
     也就是说那段时间改知识框架对产出一个字的影响都没有 —— 08-08 改 CTA 口径时
     才发现这件事。写手真正读的一直是 必须命中清单.md。现在两边都读。
 
-    砍掉三节再喂，理由各不相同：
+    砍掉四节再喂，理由各不相同：
       §七 高热选题母题库  —— 选题在进这个函数之前就定死了，写稿时用不上
       §十二 选题4维框架   —— 同上，而且它明写「来自 eric-xhs-topic」
       §十三 标题12类触发器 —— **它是 eric-xhs-title/SKILL.md 的副本**，
         而 title_rules() 已经把 SKILL.md 的实证规律那节单独喂进 prompt 了。
         同一份规则喂两遍，迟早只更新其中一份 —— title_rules() 的 docstring
         记着 08-05 就是这么出的事（副本停在旧措辞，模型照副本写，标题踩负信号）。
+      §十八 核心理论矩阵（2026-09-02 加）—— 同样是选题生成阶段的东西（怎么从核心理论
+        辐射出候选选题），选题定了之后写稿用不上，跟 §七/§十二 是同一类，一并砍掉。
     """
     t = _read_or(FRAME, "")
     if not t:
         raise SystemExit(f"⛔ 取不到知识框架：{FRAME} 缺失")
-    for head in ("## 七、", "## 十二、", "## 十三、"):
+    for head in ("## 七、", "## 十二、", "## 十三、", "## 十八、"):
         t = re.sub(rf"^{re.escape(head)}.*?(?=^## )", "", t, flags=re.M | re.S)
     return t.strip()
 
@@ -1361,6 +1363,15 @@ def rework_one(item, args, lane="搜索流"):
         if not ok:
             print(f"机械检查未过：\n{mech}")
             feedback = f"【机械检查（代码硬核对，必须全部修掉）】\n{mech}\n{KEEP_PASSED}"
+            # ⛔ 2026-09-01 修：下面「改了但分数没提上去→切档」那条止损线，触发条件是
+            # 拿到了审核分数——但机械检查不过连审核都进不去，走不到那一步，止损线
+            # 形同虚设。实测：《试用期没拿到结果》《晋升答辩有可能不过》连续 3 晚
+            # 返工，每次都卡在同一条机械项（CTA 没给编号选项 + 正文没有点名概念），
+            # 3 轮从没换过档，白烧 3 轮 claude 调用。现在机械检查不过也算「这一档没
+            # 走通」，同样触发切档。
+            if mode != "结构":
+                print(f"   · {_LABEL[mode]}机械检查未过，下一轮改走全量重写")
+                mode = "结构"
             continue
         score, redline, report, disposition = audit(draft.name, lane)
         if score is None:

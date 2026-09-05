@@ -9,19 +9,24 @@
 5. 跨篇查重：签名句（我面过300人/上周一个候选人 等）近 5 篇内重复即违规
 6. 文风守门线：平均句长 ≤30 / 排比 ≤1。指标实现见 style_metrics.py。
    ⛔ 引语密度与具体名词密度两条已于 2026-08-11 删除（Eric 定，理由见下方注释）。
+7. 标题跨篇相似度：与已发布/已产出的其它标题相似度 ≥30% 即违规（Eric 2026-09-05 定）。
 
 用法：python3 draft_check.py [--days 2]（被 health_check.py 每日调用）
 违规 → 打印明细，退出码 1。
 """
 import argparse
+import csv
 import re
 import sys
 from datetime import date, timedelta
+from difflib import SequenceMatcher
+from functools import lru_cache
 from pathlib import Path
 
 from style_metrics import measure
 
 SUCAI = Path(__file__).resolve().parents[2] / "xhs" / "素材库"
+PUB_LOG = SUCAI / "发布日志.csv"
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 SIGNATURES = ["我面过300", "上周一个候选人", "笔都没动", "在表上打了叉", "45分钟"]
 CTA_HINTS = ["评论区", "你呢", "你遇到过", "你会怎么", "留言", "？\n", "?\n"]
@@ -233,6 +238,98 @@ def extract(text):
     return title
 
 
+# ---------- 清单第 7 条：标题跨篇相似度（Eric 2026-09-05 定） ----------
+#
+# 起因：Eric 肉眼扫发布日志，标题重复度已到 85% 以上。抽样实测印证了这个感觉——
+# 发布日志里「社保对不上，HR不在面试时查你」vs「社保和简历对不上，HR不在面试那天查」
+# 相似度 0.77，「试用期过了不给转正，他在等你先开口」vs「试用期过了没谈转正，
+# 他不在等你表现」相似度 0.69，同一批稿子只是换了几个字重复投。
+# 同一样本里真正不相关的两条标题相似度只有 0.13～0.16，卡在 0.30 中间没有误伤空间。
+#
+# 判定用「字符 Jaccard 与 difflib 序列比取较大值」，跟 scripts/xhs-loop/
+# cross_section_report.py 里验证过的 title_similarity() 是同一套算法（那边是给
+# 「文件↔发布记录」做强匹配，阈值 0.95 只收精确复述；这里是防真重复，用途不同，
+# 阈值也不同，各自独立配置，不共享判据）。
+TITLE_DUP_THRESHOLD = 0.30
+
+
+def _title_norm(s: str) -> str:
+    return re.sub(r"[^\w一-鿿]", "", s or "").lower()
+
+
+def _char_jaccard(a: str, b: str) -> float:
+    sa, sb = set(a), set(b)
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
+
+
+def title_similarity(a: str, b: str) -> float:
+    na, nb = _title_norm(a), _title_norm(b)
+    if not na or not nb:
+        return 0.0
+    return max(_char_jaccard(na, nb), SequenceMatcher(None, na, nb).ratio())
+
+
+def _slug_of_draft_filename(fname: str) -> str:
+    """成稿_2026-08-19_试用期没拿到结果.md → 试用期没拿到结果。
+
+    同一 slug 在不同日期出现是同一篇稿子的定向返工（rework_one 明确「只改点到的
+    问题，其余保持原样」），标题理应不变——不能拿它跟自己比对，那不是真重复。
+    """
+    m = DATE_RE.search(fname)
+    if not m:
+        return fname
+    prefix = f"成稿_{m.group(1)}_"
+    return fname[len(prefix):-3] if fname.startswith(prefix) and fname.endswith(".md") else fname
+
+
+@lru_cache(maxsize=1)
+def _published_titles() -> tuple:
+    """(slug, 标题) —— slug 取自「成稿文件」列，跟 _other_draft_titles 用同一套键，
+    这样同一篇稿子发布后再被 health_check 扫到，不会拿自己的发布记录跟自己比对。"""
+    if not PUB_LOG.exists():
+        return ()
+    out = []
+    with PUB_LOG.open(encoding="utf-8-sig") as f:
+        for r in csv.DictReader(f):
+            title = (r.get("标题") or "").strip()
+            if not title:
+                continue
+            out.append((_slug_of_draft_filename((r.get("成稿文件") or "").strip()), title))
+    return tuple(out)
+
+
+@lru_cache(maxsize=1)
+def _other_draft_titles() -> tuple:
+    """(slug, 标题) —— 素材库根目录 + 归档稿 全量，供跨稿比对。"""
+    out = []
+    for f in list(SUCAI.glob("成稿_*.md")) + list((SUCAI / "归档稿").glob("成稿_*.md")):
+        title = extract(f.read_text(encoding="utf-8"))
+        if title:
+            out.append((_slug_of_draft_filename(f.name), title))
+    return tuple(out)
+
+
+def title_dup_issue(fname: str, title: str) -> str:
+    """标题跟已发布 / 其它选题的稿子撞了没有。返回违规文案，没撞返回空串。"""
+    if not title:
+        return ""
+    cur_slug = _slug_of_draft_filename(fname)
+    pool = [t for slug, t in _published_titles() if slug != cur_slug]
+    pool += [t for slug, t in _other_draft_titles() if slug != cur_slug]
+    best_score, best_title = 0.0, ""
+    for t in pool:
+        s = title_similarity(title, t)
+        if s > best_score:
+            best_score, best_title = s, t
+    if best_score >= TITLE_DUP_THRESHOLD:
+        return (f"标题与已产出的「{best_title}」相似度 {best_score*100:.0f}%"
+                f"（≥{int(TITLE_DUP_THRESHOLD*100)}% 上限）—— 换关键词角度或换表达，"
+                f"不能只改几个字")
+    return ""
+
+
 # 文风守门线 —— 2026-08-11 Eric 砍掉两条密度类拦截：
 #
 #   ⛔ 已删除：引语密度 ≥0.8/百字、具体名词密度 ≥2.0/百字
@@ -403,6 +500,9 @@ def check_one(d, f, all_drafts, lane_override=None):
     tlen = len(_EMOJI.sub("", title))
     if tlen > 20:
         issues.append(f"标题 {tlen} 字（>20）：「{title[:30]}」")
+    dup = title_dup_issue(f.name, title)
+    if dup:
+        issues.append(dup)
 
     lane = lane_of(text, lane_override)
     lo, hi = BODY_RANGE[lane]
