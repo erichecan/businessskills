@@ -276,11 +276,26 @@ async function main() {
   //    看起来像选择器失效，实际是被自己点没的。
   //    只在跨午夜时现形：默认时间是「当前+1.5h」，23:25 跑时它已经是次日，
   //    而轮换池给的目标也是次日 → 同一天，一点就废。22:00 跑时默认还在当天，撞不上。
-  //    判断用时间框的文本而不是格子的 selected class：class 名会随组件版本变，
-  //    时间框的值是这一步真正要改的东西，且后面第 5 步还会回读兜底。
+  //
+  // ⛔ 2026-09-07 修：上面那句「判断用时间框的文本而不是格子的 selected class」
+  //    是错的，正是它让这条修复本身失效了一次。.d-datepicker-input-filter 的文本
+  //    是组件挂载时渲染死的，不会跟着后面 `Emulation.setTimezoneOverride` 生效后的
+  //    新 Date() 重新计算；而日历格子的高亮是每次渲染都重算的，跟真实「今天」同步。
+  //    实测（本机系统时区 EDT，宿主机 22:00 跑批 ≈ 上海时间次日上午）：input 文本
+  //    还停在「昨天 23:xx」，格子里「明天」那一格却已经带着选中态的
+  //    `--color-primary` 高亮 class——文本判断说「没选中」，去点那一格，
+  //    点掉的却是已选中的格子，面板照样被自己点没。改成直接读格子自己的
+  //    selected class（`--color-primary`），这才是真正决定「点了会不会被反选」
+  //    的那份状态，文本只留作兜底 OR 条件。
   const dateStr = `${Y}-${String(MO).padStart(2, '0')}-${String(D).padStart(2, '0')}`;
   await ensurePanel('选日期前');
-  if (String(await readInput(cdp)).includes(dateStr)) {
+  const cellAlreadySelected = await evaluate(cdp, `(() => {
+    const cell = [...${POP}.querySelectorAll('.d-datepicker-cell-main:not(.disabled)')]
+      .find(e => e.textContent.trim() === '${D}');
+    return !!cell && /(^|\\s)--color-primary(\\s|$)/.test(cell.className);
+  })()`);
+  const textAlreadySelected = String(await readInput(cdp)).includes(dateStr);
+  if (cellAlreadySelected || textAlreadySelected) {
     console.log(`✅ ${D} 号已是当前选中日，跳过点击（再点会取消选中）`);
   } else {
     await clickBy(cdp,
