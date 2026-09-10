@@ -23,11 +23,15 @@ except ImportError:
 
 DIR = Path(__file__).parent
 PAD = 4  # 留一点边，避免线稿贴边被卡片圆角/缩放切到
+ALPHA_MIN = 128  # 低于此值不算「内容」——不带阈值的 getbbox() 只要有一个 alpha=1
+# 的杂点（羽化/生成噪点）就会把边界撑回整张画布，裁剪等于没生效。
+# 2026-09-09 实测：pose9_推眼镜反击 画布 330×996，裸 getbbox() 判定内容铺满全图，
+# 阈值 128 后实际内容只有 326×445——杂点占比不到 1%，但足以让裁剪彻底失效。
 
 
 def trim(p: Path, dry: bool):
     im = Image.open(p).convert("RGBA")
-    bb = im.split()[3].getbbox()          # 按 alpha 求内容边界
+    bb = im.split()[3].point(lambda a: 255 if a > ALPHA_MIN else 0).getbbox()
     if not bb:
         return None
     w, h = im.size

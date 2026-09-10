@@ -71,9 +71,64 @@
   /* 卡型微调 */
   .cover h1 { font-size:118px; }
   .cover .sub { font-size:56px; font-weight:600; color:var(--ink); }
-  /* 封面变体 A：大形象居中 */
-  .coverbig h1 { font-size:118px; }
-  .coverbig .poseimg { max-height:720px; max-width:80%; margin-bottom:140px; }
+  /* 封面变体 A：大形象居中（2026-09-09 定为默认封面）
+     结构：整卡背景铺暖色渐变网格，::before 垫一张悬浮白卡，
+     tag/h1/body/figure-wrap 显式 position:relative 才能画到 ::before 上面——
+     ::before 是这几个元素里最早的「兄弟」，不带 position 的话按绘制顺序会被它盖住。 */
+  .coverbig {
+    /* 蓝色配色（2026-09-09 换色，要求「不要深蓝」——三层 radial 都是浅蓝/湖蓝，
+       没有一处压到藏青/靛蓝这类暗色，保证卡片整体亮度和纸感底一致，不显沉。 */
+    background:
+      radial-gradient(1000px 700px at 8% -6%, #cfe9ff 0%, rgba(207,233,255,0) 60%),
+      radial-gradient(900px 800px at 105% 8%, #d6e4ff 0%, rgba(214,228,255,0) 55%),
+      radial-gradient(1100px 900px at 50% 115%, #aee0f5 0%, rgba(174,224,245,0) 55%),
+      linear-gradient(160deg, #f5faff 0%, #edf5fc 45%, #e6f0fa 100%);
+    padding:184px 144px 40px;
+  }
+  .coverbig::before {
+    content:""; position:absolute; left:64px; right:64px; top:96px; bottom:96px;
+    background:#fffdfa; border-radius:48px;
+    box-shadow:0 40px 90px -20px rgba(120,60,20,.28), 0 2px 0 rgba(255,255,255,.6) inset;
+  }
+  .coverbig .idx { top:136px; right:104px; }
+  .coverbig .tag, .coverbig h1, .coverbig .body, .coverbig .figure-wrap { position:relative; }
+  .coverbig .tag {
+    display:inline-flex; align-items:center; gap:14px; align-self:flex-start;
+    background:#dceafe; color:#2f6fed; font-size:32px; font-weight:700;
+    padding:16px 32px; border-radius:100px; letter-spacing:.05em; margin-bottom:0;
+  }
+  .coverbig .tag::before { content:""; width:14px; height:14px; border-radius:50%; background:#2f6fed; }
+  .coverbig h1 { font-size:118px; margin-top:52px; }
+  .coverbig h1 .hl {
+    /* 荧光笔高亮：底部 40% 垫黄色色块，不是简单变红字——跟其他卡型的
+       h1 .hl（变红字）视觉上是两套语言，只在 coverbig 里生效。
+       white-space:nowrap 让高亮短语按整体换行，不会被自动折行从中间切开——
+       前提是高亮短语本身别写太长（超过一行宽度会整体溢出面板，不会自动换行）。 */
+    color:var(--ink); background:linear-gradient(180deg, transparent 60%, #ffd75e 60%);
+    padding:0 6px; white-space:nowrap;
+  }
+  .coverbig .body { color:#5b5347; }
+  .coverbig .foot { display:none; }
+  /* 人物：figure-wrap 撑满剩余高度，光晕+投影垫在图片下面做景深 */
+  .coverbig .figure-wrap {
+    flex:1; margin-top:20px; display:flex; align-items:flex-end; justify-content:center;
+  }
+  .coverbig .glow {
+    position:absolute; left:50%; bottom:20px; transform:translateX(-50%);
+    width:640px; height:640px; border-radius:50%;
+    background:radial-gradient(circle, rgba(120,180,255,.5) 0%, rgba(120,180,255,0) 70%);
+  }
+  .coverbig .shadow-ellipse {
+    position:absolute; left:50%; bottom:8px; transform:translateX(-50%);
+    width:380px; height:50px; border-radius:50%;
+    background:radial-gradient(ellipse, rgba(30,50,80,.2) 0%, rgba(30,50,80,0) 72%);
+  }
+  .coverbig .poseimg {
+    position:relative; height:720px; width:auto; max-width:80%; object-fit:contain; margin:0;
+    mix-blend-mode:normal;
+    /* 继承自 .poseimg 的 multiply 是给纯色背景校准的：换成渐变+光晕背景后，
+       人物浅色区域会把背景色「吸」进来（脸和手发蓝/发橙），这里要显式关掉。 */
+  }
   /* 封面变体 B：形象+对话气泡（角色说出结论） */
   .covertalk h1 { font-size:104px; }
   .covertalk .poseimg { position:absolute; left:64px; bottom:150px; max-height:560px; max-width:44%; margin:0; }

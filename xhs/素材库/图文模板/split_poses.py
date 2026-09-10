@@ -34,6 +34,9 @@ STATE = HERE / ".split_state.json"
 ALPHA_MIN = 12       # alpha 高于此值算「有内容」，滤掉 ChatGPT 生成的极淡光晕
 MIN_BLOCK_W = 120    # 窄于此的内容块视为噪点（飘出来的问号、纸飞机等），并入相邻块
 PAD = 4
+TRIM_ALPHA_MIN = 128  # 单张切片裁边界用的阈值，比 ALPHA_MIN 高很多：
+# 不带阈值的 getbbox() 只要有一个 alpha=1 的杂点就会把边界撑回整张切片，
+# 裁剪等于没生效（2026-09-09 实测 pose9 就是这样，见 trim_poses.py 同款修复）。
 # 验收只卡高度：卡片里 poseimg 是按 height 约束的，宽度不是瓶颈。
 # 「站立」「摊手」这类纯人物姿势天生就窄（220px 也正常），按宽度判会误报。
 MIN_H = 700
@@ -132,7 +135,7 @@ def split_one(src: Path, names, dry: bool):
     ok = True
     for (x0, x1), name in zip(blocks, names):
         cell = im.crop((max(0, x0 - PAD), 0, min(im.width, x1 + PAD), im.height))
-        bb = cell.split()[3].getbbox()
+        bb = cell.split()[3].point(lambda a: 255 if a > TRIM_ALPHA_MIN else 0).getbbox()
         if bb:
             cell = cell.crop(bb)
         w, h = cell.size

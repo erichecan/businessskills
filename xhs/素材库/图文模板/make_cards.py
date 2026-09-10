@@ -69,8 +69,14 @@ def render(cards, outdir: Path):
                   f"人物会被挤没，本张不放姿势图")
             pose_name = ""
         pose_file = Path(__file__).parent / f"{pose_name}.png"
-        pose = (f'<img class="poseimg" src="file://{pose_file}">'
-                if pose_name and pose_file.exists() else "")
+        if pose_name and pose_file.exists():
+            img_tag = f'<img class="poseimg" src="file://{pose_file}">'
+            # coverbig 的人物要配光晕+投影撑出景深，其他卡型保持纯图不动
+            pose = (f'<div class="figure-wrap"><div class="glow"></div>'
+                    f'<div class="shadow-ellipse"></div>{img_tag}</div>'
+                    if ctype == "coverbig" else img_tag)
+        else:
+            pose = ""
         page = (TPL.replace("{{POSE_BLOCK}}", pose)
                    .replace("{{IP_BLOCK}}", ip)
                    .replace("{{TYPE}}", c.get("type", ""))
