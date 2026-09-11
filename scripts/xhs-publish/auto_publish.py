@@ -79,6 +79,44 @@ sys.path.insert(0, str(REPO / "scripts" / "case-entry"))
 
 PUB_LOG_COLS = ["日期", "成稿文件", "标题", "闸门", "预填", "定时", "发布", "笔记链接", "备注"]
 
+XHS_CHROME_PORT = 9333
+
+
+def ensure_cdp_proxy_healthy(retries=3):
+    """cdp-proxy 是发布链路的地基：一旦它连错了 Chrome，prefill_xhs 会在错误的浏览器里
+    建 tab，而 set_schedule.mjs 直连 9333 找 tab 时自然找不到。
+
+    2026-09-10 22:00 的全自动发布就是这样死的：一份脱离 launchd 管理的孤儿
+    cdp-proxy 进程（大概率是别的会话手动起了 web-access skill、没设
+    CHROME_DEBUG_PORT）抢先绑定了端口 3456，回退到自动发现，选中了日常 Chrome 的
+    9222；同一时刻 launchd 里配置正确（CHROME_DEBUG_PORT=9333）的那份反复被
+    "已有实例运行在端口 3456，退出"。日志一路显示"预填成功""定时开关已打开"，
+    最后一步却报"没找到小红书发布页 tab"——两边根本不是同一个浏览器进程。
+
+    判断权放代码里，不指望人事后翻日志才发现：每次真正要碰浏览器之前自检一次，
+    连错了就杀掉占端口的进程、把 launchd 那份正确配置的实例拉起来。"""
+    import urllib.request
+
+    bad = None
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(f"{PROXY_BASE}/health", timeout=3) as r:
+                h = json.loads(r.read())
+            if h.get("chromePort") == XHS_CHROME_PORT:
+                return True, ""
+            bad = h.get("chromePort")
+        except Exception as e:
+            bad = f"health 读取失败：{e}"
+        r = subprocess.run(["lsof", "-nP", "-iTCP:3456", "-sTCP:LISTEN", "-t"],
+                            capture_output=True, text=True)
+        for pid in r.stdout.split():
+            subprocess.run(["kill", pid])
+        time.sleep(1)
+        subprocess.run(["launchctl", "kickstart", "-k",
+                        f"gui/{os.getuid()}/com.eric.cdpproxy"], capture_output=True)
+        time.sleep(3)
+    return False, f"cdp-proxy 连到错误的 Chrome（chromePort={bad}，应为 {XHS_CHROME_PORT}），自愈 {retries} 次仍未恢复"
+
 # 发布时段轮换池 — 每次发布取下一个，用来测出哪个时段搜索进入占比最高。
 # 一轮 7 个点跑完，配合词库的「搜索来源占比」回填即可横向比较。
 SLOT_HOURS = [9, 11, 12, 17, 18, 20, 22]
@@ -820,6 +858,12 @@ def main():
         batch = passed[:max(quota, 1) if not args.dry_run else 1]
         print(f"[{datetime.now():%Y-%m-%d %H:%M}] 闸门通过 {len(passed)} 篇，"
               f"今日已发 {done_today}/{DAILY_QUOTA}，本次处理 {len(batch)} 篇\n")
+
+    ok, why = ensure_cdp_proxy_healthy()
+    if not ok:
+        print(f"⛔ {why}")
+        return 1
+
     # ⛔ 一次只能有一篇稿躺在发布页上。创作平台的发布页一次只承载一篇，连续预填第二篇
     # 会把第一篇直接覆盖掉 —— 而最后一步（选时段、点发布）要人来点，人还没点稿就没了。
     # 2026-08-03 实测：连预填 3 篇，页面上只剩最后一篇，前两篇白填。

@@ -536,13 +536,20 @@ def parse_draft(text):
 
 
 def ensure_cover(name, title):
-    """为成稿即时渲染封面卡（缓存到 成品图/<stem>/00_cover.png）。"""
+    """为成稿即时渲染封面卡（缓存到 成品图/<stem>/01_cover*.png）。
+
+    ⛔ 2026-09-10 查出的事故：这里曾经只认死文件名 01_cover.png。coverbig 改版
+    （make_cards.py 按 cards.json 的 type 字段命名，现在真实封面文件叫
+    01_coverbig.png）之后，这个判断永远读不到"已有封面"，于是每次都用旧版
+    纯文字模板现渲一张 01_cover.png 塞进同一个目录——prefill_xhs 按文件名
+    排序上传全部图片，01_cover.png 字典序排在 01_coverbig.png 之前，真正发出去
+    的封面就变成了这张过时的占位图，真正做的 coverbig 封面被挤到第二张。
+    改成看有没有任何 01_cover*.png，不再猜具体后缀。"""
     import subprocess as sp
     import tempfile
     stem = name.removeprefix("成稿_").removesuffix(".md")
     out_dir = SUCAI / "成品图" / stem
-    cover = out_dir / "01_cover.png"
-    if cover.exists() or not title:
+    if list(out_dir.glob("01_cover*.png")) or not title:
         return
     cards = [{"type": "cover", "tag": "职场表达", "title": title, "body": ""}]
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
