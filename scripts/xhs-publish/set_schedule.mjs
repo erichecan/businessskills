@@ -326,27 +326,48 @@ async function main() {
        .find(e => e.textContent.trim().replace(/[时分]$/, '') === '${mm}')`, `选 ${mm} 分`);
   console.log(`✅ 已选 ${hh}:${mm}`);
 
-  // 5. 回读校验 —— 点了不等于选上了，一定要看时间框真的变成了目标值
+  // 5. 回读 —— 只记录实际选中的日期时间，不再因为跟目标差多少就整篇拦停/转人工
+  //
+  // ⛔ 2026-09-13 改：Eric 明确要求不设容差上限——分钟偏差、乃至日期不符，
+  // 都不拦，一律照面板里读到的实际值继续点定时发布，不再等人工收尾。
+  // 09-12、09-13 连续两天都是分钟差一两位（日期、小时对，怀疑分钟滚轮的
+  // 吸附动画在点击后又滚了一格），此前的硬拦截天天逼人手动完成，价值不大。
+  //
+  // 唯一没有一并去掉的是下面「不在未来」那道拦截——那不是回读精度问题，
+  // 是小红书对「定时时间已经过去」会静默改成立即发布，会把稿子在没到预定
+  // 时段时就推上公开时间线，性质比分钟/日期读数偏差严重得多，没见到明确
+  // 要求一起去掉之前先留着。
   await sleep(600);
   const after = String(await readInput(cdp)).replace(/\n/g, ' ');
-  const ok = after.includes(`${Y}-${String(MO).padStart(2, '0')}-${String(D).padStart(2, '0')}`) &&
-             after.includes(`${hh}:${mm}`);
   console.log(`\n回读：${after.slice(0, 70)}`);
-  if (!ok) {
-    console.error(`⛔ 回读对不上目标 ${AT} —— 不点发布，交给人处理。`);
-    cdp.close();
-    process.exit(1);
+  const dtMatch = after.match(/(\d{4})-(\d{2})-(\d{2})\D+(\d{1,2}):(\d{2})/);
+  let actualY = Y, actualMo = MO, actualD = D, actualH = H, actualMi = MI;
+  if (!dtMatch) {
+    console.log('⚠️ 回读没能解析出完整日期时间，按原目标值继续（未做拦截）');
+  } else {
+    actualY = Number(dtMatch[1]); actualMo = Number(dtMatch[2]); actualD = Number(dtMatch[3]);
+    actualH = Number(dtMatch[4]); actualMi = Number(dtMatch[5]);
+    const actualStr = `${actualY}-${String(actualMo).padStart(2, '0')}-${String(actualD).padStart(2, '0')} ` +
+      `${String(actualH).padStart(2, '0')}:${String(actualMi).padStart(2, '0')}`;
+    if (actualStr === AT) {
+      console.log(`✅ 时间已设为 ${AT}`);
+    } else {
+      console.log(`⚠️ 回读跟目标不一致（目标 ${AT} → 实际 ${actualStr}），按要求不拦，按实际值继续`);
+    }
   }
-  console.log(`✅ 时间已设为 ${AT}`);
 
   // ⛔ 目标时间必须还在未来（北京时间）。小红书对「定时到过去」不报错，
   // 它会直接把稿**立刻发出去** —— 2026-08-06 实测：设北京 08-07 09:00 时
   // 北京已经 10:30，后台显示 10:36 直接发布，不是定时。
   // 失败得毫无声音，时段轮换的实验数据也全废，所以这里必须硬拦。
+  //
+  // 用回读到的实际日期时分算，不用意图值——上面已经不再要求回读跟目标一致，
+  // 真正会被提交的是面板里的实际值，不是我们本来想要的值。
   const bjNow = new Date(Date.now() + (8 * 60 + new Date().getTimezoneOffset()) * 60000);
-  const targetBj = new Date(Y, MO - 1, D, H, MI);
+  const targetBj = new Date(actualY, actualMo - 1, actualD, actualH, actualMi);
   if (targetBj - bjNow < 5 * 60000) {
-    console.error(`⛔ 目标时间 ${AT} 不在未来（北京当前 ` +
+    console.error(`⛔ 实际时间 ${actualY}-${String(actualMo).padStart(2, '0')}-${String(actualD).padStart(2, '0')} ` +
+      `${String(actualH).padStart(2, '0')}:${String(actualMi).padStart(2, '0')} 不在未来（北京当前 ` +
       `${bjNow.getFullYear()}-${String(bjNow.getMonth() + 1).padStart(2, '0')}-` +
       `${String(bjNow.getDate()).padStart(2, '0')} ${String(bjNow.getHours()).padStart(2, '0')}:` +
       `${String(bjNow.getMinutes()).padStart(2, '0')}）。` +
