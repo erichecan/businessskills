@@ -54,6 +54,16 @@ fi
 "$PY" "$DIR/auto_analyze.py" --date "$DAY" --limit 10
 "$PY" "$DIR/backfill.py" --date "$DAY"
 
+# 2026-09-12 补：场景打标 + 变体去重，两步都是纯字符串规则，不调模型，跑在 1200+ 行
+# 词库上几秒钟就完事。不接这两步的后果实测过——查"为什么攒了 8k 素材写不出稿"时
+# 发现 scene_map.py 打的「场景」标签一直没被 backfill.py 的整表重写保留下来，
+# pick_topic 的【场景×产出缺口】选题因此形同虚设，一路退回全局兜底、持续偏斜面试赛道；
+# 同时「HR问你的缺点」这类同问题的措辞变体各自占着探测/选题名额，选中后又常年撞上
+# draft_check 的标题查重被拦下重写。这两步跑在 backfill 之后，保证不管新词从哪个
+# 入口（本轮 backfill 新增候选词 / import_pool 导入）进来，当轮就能被打标和去重。
+"$PY" "$DIR/dedupe_keywords.py"
+"$PY" "$DIR/../scene_map.py" --write
+
 echo "===== $(date '+%F %T') 探词链路结束 ====="
 
 # ⛔ 2026-08-13：这里原先什么都不做，脚本的退出码于是等于最后一条命令（backfill）的。
