@@ -21,6 +21,7 @@ import argparse
 import csv
 import json
 import os
+import random
 import re
 import subprocess
 import sys
@@ -119,16 +120,38 @@ SLUG_MAX_CHARS = 20
 # 标定，参照系是内部审核分而非真实发布数据，且文档明写「与分数不单调相关
 # （67 分稿密度 3.25 高于 83 分稿的 2.52）」「定位是异常检测不是质量评分」。
 # 所以它只配当异常值拦截线，不该被当成质量目标去堆。
-WRITE_ACTIONS = """
+# ⛔ 2026-09-14 改：原来第 2 条直接把"你是哪一种？回个字母就行："写进骨架里，
+# 模型于是逐字照抄第一行、只填 ABC——查全库实测 112 篇文章用"你是哪一种"开头，
+# 其中 90 篇跟这句一字不差，是全账号规模最大的模板化重复（半数以上已发布笔记
+# 收尾都长一个样）。SKILL.md 验证过的是"明说降门槛、句子停在这里、不接回报"
+# 这个**机制**本身有效，不是这句具体措辞必须一字不差——所以留住机制，把措辞
+# 换成随机挑选，别再让"照抄骨架第一行"成为最省事的写法。
+CTA_OPENERS = [
+    "你是哪一种？回个字母就行：",
+    "属于哪一种，评论区扣个字母就行：",
+    "看看你是哪种，回个字母：",
+    "你踩中哪条，字母打一下就行：",
+    "对号入座，回个字母：",
+    "你是哪一挂，字母扣一下就行：",
+    "换你会是哪种，字母打出来就行：",
+    "看看自己占哪条，回个字母：",
+]
+
+
+def write_actions() -> str:
+    opener = random.choice(CTA_OPENERS)
+    return f"""
 
 【怎么落笔才不会卡在机械项 —— 这些是动作，不是让你事后去数】
 1. 具体名词（数字/时间/金额/职位/时长）：**全部从上面给的原话和案例里取**，
    每一段至少落一个。取不到就换个角度写，或者说明这篇素材不足 ——
    ⛔ 严禁自己编数字、编金额、编职位。编出来的会被审核按「编造原话」判红线，
    这一轮就白跑了；更要紧的是读者真会照着做决定。
-2. CTA：结尾必须给 2–4 个**带字母编号**的选项，让读者回一个字母就能参与。
-   照这个骨架写，别改成没有编号的开放式提问：
-       你是哪一种？回个字母就行：
+2. CTA：结尾必须给 2–4 个**带字母编号**的选项，让读者回一个字母就能参与，
+   句子说完就停、不接"我会…""你就能…"这类回报承诺。骨架长这样（开场那句
+   随手换个说法，别每篇都写"你是哪一种？回个字母就行："——那句已经被写烂了，
+   本次给你的参考开场是「{opener}」，也可以自己想一句更贴这篇语气的）：
+       {opener}
        A. <一种具体处境>
        B. <另一种具体处境>
        C. <第三种>
@@ -153,10 +176,11 @@ NO_TOOLS_NOTE = """\n\n⛔ 本次调用没有任何工具可用，也不需要�
 # 它们分不清「真实细节」和「编出来的数字」，且实测惩罚了可追溯真实原话、
 # 奖励了明令禁止的编造）。规则删了、prompt 没跟上，于是每一轮返工都在为两条
 # 不存在的闸门消耗模型注意力，并把它往堆砌数字的方向推 —— 那正是红线行为。
-KEEP_PASSED = """⚠️ 改的是被指出的问题，别把已经达标的地方改坏。尤其守住这几条：
+def keep_passed() -> str:
+    return """⚠️ 改的是被指出的问题，别把已经达标的地方改坏。尤其守住这几条：
 正文字数守住本篇口径的规格 · 平均句长≤30 · 排比≤1 处 · 「不是X是Y」≤2 处 ·
 泛指群体词（很多人/有些人/大多数人）≤2 处 · 全篇只对读者说话不换视角 ·
-结尾保留带字母编号的选项。改完在心里核一遍这几项再输出。""" + WRITE_ACTIONS
+结尾保留带字母编号的选项。改完在心里核一遍这几项再输出。""" + write_actions()
 
 
 # 两条流**共用一套流程和一个正文规格**，只在标题/首图/开头三处切口径。
@@ -831,7 +855,7 @@ draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，�
 
 【必须命中清单（逐条命中，机械项由代码核对，自报无效）】
 {_read_or(SUCAI / '必须命中清单.md', '（清单缺失）')}
-{WRITE_ACTIONS}
+{write_actions()}
 
 【格式范例（这篇独立审核 86 分，是目前唯一过闸门的稿。学它的结构，别抄它的内容）】
 ⚠️ 它自己被扣分的两处别学：①「上面七张图讲的是…」这类元叙述——正文不要提"图里讲了什么"，
@@ -1404,7 +1428,7 @@ def rework_one(item, args, lane="搜索流"):
     slug = fname.removeprefix("成稿_").removesuffix(".md").split("_", 1)[-1]
     feedback = (f"【上一次独立审核 {item['score']} 分，未过线（需 ≥{args.threshold}）。"
                 f"这是定向返工：只改下面点到的问题，其余保持原样，不要重写。】\n"
-                f"{report[:4000]}\n{body_budget_hint(draft, lane)}\n{KEEP_PASSED}")
+                f"{report[:4000]}\n{body_budget_hint(draft, lane)}\n{keep_passed()}")
     # 旧评分卡的分数不能当门槛（见 is_stale_score）：拿它比会把真正的改进判成倒退，
     # 然后回滚到那份按现行标准根本不合格的原稿。基线置 -1 = 本轮任何过了机械检查的
     # 新版本都优于它，之后的轮次再正常择优（都是新卡分，可比）。
@@ -1445,7 +1469,7 @@ def rework_one(item, args, lane="搜索流"):
         ok, mech = mech_check(draft.name, lane)
         if not ok:
             print(f"机械检查未过：\n{mech}")
-            feedback = f"【机械检查（代码硬核对，必须全部修掉）】\n{mech}\n{KEEP_PASSED}"
+            feedback = f"【机械检查（代码硬核对，必须全部修掉）】\n{mech}\n{keep_passed()}"
             # ⛔ 2026-09-01 修：下面「改了但分数没提上去→切档」那条止损线，触发条件是
             # 拿到了审核分数——但机械检查不过连审核都进不去，走不到那一步，止损线
             # 形同虚设。实测：《试用期没拿到结果》《晋升答辩有可能不过》连续 3 晚
@@ -1475,7 +1499,7 @@ def rework_one(item, args, lane="搜索流"):
             predict_one(draft.name, lane)
             return "过线"
         feedback = (f"【独立审核 {score} 分 · 处置「{disposition}」，仍未过线】\n"
-                    f"{report[:4000]}\n{KEEP_PASSED}")
+                    f"{report[:4000]}\n{keep_passed()}")
     if best["md"] and best["md"] != draft.read_text(encoding="utf-8"):
         draft = save(slug, best["md"], best["cards"])
         print(f"回滚到最佳版本（{best['score']} 分）")
@@ -1850,7 +1874,8 @@ MECH_FIX_PROMPT = """你在修一篇已经通过内容审核的小红书成稿�
 
 【修改要点】
 · CTA 没给编号选项 → 把结尾那句开放式提问换成 2–4 个带字母编号的选项，
-  形如「你是哪一种？评论区回个字母：」再跟 A/B/C 三行。
+  形如「{opener}」再跟 A/B/C 三行（开场这句只是参考语气，别每篇都抄同一句——
+  "你是哪一种？回个字母就行"这句已经被写烂了，全库 112 篇用过这个开头）。
   每个选项是一种**正文里真实出现过的具体处境**，破折号后给一个正文没给过的具体回报。
   ⛔ 选项文案里必须出现「评论区」三个字。
 · 正文字数超上限 → 就近压缩最啰嗦的那一两句，别删有信息量的细节。
@@ -2021,7 +2046,8 @@ def mech_fix_one(item, dry_run=False) -> str:
                   f"必须同时压缩正文里最啰嗦的一两句，至少腾出 {110 - room} 字。"
                   f"改完总字数必须 ≤{hi}。")
     prompt = MECH_FIX_PROMPT.format(score=item["score"], mech=item["mech"], body=body,
-                                    cur=cur, lo=lo, hi=hi, budget=budget)
+                                    cur=cur, lo=lo, hi=hi, budget=budget,
+                                    opener=random.choice(CTA_OPENERS))
     if dry_run:
         print(f"   [dry-run] prompt {len(prompt)} 字，正文节 {len(m.group(2).strip())} 字")
         return "未修好"
@@ -2114,7 +2140,7 @@ def run_one(row, args, lane, fixed_title="") -> str:
         ok, mech = mech_check(draft.name, lane)
         if not ok:
             print(f"机械检查未过：\n{mech}")
-            feedback = f"【机械检查（代码硬核对，必须全部修掉）】\n{mech}\n{KEEP_PASSED}"
+            feedback = f"【机械检查（代码硬核对，必须全部修掉）】\n{mech}\n{keep_passed()}"
             continue
         print("机械检查通过 → 送独立审核")
 
@@ -2138,7 +2164,7 @@ def run_one(row, args, lane, fixed_title="") -> str:
             return "过线"
         feedback = (f"【独立审核 {score} 分 · 处置「{disposition}」，未过线"
                     f"（需 ≥{args.threshold}、红线为无、且处置=发布）】\n"
-                    f"{report[:4000]}\n{KEEP_PASSED}")
+                    f"{report[:4000]}\n{keep_passed()}")
 
     if not draft:
         print("⛔ 一轮成稿都没产出，无产物可归档")

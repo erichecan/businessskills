@@ -631,10 +631,13 @@ def check_one(d, f, all_drafts, lane_override=None):
 
     issues.extend(concept_issues(text, d))
 
-    prev5 = [pf.read_text(encoding="utf-8") for pd, pf in all_drafts if pd < d][-5:]
+    # ⛔ 2026-09-14 改：原来只跟「近 5 篇」比，窗口太窄——查全库发现「我面过300」
+    # 这句签名句在 16 篇文章里出现过，散布在整个发布历史里，只要隔了 5 篇以上
+    # 就能绕开这条检查，形同虚设。改成跟**全部**更早的稿子比，不再设窗口。
+    prev_all = [pf.read_text(encoding="utf-8") for pd, pf in all_drafts if pd < d]
     for sig in SIGNATURES:
-        if sig in text and any(sig in p for p in prev5):
-            issues.append(f"签名句「{sig}」近 5 篇内重复使用（模板自我复制）")
+        if sig in text and any(sig in p for p in prev_all):
+            issues.append(f"签名句「{sig}」跟更早的稿子重复使用（模板自我复制）")
     return issues
 
 
