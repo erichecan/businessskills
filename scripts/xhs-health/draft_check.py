@@ -16,6 +16,7 @@
 """
 import argparse
 import csv
+import random
 import re
 import sys
 from datetime import date, timedelta
@@ -438,6 +439,32 @@ def _concept_names():
     return [c["name"] for c in d["concepts"]]
 
 
+# ⛔ 2026-09-14 改：原来这里只给一句示范"这背后其实是____的问题"，
+# calibrate_audit.py 修复标题匹配断点后第一次跑出真实数据（n=61）：审核里
+# "正文"这类执行/收尾维度打得越高，真实评论数反而越低（-0.37 秩相关）。
+# 回头翻全库物证：200+ 篇已发布稿子里有 43 篇一字不差抄了这句示范
+# 「这背后其实是XX力的问题」，只换了力的名字——同一句模板句在近半数文章里
+# 重复出现，正是最典型的 AI 味信号（读者刷几篇就会觉得"这号写的都一个调调"）。
+# 不是"要点名概念"这条要求本身有问题（点概念不影响真实表现——选题/标题这两个
+# 维度反而正相关），问题是"给了标准答案，大家就都抄标准答案"。改法：
+# 不再给单一示范句，换成一批不同句式随机挑几个，且明确点名"这句是被写滥的
+# AI 味模板，别抄"——参考真实数据里评论最多那篇的写法："领导带头孤立我怎么办，
+# 本质上考验的是边界力：不争对错，但让他的每一步都要付账"——概念是自然嵌进
+# 叙述里的一句话，不是贴在结尾的总结句。
+_CONCEPT_HINT_PATTERNS = [
+    "本质上考验的是XX力",
+    "拼的是XX力",
+    "起作用的是XX力",
+    "分水岭在XX力",
+    "真正拉开差距的是XX力",
+    "决定成败的是XX力",
+    "卡住你的是XX力没立住",
+    "赢在XX力",
+    "输就输在XX力",
+    "比的是XX力",
+]
+
+
 def concept_issues(text, d):
     """七种力三条硬规则。只对 CONCEPT_RULES_FROM 起的新稿生效。"""
     if d < CONCEPT_RULES_FROM:
@@ -459,8 +486,12 @@ def concept_issues(text, d):
     tail = flat[int(len(flat) * (1 - _TAIL_RATIO)):]
     if not any(n in tail for n in names):
         where = "全篇都没提" if not hit else f"只在前半段提了{'、'.join(hit)}"
+        hints = "」「".join(random.sample(_CONCEPT_HINT_PATTERNS, 3))
         issues.append(f"正文后半段没有显性点名概念（{where}）"
-                      f" —— 句式参考「这背后其实是____的问题」")
+                      f" —— ⛔ 别写「这背后其实是____的问题」，全库已有 43 篇"
+                      f"一字不差用了这句，是被写滥的 AI 味模板句；换种自然说法，"
+                      f"参考句式「{hints}」，或按这篇语境自己想一句更贴的，"
+                      f"把概念自然嵌进句子里，不要写成结尾总结句、不要照抄示范。")
     return issues
 
 
