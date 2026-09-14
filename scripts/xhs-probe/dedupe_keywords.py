@@ -20,9 +20,22 @@
     两个完全不同的问题。收紧到 0.85 才把这类误伤过滤掉，同时仍稳稳盖住已知的
     真变体（下限 0.92，留了 7 个点余量）。
 
+## 活跃词 vs 已绑定发布的词（2026-09-13 加）
+
+不做探词之后（pick_topic 直接从「候选」里选，不再要求先过 probe 验证），
+写之前就没有任何一步是在跟"别人已经发过什么"比较了——那部分风险 Eric 判断
+可以接受（反正探测出来的稿子真实表现也一样差，见 预测复盘.md）。但"跟自己
+已经发过的东西撞"必须提前拦住，不然就是白白多花一次写稿+审核的额度去
+撞一个注定被 draft_check 标题查重打回的稿子。
+
+所以这一版除了原来的「候选/已验证」互相去重，新增一步：候选/已验证的词
+如果跟「已发布/已出稿/待发布/排队」这些已经绑定到具体稿子的词相似度达标，
+同样判「放弃」——已绑定的词是发布记录的一部分，只读不动，只把活跃词那边
+标掉。
+
 ## 用法
 
-  python3 dedupe_keywords.py --dry-run     # 只看会合并哪些组，不落盘
+  python3 dedupe_keywords.py --dry-run     # 只看会合并/放弃哪些词，不落盘
   python3 dedupe_keywords.py               # 落盘：多余变体状态改「放弃」
   python3 dedupe_keywords.py --threshold 0.85
 """
@@ -40,9 +53,11 @@ from draft_check import title_similarity  # noqa: E402
 CIKU = backfill.CIKU
 THRESHOLD = 0.85
 
-# 只在「还没定型」的词里去重：已验证/候选是活跃池，会被 pick_topic / probe 选中；
+# 只在「还没定型」的词里互相合并：已验证/候选是活跃池，会被 pick_topic / probe 选中；
 # 排队·已出稿·待发布·已发布是已经绑定到具体稿子的词，动它们等于篡改发布记录。
 ACTIVE = lambda s: s == "已验证" or s.startswith("候选")  # noqa: E731
+# 已绑定到具体稿子/笔记的词——只读，不参与合并，但拿来当"活跃词不能撞的墙"。
+LOCKED = lambda s: s in ("已发布", "已出稿", "待发布", "排队")  # noqa: E731
 
 
 def _keeper_rank(row):
@@ -97,20 +112,39 @@ def main() -> int:
     args = ap.parse_args()
 
     rows = backfill.read_csv(CIKU)
-    active_idx = [i for i, r in enumerate(rows) if r.get("关键词", "").strip()
-                  and ACTIVE(r.get("状态", "").strip())]
-    active_rows = [rows[i] for i in active_idx]
-    print(f"参与去重 {len(active_rows)} 个词（已验证/候选，排队及以后的不动）")
-
-    clusters = find_clusters(active_rows, args.threshold)
-    if not clusters:
-        print("没有发现相似度达标的变体，不用合并")
-        return 0
+    active_rows = [r for r in rows if r.get("关键词", "").strip()
+                   and ACTIVE(r.get("状态", "").strip())]
+    locked_rows = [r for r in rows if r.get("关键词", "").strip()
+                   and LOCKED(r.get("状态", "").strip())]
+    print(f"参与去重 {len(active_rows)} 个词（已验证/候选，排队及以后的不动），"
+          f"对照 {len(locked_rows)} 个已绑定发布/排期的词")
 
     today = date.today().isoformat()
+    dropped_vs_locked = 0
+    still_active = []
+    for r in active_rows:
+        best = None
+        for lr in locked_rows:
+            s = title_similarity(r["关键词"], lr["关键词"])
+            if best is None or s > best[0]:
+                best = (s, lr)
+        if best and best[0] >= args.threshold:
+            s, lr = best
+            print(f"   ⛔ 「{r['关键词']}」（{r.get('状态')}）与已绑定的「{lr['关键词']}」"
+                  f"（{lr.get('状态')}）相似度 {s*100:.0f}%，判重复变体")
+            if not args.dry_run:
+                old_note = (r.get("备注") or "").strip()
+                note = f"与已绑定的「{lr['关键词']}」相似度{s*100:.0f}%，判重复变体，自动放弃（{today}）"
+                r["备注"] = f"{old_note}；{note}" if old_note else note
+                r["状态"] = "放弃"
+            dropped_vs_locked += 1
+        else:
+            still_active.append(r)
+
+    clusters = find_clusters(still_active, args.threshold)
     merged = 0
     for members, score in sorted(clusters, key=lambda c: -c[1]):
-        group_rows = [active_rows[m] for m in members]
+        group_rows = [still_active[m] for m in members]
         group_rows.sort(key=_keeper_rank)
         keeper, dups = group_rows[0], group_rows[1:]
         print(f"\n[相似度 {score*100:.0f}%] 保留「{keeper['关键词']}」"
@@ -124,8 +158,13 @@ def main() -> int:
                 d["状态"] = "放弃"
             merged += 1
 
+    if not clusters and not dropped_vs_locked:
+        print("没有发现相似度达标的变体，不用合并")
+        return 0
+
     print(f"\n{'（--dry-run，未落盘）' if args.dry_run else ''}"
-          f"共 {len(clusters)} 组变体，{merged} 个词被判重复")
+          f"跟已绑定的词撞车 {dropped_vs_locked} 个，活跃词内部 {len(clusters)} 组变体、"
+          f"{merged} 个词被判重复")
     if not args.dry_run:
         backfill.backup(CIKU)
         cols = list(rows[0].keys()) if rows else backfill.CIKU_COLS
