@@ -6,9 +6,17 @@
 
 做法：
   审核记录.csv（独立审核行：总分 + 选题/标题/首图/开头/正文/可信度/CTA 七个维度分）
-    → 成稿文件 → parse_draft 取发布标题
+    → 成稿文件 → 发布日志.csv 的「笔记链接」→ 笔记ID
     → 发布数据.csv（后台抓回的真实观看/点赞/收藏/评论/分享/搜索来源占比）
-  两边按标题对上，算每个维度分与真实表现的**秩相关**（Spearman）。
+  两边按笔记ID对上，算每个维度分与真实表现的**秩相关**（Spearman）。
+
+⛔ 2026-09-13 改：原来按「审核记录里存的标题」去 发布数据.csv 里找同名行——
+实测 220 篇独立审核里只有 1 篇能对上号，因为标题在最后一次独立审核**之后**
+经常又被机修/标题档改过一轮（改完不重审，见 refine_loop.mech_fix_one /
+title_fix_one「未重审，沿用原XX分」那段），审核记录里存的是改之前的标题，
+跟真正发布出去的标题对不上。发布日志.csv 的「笔记链接」是发布那一刻写的、
+真实提交后的笔记 URL，不会因为之后改标题而变——改成从这里取笔记ID 再去
+发布数据.csv 找，79/79 成稿文件全部精确对上，标题字符串匹配比不了。
 
 ⛔ 三条不可妥协的纪律，否则这个脚本会制造出比没有更糟的东西：
 
@@ -26,6 +34,7 @@
 """
 import argparse
 import csv
+import re
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -33,9 +42,11 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 SUCAI = REPO / "xhs" / "素材库"
 AUDIT_LOG = SUCAI / "审核记录.csv"
+PUB_LOG = SUCAI / "发布日志.csv"
 PUB_DATA = SUCAI / "发布数据.csv"
 REPORT = SUCAI / "审核校准报告.md"
-sys.path.insert(0, str(REPO / "scripts" / "case-entry"))
+
+NOTE_ID_RE = re.compile(r"/explore/([0-9a-f]+)")
 
 DIMS = ["选题", "标题", "首图", "开头", "正文", "可信度", "CTA"]
 # 搜索流的主指标就是搜索来源占比（见 eric-xhs-audit 决策 4），放在第一位。
@@ -61,16 +72,17 @@ def num(v):
         return None
 
 
-def latest_stats():
-    """同一篇笔记会被抓多次，只留发布天数最大的那一行。"""
+def latest_stats_by_note():
+    """同一篇笔记会被抓多次，只留发布天数最大的那一行。按笔记ID索引——
+    标题会被机修/标题档事后改掉，笔记ID不会，见本文件顶部 2026-09-13 那条注释。"""
     best = {}
     for r in read_csv(PUB_DATA):
-        t = (r.get("标题") or "").strip()
+        nid = (r.get("笔记ID") or "").strip()
         d = num(r.get("发布天数"))
-        if not t or d is None:
+        if not nid or d is None:
             continue
-        if t not in best or d > num(best[t].get("发布天数")):
-            best[t] = r
+        if nid not in best or d > num(best[nid].get("发布天数")):
+            best[nid] = r
     return best
 
 
@@ -84,12 +96,14 @@ def audited_drafts():
     return out
 
 
-def draft_title(name):
-    from case_entry import parse_draft
-    for p in (SUCAI / name, SUCAI / "归档稿" / name):
-        if p.exists():
-            return (parse_draft(p.read_text(encoding="utf-8")).get("title") or "").strip()
-    return ""
+def draft_to_note():
+    """成稿文件 → 笔记ID，来源 发布日志.csv 的「笔记链接」列（只有真正发布成功的行才有值）。"""
+    out = {}
+    for r in read_csv(PUB_LOG):
+        m = NOTE_ID_RE.search((r.get("笔记链接") or "").strip())
+        if m:
+            out[(r.get("成稿文件") or "").strip()] = m.group(1)
+    return out
 
 
 def spearman(xs, ys):
@@ -121,13 +135,14 @@ def spearman(xs, ys):
 
 
 def build_pairs(min_days):
-    stats, audits = latest_stats(), audited_drafts()
+    stats, audits, d2n = latest_stats_by_note(), audited_drafts(), draft_to_note()
     paired, pending = [], []
     for name, a in audits.items():
-        title = draft_title(name)
-        if not title or title not in stats:
+        nid = d2n.get(name)
+        if not nid or nid not in stats:
             continue
-        s = stats[title]
+        s = stats[nid]
+        title = (s.get("标题") or "").strip() or name
         days = num(s.get("发布天数")) or 0
         # ⛔ 笔记标题的键不能叫「标题」—— DIMS 里也有个维度叫「标题」，
         # 同名会被维度分覆盖掉，报告里就成了「已发 3 天」旁边跟着一个分数。
