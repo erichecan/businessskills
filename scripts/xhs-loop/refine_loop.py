@@ -1656,11 +1656,15 @@ def _cards_path(draft: Path) -> Path:
     return draft.parent / (draft.name.replace("成稿_", "图文_").removesuffix(".md") + "_cards.json")
 
 
-def title_fix_one(draft: Path, score, threshold, report, kw=""):
-    """标题定向修改：同步改 H1 / 发布标题节 / 首图大字三处。返回 True/False。
+def _apply_title_json(draft: Path, kw: str, raw_out: str) -> bool:
+    """把「只改标题」模型的 JSON 输出写回 H1 / 发布标题节 / 首图大字三处。返回 True/False。
 
     ⛔ 三处必须一起改。只改 md 不改 cards.json 的话，渲染出来就是
     「标题说 A、首图大字说 B」—— 比不改更糟。
+
+    从 title_fix_one 里抽出来，给 mech_title_dedup_one（2026-09-13 加，标题撞车专修）
+    共用同一份落地逻辑 —— 两个调用方各写一份的话，以后改一处漏改另一处，
+    正好制造出上面这条注释点名的那种不一致。
     """
     text = draft.read_text(encoding="utf-8")
     m_sec = re.search(r"(^##\s*发布标题[^\n]*\n)(.*?)(?=\n#{1,3}\s|\Z)", text, re.S | re.M)
@@ -1675,16 +1679,7 @@ def title_fix_one(draft: Path, score, threshold, report, kw=""):
         print(f"   ⛔ 读不到 {cards_p.name} 的首张卡片，交回全量重写")
         return False
 
-    body_m = BODY_SEC_RE.search(text)
-    gist = re.sub(r"\s+", " ", body_m.group(2))[:300] if body_m else ""
-    prompt = TITLE_FIX_PROMPT.format(
-        gap=threshold - score, score=score, threshold=threshold,
-        title_rules=title_rules(), kw=kw or "（成稿头部「关键词来源」那一行）",
-        report=report[:2500], titles=m_sec.group(2).strip()[:600],
-        cover_title=cover.get("title", ""), cover_body=cover.get("body", ""),
-        body_gist=gist)
-    out = run_model(prompt, "titlefix", first_pass=False, model=TITLE_MODEL)
-    raw = re.sub(r"^```(?:json)?\n?|\n?```$", "", (out or "").strip(), flags=re.M).strip()
+    raw = re.sub(r"^```(?:json)?\n?|\n?```$", "", (raw_out or "").strip(), flags=re.M).strip()
     try:
         d = json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
         titles = [str(x).strip() for x in d["titles"] if str(x).strip()]
@@ -1713,12 +1708,49 @@ def title_fix_one(draft: Path, score, threshold, report, kw=""):
          + (f"（{d['why']}）" if i == 1 and d.get("why") else "")
          for i, tt in enumerate(titles[:3], 1)])
     text = re.sub(r"^#\s+.*$", f"# {titles[0]}", text, count=1, flags=re.M)   # ① H1
-    text = text[:m_sec.start(2)] + "\n" + body_new + "\n\n" + text[m_sec.end(2):]  # ② 发布标题节
+    # ⛔ 2026-09-13 修：H1 替换会让新标题跟旧标题字数不一样，从而把 text 的绝对
+    # 长度改了——上面 m_sec 的 start(2)/end(2) 是在替换**之前**那份 text 上量出来的
+    # 偏移量，H1 一变，后面所有位置全体错位。实测：换一次标题就能把「## 发布标题」
+    # 这行整个切没（H1 变长/变短几个字，切割点就往后/往前挪了几个字，直接啃进
+    # 标题这行文本里）。改法：H1 替换完之后，在**新** text 上重新定位一次
+    # 「## 发布标题」节，再拿新的位置去切。
+    m_sec2 = re.search(r"(^##\s*发布标题[^\n]*\n)(.*?)(?=\n#{1,3}\s|\Z)", text, re.S | re.M)
+    if not m_sec2:
+        print("   ⛔ 换完 H1 后定位不到「## 发布标题」节，交回全量重写")
+        return False
+    text = text[:m_sec2.start(2)] + "\n" + body_new + "\n\n" + text[m_sec2.end(2):]  # ② 发布标题节
     draft.write_text(text, encoding="utf-8")
     cover["title"], cover["body"] = d["cover_title"], d["cover_body"]          # ③ 首图大字
     cards_p.write_text(json.dumps(cards, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"   · 标题改为「{titles[0]}」，首图大字同步（{cards_p.name}）")
     return True
+
+
+def title_fix_one(draft: Path, score, threshold, report, kw=""):
+    """标题定向修改：同步改 H1 / 发布标题节 / 首图大字三处。返回 True/False。"""
+    text = draft.read_text(encoding="utf-8")
+    m_sec = re.search(r"(^##\s*发布标题[^\n]*\n)(.*?)(?=\n#{1,3}\s|\Z)", text, re.S | re.M)
+    if not m_sec:
+        print("   ⛔ 找不到「## 发布标题」节，交回全量重写")
+        return False
+    cards_p = _cards_path(draft)
+    try:
+        cards = json.loads(cards_p.read_text(encoding="utf-8"))
+        cover = cards[0]
+    except (OSError, ValueError, IndexError):
+        print(f"   ⛔ 读不到 {cards_p.name} 的首张卡片，交回全量重写")
+        return False
+
+    body_m = BODY_SEC_RE.search(text)
+    gist = re.sub(r"\s+", " ", body_m.group(2))[:300] if body_m else ""
+    prompt = TITLE_FIX_PROMPT.format(
+        gap=threshold - score, score=score, threshold=threshold,
+        title_rules=title_rules(), kw=kw or "（成稿头部「关键词来源」那一行）",
+        report=report[:2500], titles=m_sec.group(2).strip()[:600],
+        cover_title=cover.get("title", ""), cover_body=cover.get("body", ""),
+        body_gist=gist)
+    out = run_model(prompt, "titlefix", first_pass=False, model=TITLE_MODEL)
+    return _apply_title_json(draft, kw, out)
 
 
 REWORK_FIX_PROMPT = """你在做一篇小红书成稿的**定向返工**。它离发布线只差 {gap} 分，
@@ -1796,13 +1828,146 @@ MECH_FIX_PROMPT = """你在修一篇已经通过内容审核的小红书成稿�
 前后不要加任何解释、不要加代码块围栏。"""
 
 
+# ── 机修队列里的标题撞车专修（2026-09-13 加）───────────────────────────────
+#
+# ⛔ 死循环实测：答辩最后一页结束语 / 面试被问隐私他在核对什么 / 数据还没出来
+# 先给日子 / 领导不回消息 / 孤立是领导默许 这 5 篇，连续 7+ 天、每天 2 次运行
+# 各重试 2 次，理由和结果一字不差——机械项早就只剩「标题跟已发布的另一篇撞车」，
+# 但 MECH_FIX_PROMPT 只改正文、从不碰标题，这种卡点无论重试几次都不可能修好，
+# 纯粹白打模型调用（≈28 次/周），还因为机修排在每轮最前面，挤占了写新稿的时间。
+#
+# 返工档遇到同类问题时有 title_fix_one 可用，但那条通道要靠独立审核的分维度
+# 报告判断「扣分在标题维度」才会触发；机修队列里根本没有这种报告（分数早已
+# 过线，机修从不重审），没法直接复用它的判据，所以单独开一条更直接的通道：
+# 卡点已经写死在 mech_check 的输出里了（撞的是哪一篇、相似度多少），不需要
+# 再猜，直接把那篇标题喂给模型让它主动避开——比返工档"全量重写靠随机换标题
+# 赌运气"命中率更高，改动面也更小（不动正文）。
+TITLE_DUP_MECH_RE = re.compile(r"标题与已产出的「.+?」相似度\s*\d+%")
+
+
+def _mech_bullets(mech: str) -> list:
+    return [ln.strip() for ln in mech.splitlines() if ln.strip().startswith("-")]
+
+
+TITLE_DEDUP_PROMPT = """你在给一篇小红书成稿**只改标题**，正文一个字都不动。
+
+它内容已经过线（独立审核 {score} 分），唯一卡住发布的是标题跟已发布的另一篇撞得太像：
+{mech}
+
+⛔ 只输出下面要求的 JSON，不要解释、不要代码块围栏。
+⛔ 不要改正文、不要改结构、不要换选题 —— 关键词是定死的，标题必须仍然命中它。
+⛔ 新标题必须在具体措辞、角度上明显区别于上面撞车的那篇标题，不能只改一两个字。
+
+【标题规则】
+{title_rules}
+
+【本篇关键词（标题必须命中，不能换）】
+{kw}
+
+【当前的三个候选标题】
+{titles}
+
+【当前首图大字（cards.json 第 1 张）】
+title（关键词那半句）：{cover_title}
+body（推翻的预设，用 <br> 换行）：{cover_body}
+
+【正文在讲什么（只作参照，别改它）】
+{body_gist}
+
+输出这个 JSON：
+{{
+  "titles": ["<新首选标题>", "<备选 2>", "<备选 3>"],
+  "why": "<一句话说清新首选跟撞车那篇的角度差异>",
+  "cover_title": "<首图大字：关键词那半句，≤14 字，挑其中 3-5 字的判断/结论词
+   用 <span class=\\"hl\\">该短语</span> 包住做荧光笔高亮，只包一处，别整句包>",
+  "cover_body": "<首图大字下半：推翻预设那半句，用 <br> 分成两行，每行 ≤12 字>"
+}}
+
+⛔ cover_title / cover_body 必须和新首选标题说的是同一件事 —— 三处不一致
+（H1 / 发布标题 / 首图大字）是这一档最容易翻车的地方。"""
+
+
+def mech_title_dedup_one(item) -> bool:
+    """标题撞车专修：只改标题（联动 H1/发布标题/首图大字），正文一个字不动。
+
+    返回是否真的改出了不同的标题，不代表机械检查已经过线——调用方
+    （mech_fix_one）会重新跑一遍 mech_check 才算数。
+    """
+    fname, path = item["file"], item["path"]
+    text = path.read_text(encoding="utf-8")
+    m_sec = re.search(r"(^##\s*发布标题[^\n]*\n)(.*?)(?=\n#{1,3}\s|\Z)", text, re.S | re.M)
+    if not m_sec:
+        print("   ⛔ 找不到「## 发布标题」节，跳过（这篇得人工看）")
+        return False
+    cards_p = _cards_path(path)
+    try:
+        cards = json.loads(cards_p.read_text(encoding="utf-8"))
+        cover = cards[0]
+    except (OSError, ValueError, IndexError):
+        print(f"   ⛔ 读不到 {cards_p.name} 的首张卡片，跳过（这篇得人工看）")
+        return False
+
+    body_m = BODY_SEC_RE.search(text)
+    gist = re.sub(r"\s+", " ", body_m.group(2))[:300] if body_m else ""
+    kw = ""
+    try:
+        sys.path.insert(0, str(REPO / "scripts" / "xhs-publish"))
+        from auto_publish import keyword_of
+        kw = keyword_of(fname) or ""
+    except Exception:
+        pass
+
+    prompt = TITLE_DEDUP_PROMPT.format(
+        score=item["score"], mech="\n".join(_mech_bullets(item["mech"])),
+        title_rules=title_rules(), kw=kw or "（成稿头部「关键词来源」那一行）",
+        titles=m_sec.group(2).strip()[:600],
+        cover_title=cover.get("title", ""), cover_body=cover.get("body", ""),
+        body_gist=gist)
+    out = run_model(prompt, "mechtitledup", first_pass=False, model=TITLE_MODEL)
+    return _apply_title_json(path, kw, out)
+
+
 def mech_fix_one(item, dry_run=False) -> str:
     """定点修一篇。返回 修好 / 未修好 / 失败。"""
     fname, path = item["file"], item["path"]
     print(f"\n{'='*54}\n机修 {fname}（{item['score']} 分，内容已过线，只差机械项）")
-    for line in item["mech"].splitlines():
-        if line.strip().startswith("-"):
-            print(f"   {line.strip()}")
+    bullets = _mech_bullets(item["mech"])
+    for b in bullets:
+        print(f"   {b}")
+
+    # 机械项如果**只是**标题撞车，走上面的专修通道，别再进下面这条只改正文的老路——
+    # 那条路结构性地不可能碰这个问题，见上面 TITLE_DUP_MECH_RE 那段注释。
+    if bullets and all(TITLE_DUP_MECH_RE.search(b) for b in bullets):
+        if dry_run:
+            print("   [dry-run] 标题撞车专修")
+            return "未修好"
+        # 跟下面机械修一样的纪律：改坏了、两次都没修好，就还原，不留半成品——
+        # 这里要连 cards.json 的首图大字一起备份，标题和首图大字是联动写的。
+        text_backup = path.read_text(encoding="utf-8")
+        cards_p = _cards_path(path)
+        cards_backup = cards_p.read_text(encoding="utf-8") if cards_p.exists() else None
+        for attempt in (1, 2):
+            mech_title_dedup_one(item)
+            ok, mech = mech_check(fname)
+            if ok:
+                # 同下面机械修那份注释：归档稿里的要挪回根目录，闸门只扫根目录。
+                if path.parent.name == "归档稿":
+                    path = path.replace(SUCAI / fname)
+                    print("   · 从 归档稿/ 挪回素材库（闸门只扫根目录）")
+                print(f"   ✅ 机械项已过（第 {attempt} 次，标题撞车专修）—— 未重审，沿用原 {item['score']} 分")
+                return "修好"
+            print(f"   ⚠️ 第 {attempt} 次改完仍不过：{mech.splitlines()[-1][:70] if mech else ''}")
+            item["mech"] = mech
+            new_bullets = _mech_bullets(mech)
+            if not (new_bullets and all(TITLE_DUP_MECH_RE.search(b) for b in new_bullets)):
+                bullets = new_bullets
+                break          # 改出了新的、非标题撞车类问题，交给下面的机械修（保留这次改的标题）
+        else:
+            path.write_text(text_backup, encoding="utf-8")
+            if cards_backup is not None:
+                cards_p.write_text(cards_backup, encoding="utf-8")
+            print("   ⛔ 两次都没修好，留在机修队列（这篇可能得人工看），已还原标题")
+            return "未修好"
 
     text = path.read_text(encoding="utf-8")
     m = BODY_SEC_RE.search(text)
