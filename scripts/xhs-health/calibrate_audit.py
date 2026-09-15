@@ -18,7 +18,7 @@ title_fix_one「未重审，沿用原XX分」那段），审核记录里存的�
 真实提交后的笔记 URL，不会因为之后改标题而变——改成从这里取笔记ID 再去
 发布数据.csv 找，79/79 成稿文件全部精确对上，标题字符串匹配比不了。
 
-⛔ 三条不可妥协的纪律，否则这个脚本会制造出比没有更糟的东西：
+⛔ 四条不可妥协的纪律，否则这个脚本会制造出比没有更糟的东西：
 
  1. **样本不够就不出结论。** 相关系数在 n=3 时几乎必然出现 |ρ|>0.8 的巧合。
     低于 MIN_SAMPLE 一律只报「还差几篇」，绝不给系数。
@@ -26,6 +26,15 @@ title_fix_one「未重审，沿用原XX分」那段），审核记录里存的�
     拿它反推审核标准等于用抛硬币的结果去改考试大纲。
  3. **本脚本不改任何 skill 文件。** 它只出证据和建议，改不改由人决定。
     评分标准一旦能被脚本自动改写，就没有任何东西能拦住它慢慢漂移到一个自洽但错误的口径上。
+ 4. **不同评分卡版本的维度分不能直接混在一起算相关系数。**
+    ⛔ 2026-09-14 加，起因：`eric-xhs-audit` 的维度权重在 08-08/08-11/08-15
+    改过三次（选题 20→32、标题 25→35、首图 20→10、开头 15→8、CTA 10→5、
+    可信度 15→0 撤销），维度分的满分和分布本身随时间在跳变。把跨卡的分数
+    混在一起算 Spearman，卡版本变化和「时间越晚账号越成熟」这类其它同期变化
+    会一起被算进相关系数里——见得到的强相关（选题/标题 vs 评论 pooled +0.47）
+    在按 `CURRENT_RUBRIC_SINCE` 拆开后于任一卡内单独算都掉到 |ρ|<0.15，
+    是刻度错位造出来的相关，不是真信号。**headline 相关系数表只用同一张卡
+    （当前卡）内的样本，跨卡样本只作历史参考、不进系数。**
 
 用法：
   python3 calibrate_audit.py              # 出报告，写 xhs/素材库/审核校准报告.md
@@ -54,6 +63,10 @@ DIMS = ["选题", "标题", "首图", "开头", "正文", "可信度", "CTA"]
 OUTCOMES = ["搜索来源占比", "观看", "点赞", "收藏", "评论"]
 MIN_DAYS = 7
 MIN_SAMPLE = 8          # 低于这个数不出系数。7 个维度 × 5 个指标 = 35 个数，n<8 时纯属噪声
+
+# 当前评分卡生效日——来源 skills/eric-xhs-audit/SKILL.md「当前权重（2026-08-15 起）」，
+# 这一行必须跟那份 skill 文件手动保持同步，它下次改权重时这里也要跟着改。
+CURRENT_RUBRIC_SINCE = "2026-08-15"
 
 
 def read_csv(p):
@@ -146,7 +159,13 @@ def build_pairs(min_days):
         days = num(s.get("发布天数")) or 0
         # ⛔ 笔记标题的键不能叫「标题」—— DIMS 里也有个维度叫「标题」，
         # 同名会被维度分覆盖掉，报告里就成了「已发 3 天」旁边跟着一个分数。
+        audit_date = (a.get("日期") or "").strip()[:10]
+        # 同卡 = 这篇稿子是在当前评分卡生效之后被审核出的分数，跟今天的权重
+        # 口径一致。卡切换前审出的分数，维度满分/分布都不一样，不能直接拿来
+        # 跟同期结果算相关系数（见文件头纪律 4）。
+        same_card = bool(audit_date) and audit_date >= CURRENT_RUBRIC_SINCE
         row = {"成稿": name, "发布标题": title, "天数": days,
+               "审核日": audit_date, "同卡": same_card,
                "总分": num(a.get("总分")),
                **{d: num(a.get(d)) for d in DIMS},
                **{o: num(s.get(o)) for o in OUTCOMES}}
@@ -169,9 +188,16 @@ def render(paired, pending, min_days, relaxed):
                      f"还差 {max(0, min_days - int(r['天数']))} 天 · 审核 {r['总分']} 分")
         L.append("")
 
-    if len(paired) < MIN_SAMPLE:
-        L += ["## ⛔ 样本不足，本次不给任何相关系数", "",
-              f"现有 {len(paired)} 篇，门槛 {MIN_SAMPLE} 篇，还差 **{MIN_SAMPLE - len(paired)} 篇**。", "",
+    same_card = [r for r in paired if r["同卡"]]
+    old_card = [r for r in paired if not r["同卡"]]
+    L += [f"**同卡样本（{CURRENT_RUBRIC_SINCE} 起，跟当前 eric-xhs-audit 权重口径一致）："
+          f"{len(same_card)} 篇**；另有 {len(old_card)} 篇审核发生在改权重之前，"
+          "维度满分/分布跟现在不一样，**只列作历史参照，不进下面的相关系数表**"
+          "（原因见本文件头纪律 4）。", ""]
+
+    if len(same_card) < MIN_SAMPLE:
+        L += ["## ⛔ 同卡样本不足，本次不给任何相关系数", "",
+              f"现有 {len(same_card)} 篇，门槛 {MIN_SAMPLE} 篇，还差 **{MIN_SAMPLE - len(same_card)} 篇**。", "",
               "为什么不凑合着算：7 个维度 × 5 个指标 = 35 个系数，样本个位数时",
               "必然会蹦出几个 |ρ|>0.8 的「强相关」，那是巧合不是规律。",
               "拿它去改审核标准，等于用噪声重写考试大纲 —— 比不改更糟，",
@@ -181,7 +207,7 @@ def render(paired, pending, min_days, relaxed):
               "那份样本量够，且已写进 eric-xhs-audit 的维度 2。", ""]
         return "\n".join(L).rstrip() + "\n"
 
-    L += ["## 各维度分 vs 真实表现（Spearman 秩相关）", "",
+    L += ["## 各维度分 vs 真实表现（Spearman 秩相关，仅同卡样本）", "",
           "系数为正 = 这个维度打得高的稿，真实表现也好，判据有效。",
           "系数接近 0 = 这条判据和结果无关，白扣分。",
           "**系数为负 = 判据方向反了，越符合标准表现越差，必须改。**", "",
@@ -191,8 +217,8 @@ def render(paired, pending, min_days, relaxed):
     for d in DIMS + ["总分"]:
         cells = []
         for o in OUTCOMES:
-            xs = [r[d] for r in paired if r[d] is not None and r[o] is not None]
-            ys = [r[o] for r in paired if r[d] is not None and r[o] is not None]
+            xs = [r[d] for r in same_card if r[d] is not None and r[o] is not None]
+            ys = [r[o] for r in same_card if r[d] is not None and r[o] is not None]
             rho = spearman(xs, ys) if len(xs) >= 3 else None
             cells.append("—" if rho is None else f"{rho:+.2f}")
             if rho is not None and o == OUTCOMES[0] and rho < -0.3:
@@ -209,13 +235,14 @@ def render(paired, pending, min_days, relaxed):
         L.append("")
     else:
         L += ["## 没有方向反了的维度", "",
-              "所有维度与主指标的相关性都不为显著负，暂无需要推翻的判据。", ""]
+              "所有维度与主指标的相关性都不为显著负，暂无需要推翻的判据（同卡样本范围内）。", ""]
 
-    L += ["## 逐篇明细", "",
-          "| 标题 | 天数 | 总分 | " + " | ".join(OUTCOMES) + " |",
-          "|---|---|---|" + "---|" * len(OUTCOMES)]
+    L += ["## 逐篇明细（含跨卡样本，仅供追溯，卡口径见「卡」列）", "",
+          "| 标题 | 卡 | 天数 | 总分 | " + " | ".join(OUTCOMES) + " |",
+          "|---|---|---|---|" + "---|" * len(OUTCOMES)]
     for r in sorted(paired, key=lambda x: -(x["总分"] or 0)):
-        L.append(f"| {r['发布标题'][:24]} | {int(r['天数'])} | {r['总分']} | "
+        card = "同卡" if r["同卡"] else "旧卡"
+        L.append(f"| {r['发布标题'][:24]} | {card} | {int(r['天数'])} | {r['总分']} | "
                  + " | ".join("—" if r[o] is None else f"{r[o]:g}" for o in OUTCOMES) + " |")
     L += ["", "---", "",
           "⛔ 本报告不改任何 skill 文件。要不要按它改审核标准，由人决定。"]
