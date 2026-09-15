@@ -97,13 +97,34 @@ function rawConnect(url) {
   });
 }
 
+const PUBLISH_URL_RE = /creator\.xiaohongshu\.com\/publish/;
+
+// ⛔ 2026-09-14 加重试 + URL 兜底。09-06/09-07 两天实测：auto_publish.py 用同一个
+// tid 调 open_sched_switch（走 cdp-proxy）能成功、之后 focus_tab.py 用同一个 tid
+// 也能找到 tab —— 唯独本文件这里独立开一条新 WebSocket 直连 9333、立刻查一次
+// Target.getTargets() 就说「没找到」。三处查的是同一个 tab、同一个 tid，只有这里
+// 查不到，说明是**查询本身的时序问题**（新连接刚建好那一刻，Chrome 的 target 列表
+// 可能还没吐出最新状态），不是 tab 真的不存在。照本文件其它地方（clickBy/ensurePanel）
+// 一贯的「重试 + 留出结算时间」写法处理：查不到就等一下再查，共 5 次、留够 2 秒。
+// 精确 ID 还是查不到时，退一步按发布页 URL 认——tid 不假，URL 规则也不会认错，
+// 两条路径都指向同一个「小红书发布页」这件事，不是放宽标准。
 async function attach() {
   const raw = await rawConnect(await browserWsUrl());
-  const { targetInfos } = await raw.send('Target.getTargets');
-  const pages = targetInfos.filter(t => t.type === 'page');
-  const t = WANT_TID ? pages.find(p => p.targetId === WANT_TID)
-                     : pages.find(p => /creator\.xiaohongshu\.com\/publish/.test(p.url || ''));
-  if (!t) { raw.close(); throw new Error('没找到小红书发布页 tab'); }
+  let t = null;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const { targetInfos } = await raw.send('Target.getTargets');
+    const pages = targetInfos.filter(p => p.type === 'page');
+    t = WANT_TID
+      ? (pages.find(p => p.targetId === WANT_TID)
+         || pages.find(p => PUBLISH_URL_RE.test(p.url || '')))
+      : pages.find(p => PUBLISH_URL_RE.test(p.url || ''));
+    if (t) break;
+    if (attempt < 5) {
+      console.log(`  ⟳ 没找到小红书发布页 tab，第 ${attempt} 次，${attempt * 400}ms 后重查…`);
+      await sleep(attempt * 400);
+    }
+  }
+  if (!t) { raw.close(); throw new Error('没找到小红书发布页 tab（重试 5 次后仍未找到）'); }
   const { sessionId } = await raw.send('Target.attachToTarget', { targetId: t.targetId, flatten: true });
   return { send: (m, p) => raw.send(m, p, sessionId), close: () => raw.close() };
 }
@@ -215,7 +236,19 @@ async function main() {
     for (let i = 0; i < 4; i++) {
       if (await evaluate(cdp, `!!${POP}`)) return;
       if (i) console.log(`   面板没开（${what}），第 ${i + 1} 次尝试…`);
-      await clickBy(cdp, `document.querySelector('.d-datepicker-input-filter')`, '打开日历');
+      try {
+        await clickBy(cdp, `document.querySelector('.d-datepicker-input-filter')`, '打开日历');
+      } catch (e) {
+        // ⛔ 2026-09-14 修：clickBy 自己重定位 3 次失败会直接 throw，这里以前没接住——
+        // 上面这个 for 循环本来是专门为「组件选完日期后自己收起、还在动画/还没重新
+        // 挂好监听」这种情况设计的重试（见本函数顶部注释），但 clickBy 一 throw，
+        // 异常直接冲出 ensurePanel，外层的「等更久再试」从来没机会真正执行。
+        // 09-06「打开日历：没找到元素」、09-09「坐标处是「」」两次实测失败，
+        // 都发生在刚选完日期那一刻——正是文档里说的收起动画期间，不是选择器真的错了。
+        // 把 clickBy 的失败当「这次没点开，按计划等久一点再试」处理，
+        // 4 次都失败了再报错，让原本设计好的退避真正生效。
+        console.log(`   ⟳ 第 ${i + 1} 次点「打开日历」未命中（${e.message}），继续重试…`);
+      }
       await sleep(500 + i * 700);
     }
     throw new Error(`日历面板没能打开（${what}，已重试 4 次）`);
