@@ -907,10 +907,28 @@ def material_ok(kw: str) -> tuple[bool, int]:
 MATERIAL_WINDOW_DAYS = 14
 MATERIAL_PER_DRAFT = 25
 
+# ⛔ 2026-09-17 补：窗口配额必须配一个**每日上限**，否则它允许暴写。
+# 起因是拿真实数据推演了一遍未来 14 天：存量 80 篇滚出窗口之后，
+# 「窗口供给÷25 − 窗口已写」会一次性释放一大块 ——
+#   09-27 可写 4 篇 → 09-28 可写 9 → 09-29 可写 14 → **09-30 可写 25 篇**。
+# 14 天总量确实还是守恒的，但「一天写 25 篇」跟「两周匀速写 29 篇」完全不是一回事：
+# 那 25 篇共享同一批最近素材，正是这套配额本来要消灭的稀释，只是把它压缩到了一天。
+# 所以再加一道按天的闸：稳态速率是 采集/天 ÷ 25 ≈ 2-3 篇，留一点余量给补课，封顶 4。
+MATERIAL_PER_DAY = 4
+
+
+def _drafts_since(cutoff: str) -> int:
+    return sum(1 for d in list(SUCAI.glob("成稿_*.md")) + list((SUCAI / "归档稿").glob("成稿_*.md"))
+               if (m := re.match(r"成稿_(\d{4}-\d{2}-\d{2})_", d.name)) and m.group(1) >= cutoff)
+
 
 def material_quota() -> tuple[int, int, int]:
-    """(本窗口还能写几篇, 窗口内新增素材条数, 窗口内已写稿数)。"""
-    cutoff = (date.today() - timedelta(days=MATERIAL_WINDOW_DAYS)).isoformat()
+    """(本轮还能写几篇, 窗口内新增素材条数, 窗口内已写稿数)。
+
+    两道闸取小：**窗口总量**（防稀释）+ **每日上限**（防暴写，见 MATERIAL_PER_DAY）。
+    """
+    today = date.today()
+    cutoff = (today - timedelta(days=MATERIAL_WINDOW_DAYS)).isoformat()
     inflow = 0
     for r in _csv_rows(SUCAI / "运行日志.csv"):
         if (r.get("日期") or "")[:10] >= cutoff:
@@ -918,9 +936,10 @@ def material_quota() -> tuple[int, int, int]:
                 inflow += int((r.get("本轮新增条数") or "0").strip() or 0)
             except ValueError:
                 pass
-    written = sum(1 for d in list(SUCAI.glob("成稿_*.md")) + list((SUCAI / "归档稿").glob("成稿_*.md"))
-                  if (m := re.match(r"成稿_(\d{4}-\d{2}-\d{2})_", d.name)) and m.group(1) >= cutoff)
-    return max(0, inflow // MATERIAL_PER_DRAFT - written), inflow, written
+    written = _drafts_since(cutoff)
+    by_window = max(0, inflow // MATERIAL_PER_DRAFT - written)
+    by_day = max(0, MATERIAL_PER_DAY - _drafts_since(today.isoformat()))
+    return min(by_window, by_day), inflow, written
 
 
 def relevant_quotes(kw, domain):
@@ -2553,7 +2572,9 @@ def main() -> int:
     if args.count > 0 and not args.topic:
         left, inflow, written = material_quota()
         print(f"\n素材配额：近 {MATERIAL_WINDOW_DAYS} 天采集新增 {inflow} 条 "
-              f"÷ {MATERIAL_PER_DRAFT} 条/篇 − 已写 {written} 篇 = **还能写 {left} 篇**")
+              f"÷ {MATERIAL_PER_DRAFT} 条/篇 = 上限 {inflow // MATERIAL_PER_DRAFT} 篇"
+              f" − 窗内已写 {written} 篇；每日上限 {MATERIAL_PER_DAY} 篇"
+              f" → **本轮还能写 {left} 篇**")
         if left <= 0:
             print("⛔ 素材配额已用尽，本轮不写新稿。")
             print("   这不是「今天没事干」，是上游断供了 —— 没有新素材还继续写，")
