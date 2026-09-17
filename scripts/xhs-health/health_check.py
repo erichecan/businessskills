@@ -26,7 +26,7 @@ LOG_COLUMNS = 10
 NUMERIC_COLS = [2, 3, 4, 5, 7]  # 跑的关键词数/总抓取条数/本轮新增/记忆库累计/连续0新增轮数
 
 EXPECTED_RUNS = 4            # 采集任务每 6 小时一轮
-MIN_QUOTES_PER_RUN = 2       # 每轮至少收 2 条评论区原话（成稿可信度维度的唯一合法来源）
+MIN_QUOTES_PER_RUN = 2       # 每轮至少收 2 条评论区原话（案例库的上游供给，见 check_quote_harvest）
 MAX_CANDIDATE_BACKLOG = 200  # 候选词积压上限
 
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
@@ -205,11 +205,19 @@ def check_run_completeness(alerts):
 
 
 def check_quote_harvest(alerts):
-    """评论区原话收割配额。
+    """评论区原话收割配额 —— 保留，但理由已经换过两次，注意别照着旧的理解。
 
-    原话是成稿可信度维度（15 分）的唯一合法来源，也是案例库的供给源
-    （harvest_cases.py 从这里提候选）。收割断供，成稿就只能靠脚本化改写，
-    审核必然扣「引语只有一条真人原话」。
+    ⛔ 原注释写的是「原话是成稿可信度维度（15 分）的唯一合法来源」——
+    **可信度维度 2026-08-11 就撤销了**，这句话过期了一个多月还挂在这。
+
+    ⛔ 2026-09-17（Eric 定）：评论区原话不再是任何**规则/审核判据** ——
+    选题闸门不看它、审核不再检索它、路径 B 不再要它当出处。
+    那这条告警为什么不删？因为它管的不是规则，是**供给**：
+        评论区原话.csv → harvest_cases.py → 案例库.csv
+    而案例库现在是选题闸门的**唯一**口径（material_ok）。原话断供 →
+    案例库没有新候选 → 闸门可写的词越来越少 → 产能自己掐死。
+    所以它比以前更该看，只是看的理由从「审核要用」变成了「案例库要吃」。
+
     ⚠️ 用 评论区原话.csv 的实际行数核对，不读运行日志备注里模型自报的「收割 N 条」。
     """
     quotes = SUCAI / "评论区原话.csv"
@@ -224,7 +232,7 @@ def check_quote_harvest(alerts):
               if (r.get("日期") or "").strip() == yesterday)
     quota = runs * MIN_QUOTES_PER_RUN
     if got < quota:
-        alerts.append(f"评论区原话欠收：{yesterday} 跑了 {runs} 轮只收 {got} 条"
+        alerts.append(f"评论区原话欠收（案例库的上游）：{yesterday} 跑了 {runs} 轮只收 {got} 条"
                       f"（配额 {MIN_QUOTES_PER_RUN} 条/轮 = {quota} 条）")
 
 

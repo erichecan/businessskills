@@ -207,7 +207,7 @@ def code_evidence(draft_text: str) -> str:
     ⚠️ 两块都是**证据不是判决** —— 见 draft_check 里各自的注释，
     尤其第 15 条：查不到 ≠ 编造，正文里的话术模板本来就无从追溯。
     """
-    from draft_check import search_slot_evidence, untraceable_quotes
+    from draft_check import search_slot_evidence
 
     ev = search_slot_evidence(draft_text)
     if ev["日均赞中位"] is None:
@@ -221,17 +221,16 @@ def code_evidence(draft_text: str) -> str:
                 f"（口径：日均赞＝点赞÷发布至采集的天数。⛔ 别和 probe 里 density.median_likes "
                 f"那个绝对赞数中位混用，两者差着「笔记活了多少天」）")
 
-    bad = untraceable_quotes(draft_text)
-    if not bad:
-        quotes = "正文里 ≥8 字的引语**全部**在案例库/评论区原话/probe 中逐字查到。"
-    else:
-        rows = "\n".join(f"  · {why}：「{q[:50]}」" for q, why in bad)
-        quotes = (f"以下 {len(bad)} 句引语在三个库里查不到：\n{rows}\n"
-                  f"⛔ **查不到 ≠ 编造，先判它属于哪一类**：\n"
-                  f"  ① 转述型（他说／领导说／有人在评论区说）→ 查不到就是红线「编造或冒充」；\n"
-                  f"  ② 话术模板（教读者照着说的那种）→ 作者原创，**无从追溯，不构成编造，不要扣分**。\n"
-                  f"  这两类正文里都有，代码分不了，所以留给你判。")
-    return f"【搜索位强度（维度 1 第⑤项的判据）】\n{slot}\n\n【引语可追溯性检索结果】\n{quotes}"
+    # ⛔ 2026-09-17 删除「引语可追溯性检索」整块（Eric 定）：
+    # 不再把「这句话能不能在评论区原话/案例库里逐字查到」当审核判据。
+    # 这条判据是 <80 分审核报告里第二大扣分源（122 次），09-16 已经收窄过一次
+    # （泛化问法不要求可追溯），现在整条去掉。
+    #
+    # ⚠️ 去掉的是**可追溯性**这个判据，不是反编造本身。反编造改成判「归属」——
+    # 见 SKILL.md 红线「编造或冒充」：不许声称某个真实的人说过某句话
+    # （「有人在评论区说」「我面过的一个候选人说」这类），改写成泛化问法。
+    # 归属句式是审核员读得出来的，不需要检索库。
+    return f"【搜索位强度（维度 1 第⑤项的判据）】\n{slot}"
 
 
 def _read_or(path: Path, fallback: str) -> str:
@@ -522,8 +521,6 @@ def build_audit_prompt(draft: Path, lane: str = None):
     # 但「喂进来」≠「整库塞」：审核是核对不是选材，按成稿反查即可（见 _pick_by_draft）。
     ciku, ciku_kw, ciku_total = relevant_ciku(text_for_lane)
     cases, cases_kept, cases_total, cases_strong = relevant_cases(text_for_lane)
-    quotes_lib, q_kept, q_total, q_strong = relevant_quotes(text_for_lane)
-    probe_quotes, probe_n = relevant_probe_quotes(text_for_lane)
     # 首图/七卡内容在单独的 cards.json 里。不喂进来，审核员看不到首图，
     # 只能把维度 3 按未知降级给半分——2026-08-02 三篇稿都栽在这。
     # 2026-08-12 T7 后该维度问的是「第 3 秒手指停不停」，更依赖看到首图本身。
@@ -548,13 +545,11 @@ def build_audit_prompt(draft: Path, lane: str = None):
 {concept_rules}
 {risk_rules}
 
-⛔ 关于下面三个库：给你的**不是整库，是按本篇正文反查出来的子集**。
+⛔ 下面的案例库给的**不是整库，是按本篇正文反查出来的子集**。
 筛法：把正文和库里每一行做最长公共子串比对，≥{STRONG_N} 字连续相同的（＝正文照抄了它）
-全部保留，4-5 字的（＝疑似改写）也保留，再补若干行凑够额度。所以：
-  · 正文里**照抄**的原话，一定在下面这些块里，查不到就是真的没有；
-  · 但「下面没有」**不等于「编造」** —— 原话也可能来自探测结果，
-    见后面【probe 探测结果 quotes】那一块，核对是否编造时两块都要看。
-  · 别因为「只给了子集所以无法核验」而降级 —— 核验所需的行已经在里面了。
+全部保留，4-5 字的（＝疑似改写）也保留，再补若干行凑够额度。
+⛔ 别因为「只给了子集」而降级，更**不得因为某句话在这里查不到就判编造**
+（2026-09-17 起可追溯性不再是审核判据，见下）。
 
 ──────────────────────────────
 以上是每篇都一样的规则（缓存前缀到此为止）。以下是本篇专属的材料。
@@ -563,17 +558,19 @@ def build_audit_prompt(draft: Path, lane: str = None):
 【词库.csv（维度 1 的判据：本词的竞争密度/意图强度。整库 {ciku_total} 行，只给本篇这行）】
 {ciku}
 
-【案例库.csv（红线「不编造、不冒充」的核对依据：正文引用的原话能否追溯到某个案例 ID。
+【案例库.csv（本篇选题相关的案例，供你判断正文讲的处境有没有实据。
 整库 {cases_total} 行 → 给 {cases_kept} 行，其中 {cases_strong} 行是正文照抄命中）】
 {cases}
 
-【评论区原话.csv（同一条红线的另一来源：原话是否照抄不改写。
-整库 {q_total} 行 → 给 {q_kept} 行，其中 {q_strong} 行是正文照抄命中）】
-{quotes_lib}
+⛔ **2026-09-17 起不再做「引语可追溯性」审核**（Eric 定）。原来这里还会喂
+评论区原话.csv 和 probe quotes 两个库，让你逐句核对正文引语能不能在库里查到 ——
+那条判据是 <80 分审核报告里第二大扣分源（122 次），现已整条取消。
+**不得再因为「这句话在库里查不到」扣分或判红线。**
 
-【probe 探测结果 quotes（同一条红线的第三来源，本稿头部引用了 {probe_n} 份探测结果。
-⚠️ 正文原话很多来自这里而**不在**评论区原话.csv 里，判「编造」前必须先查这一块）】
-{probe_quotes}
+反编造仍然有效，但判的是**归属**不是检索：正文有没有声称「某个真实的人说过/经历过」
+（「有人在评论区说」「我面过的一个候选人说」「一位 HR 告诉我」），
+以及有没有编造具体数字/金额/结果。这两样你读正文就能判，不需要查库。
+泛化问法（「面试官通常会追一句：…」）和话术模板一律**不算编造**。
 
 【机械检查结果（代码硬核对，以此为准）】
 {mechanical_result(draft.name)}
@@ -608,15 +605,14 @@ def build_audit_prompt(draft: Path, lane: str = None):
 
     stats = {"关键词": ciku_kw, "词库": f"1/{ciku_total}",
              "案例库": f"{cases_kept}/{cases_total}（强命中 {cases_strong}）",
-             "评论区原话": f"{q_kept}/{q_total}（强命中 {q_strong}）",
-             "probe": probe_n, "prompt字数": len(prompt)}
+             "prompt字数": len(prompt)}
     return prompt, lane, stats
 
 
 def audit_one(draft: Path, lane: str = None) -> bool:
     prompt, lane, stats = build_audit_prompt(draft, lane)
-    print(f"   料包：词库 {stats['词库']} · 案例库 {stats['案例库']} · "
-          f"原话 {stats['评论区原话']} · probe {stats['probe']} 份 → prompt {stats['prompt字数']:,} 字")
+    print(f"   料包：词库 {stats['词库']} · 案例库 {stats['案例库']}"
+          f" → prompt {stats['prompt字数']:,} 字")
     out = run_claude_waiting_out_limits(prompt)
     first = next((l for l in out.splitlines() if draft.name in l and l.count(",") >= 14), None)
     if not first:
