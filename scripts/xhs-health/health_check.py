@@ -16,6 +16,10 @@ import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from knobs import K  # noqa: E402
+
+
 REPO = Path(__file__).resolve().parents[2]
 SUCAI = REPO / "xhs" / "素材库"
 RUN_LOG = SUCAI / "运行日志.csv"
@@ -25,9 +29,9 @@ ALERT_FILE = SUCAI / "健康告警.md"
 LOG_COLUMNS = 10
 NUMERIC_COLS = [2, 3, 4, 5, 7]  # 跑的关键词数/总抓取条数/本轮新增/记忆库累计/连续0新增轮数
 
-EXPECTED_RUNS = 4            # 采集任务每 6 小时一轮
-MIN_QUOTES_PER_RUN = 2       # 每轮至少收 2 条评论区原话（案例库的上游供给，见 check_quote_harvest）
-MAX_CANDIDATE_BACKLOG = 200  # 候选词积压上限
+EXPECTED_RUNS = K("EXPECTED_RUNS")            # 采集任务每 6 小时一轮
+MIN_QUOTES_PER_RUN = K("MIN_QUOTES_PER_RUN")       # 每轮至少收 2 条评论区原话（案例库的上游供给，见 check_quote_harvest）
+MAX_CANDIDATE_BACKLOG = K("MAX_CANDIDATE_BACKLOG")  # 候选词积压上限
 
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 

@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>旋钮配置台</title>
+<style>
+:root{
+  --bg:#f7f7f5; --panel:#fff; --line:#e3e2dd; --ink:#1c1b19; --dim:#6f6d67;
+  --accent:#8a5a2b; --accent-soft:#f3ece3; --warn:#b4531a; --ok:#3f6b46;
+  --shadow:0 1px 2px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#17171a; --panel:#1f1f23; --line:#33333a; --ink:#ece9e4; --dim:#9a968e;
+  --accent:#d3a06a; --accent-soft:#2a2520; --warn:#e08a52; --ok:#7fae86;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{
+  --bg:#17171a; --panel:#1f1f23; --line:#33333a; --ink:#ece9e4; --dim:#9a968e;
+  --accent:#d3a06a; --accent-soft:#2a2520; --warn:#e08a52; --ok:#7fae86;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",system-ui,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 16px 140px}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+header h1{font-size:23px;margin:0 0 6px;letter-spacing:-.01em}
+header p{margin:0;color:var(--dim);font-size:13px}
+header .path{font-size:12px;color:var(--dim);margin-top:8px}
+
+.note{background:var(--accent-soft);border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:8px;padding:12px 14px;margin:20px 0;font-size:13px;color:var(--ink)}
+.note b{color:var(--accent)}
+
+h2{font-size:15px;margin:32px 0 2px;letter-spacing:.02em;
+  display:flex;align-items:baseline;gap:10px}
+h2 .n{font-size:12px;color:var(--dim);font-weight:400}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  box-shadow:var(--shadow);margin-top:12px;overflow:hidden}
+.knob{padding:15px 16px;border-top:1px solid var(--line)}
+.knob:first-child{border-top:0}
+.knob.dirty{background:var(--accent-soft)}
+
+.row1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lab{font-weight:600;font-size:14px}
+.key{font-size:11px;color:var(--dim);letter-spacing:.02em}
+.badge{font-size:10.5px;padding:1.5px 7px;border-radius:999px;border:1px solid var(--line);
+  color:var(--dim);white-space:nowrap}
+.badge.m{color:var(--ok);border-color:currentColor}
+.badge.d{color:var(--warn);border-color:currentColor}
+.spacer{flex:1}
+.val{display:flex;align-items:center;gap:6px}
+.val input{width:82px;padding:5px 8px;text-align:right;border:1px solid var(--line);
+  border-radius:6px;background:var(--bg);color:var(--ink);font:13px ui-monospace,Menlo,monospace}
+.val .u{font-size:12px;color:var(--dim);min-width:40px}
+.def{font-size:11px;color:var(--dim)}
+.def b{color:var(--warn)}
+
+input[type=range]{width:100%;margin:11px 0 0;accent-color:var(--accent)}
+.desc{font-size:12.5px;color:var(--dim);margin-top:9px;white-space:pre-wrap}
+details{margin-top:7px}
+summary{font-size:11.5px;color:var(--accent);cursor:pointer;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"依据 ▸ ";}
+details[open] summary::before{content:"依据 ▾ ";}
+.basis{font-size:12px;color:var(--dim);margin-top:6px;padding-left:10px;
+  border-left:2px solid var(--line);white-space:pre-wrap}
+
+.fc{margin-top:12px;padding:11px 13px;border-radius:8px;
+  background:var(--accent-soft);border:1px solid var(--line);font-size:13px}
+.fc .big{font-size:19px;font-weight:700;color:var(--accent);
+  font-family:ui-monospace,Menlo,monospace}
+.fc .sub{font-size:11.5px;color:var(--dim);margin-top:4px}
+.bars{display:flex;gap:3px;align-items:flex-end;height:34px;margin-top:9px}
+.bars i{flex:1;background:var(--line);border-radius:2px 2px 0 0;min-height:2px}
+.bars i.on{background:var(--accent)}
+
+.savebar{position:fixed;left:0;right:0;bottom:0;background:var(--panel);
+  border-top:1px solid var(--line);box-shadow:0 -4px 20px rgba(0,0,0,.08);
+  padding:12px 16px;display:none;z-index:9}
+.savebar.on{display:block}
+.savebar .in{max-width:1040px;margin:0 auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.savebar .cnt{font-size:13px;font-weight:600;color:var(--warn)}
+.savebar input{flex:1;min-width:180px;padding:8px 11px;border:1px solid var(--line);
+  border-radius:7px;background:var(--bg);color:var(--ink);font-size:13px}
+button{padding:8px 16px;border-radius:7px;border:1px solid var(--line);
+  background:var(--bg);color:var(--ink);font-size:13px;cursor:pointer}
+button.pri{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+#toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:20;
+  background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;
+  font-size:13px;display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>旋钮配置台</h1>
+    <p>这些数原本散在 6 个 Python 文件里。改完即生效 —— 下一轮定时任务就按新值跑。</p>
+    <p class="path mono" id="path"></p>
+  </header>
+
+  <div class="note">
+    <b>先看「依据」再动手。</b>
+    <span class="badge m">实测</span> 是有样本标定过的，动它之前先看那批数据；
+    <span class="badge d">拍板</span> 是当时选的，<b>没有样本支撑</b>，随时可调。
+    这两种在页面上长得一样，但可靠程度差很远。
+  </div>
+
+  <div id="groups"></div>
+</div>
+
+<div class="savebar" id="savebar"><div class="in">
+  <span class="cnt" id="cnt"></span>
+  <input id="note" placeholder="为什么改？（写进 knobs-changelog.csv，以后能追溯）">
+  <button id="reset">放弃改动</button>
+  <button class="pri" id="save">保存</button>
+</div></div>
+<div id="toast"></div>
+
+<script>
+let SCHEMA={}, SAVED={}, CUR={}, FC={};
+const $=s=>document.querySelector(s);
+const isInt=k=>SCHEMA[k].type==='int';
+const fmt=(k,v)=>isInt(k)?String(v):(Math.round(v*100)/100).toFixed(2).replace(/\.?0+$/,'')||'0';
+
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';
+  clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',2600);}
+
+/* ── 后果预估：把旋钮换算成看得懂的后果 ───────────────────────────────────
+   底数全部来自服务端读出的真实数据（采集台账/审核记录/词库），前端只做换算。 */
+function forecastFor(key){
+  const perDraft=CUR.MATERIAL_PER_DRAFT, perDay=CUR.MATERIAL_PER_DAY,
+        win=CUR.MATERIAL_WINDOW_DAYS, rate=FC.inflow_per_day||0;
+
+  if(['MATERIAL_PER_DRAFT','MATERIAL_PER_DAY','MATERIAL_WINDOW_DAYS'].includes(key)){
+    const steady=perDraft>0?rate/perDraft:0;
+    const eff=Math.min(steady,perDay);
+    const cap=Math.floor(rate*win/Math.max(perDraft,1));
+    return {big:eff.toFixed(1)+' 篇/天',
+      sub:`按近 ${FC.window_days} 天实测采集速率 ${rate} 条/天：`+
+          `供给算出 ${steady.toFixed(1)} 篇/天，每日封顶 ${perDay} 篇 → 取小。`+
+          `　窗口总量上限 ${cap} 篇/${win}天（窗内已写 ${FC.written_in_window} 篇）`+
+          (steady>perDay?'　⚠️ 每日封顶正在成为瓶颈，供给其实撑得起更多':'')};
+  }
+  if(key==='PASS_SCORE'){
+    const s=FC.scores||[]; if(!s.length) return null;
+    const pass=s.filter(x=>x>=CUR.PASS_SCORE).length;
+    return {big:`${pass} / ${s.length} 篇`,
+      sub:`按历史 ${s.length} 条独立审核分：≥${CUR.PASS_SCORE} 分会放行 ${pass} 篇、`+
+          `拦下 ${s.length-pass} 篇（${(pass/s.length*100).toFixed(0)}% 通过率）`,
+      bars:histo(s,50,100,CUR.PASS_SCORE)};
+  }
+  if(key==='MATERIAL_MIN_CASES'){
+    const h=FC.case_hist||{}; const ks=Object.keys(h).map(Number);
+    if(!ks.length) return null;
+    const tot=ks.reduce((a,k)=>a+h[k],0);
+    const ok=ks.filter(k=>k>=CUR.MATERIAL_MIN_CASES).reduce((a,k)=>a+h[k],0);
+    return {big:`${ok} / ${tot} 个词`,
+      sub:`候选池里案例数 ≥${CUR.MATERIAL_MIN_CASES} 的词能立项：放行 ${ok} 个`+
+          `（${(ok/tot*100).toFixed(0)}%），挡下 ${tot-ok} 个`+
+          (ok<60?'　⚠️ 放行太少，选题会饿死':'')};
+  }
+  return null;
+}
+function histo(vals,lo,hi,mark){
+  const n=25,b=new Array(n).fill(0);
+  vals.forEach(v=>{const i=Math.min(n-1,Math.max(0,Math.floor((v-lo)/(hi-lo)*n)));b[i]++;});
+  const mx=Math.max(...b,1);
+  return b.map((c,i)=>({h:c/mx,on:lo+(i+1)*(hi-lo)/n>mark}));
+}
+
+function render(){
+  const gs=[...new Set(Object.values(SCHEMA).map(s=>s.group))];
+  $('#groups').innerHTML=gs.map(g=>{
+    const ks=Object.keys(SCHEMA).filter(k=>SCHEMA[k].group===g);
+    return `<h2>${g}<span class="n">${ks.length} 项</span></h2><div class="card">`+
+      ks.map(k=>knobHTML(k)).join('')+`</div>`;
+  }).join('');
+  Object.keys(SCHEMA).forEach(bind);
+  updateAll();
+}
+function knobHTML(k){
+  const s=SCHEMA[k], ev=s.evidence==='measured'
+    ? '<span class="badge m">实测</span>' : '<span class="badge d">拍板</span>';
+  return `<div class="knob" id="kn-${k}">
+    <div class="row1">
+      <span class="lab">${s.label}</span>${ev}
+      <span class="key mono">${k}</span>
+      <span class="spacer"></span>
+      <span class="val">
+        <input type="number" id="num-${k}" min="${s.min}" max="${s.max}" step="${s.step}">
+        <span class="u">${s.unit}</span>
+      </span>
+    </div>
+    <input type="range" id="rng-${k}" min="${s.min}" max="${s.max}" step="${s.step}">
+    <div class="def" id="def-${k}"></div>
+    <div class="desc">${s.desc}</div>
+    <details><summary></summary><div class="basis">${s.basis}</div></details>
+    <div class="fc" id="fc-${k}" style="display:none"></div>
+  </div>`;
+}
+function bind(k){
+  const num=$(`#num-${k}`), rng=$(`#rng-${k}`);
+  const set=v=>{
+    let x=isInt(k)?Math.round(+v):+v;
+    if(isNaN(x)) return;
+    x=Math.min(Math.max(x,SCHEMA[k].min),SCHEMA[k].max);
+    CUR[k]=x; num.value=fmt(k,x); rng.value=x; updateAll();
+  };
+  num.addEventListener('input',e=>set(e.target.value));
+  rng.addEventListener('input',e=>set(e.target.value));
+}
+function updateAll(){
+  let dirty=0;
+  Object.keys(SCHEMA).forEach(k=>{
+    const s=SCHEMA[k], d=CUR[k]!==SAVED[k];
+    if(d) dirty++;
+    $(`#num-${k}`).value=fmt(k,CUR[k]); $(`#rng-${k}`).value=CUR[k];
+    $(`#kn-${k}`).classList.toggle('dirty',d);
+    $(`#def-${k}`).innerHTML = CUR[k]===s.default
+      ? `默认值` : `默认 ${fmt(k,s.default)}　·　${d?'<b>未保存</b>':'已保存的改动'}`;
+    const f=forecastFor(k), box=$(`#fc-${k}`);
+    if(f){ box.style.display='block';
+      box.innerHTML=`<div class="big">${f.big}</div><div class="sub">${f.sub}</div>`+
+        (f.bars?`<div class="bars">${f.bars.map(b=>
+          `<i class="${b.on?'on':''}" style="height:${Math.max(b.h*100,4)}%"></i>`).join('')}</div>`:'');
+    } else box.style.display='none';
+  });
+  $('#savebar').classList.toggle('on',dirty>0);
+  $('#cnt').textContent=`${dirty} 项待保存`;
+}
+
+async function load(){
+  const r=await fetch('/api/knobs'); const d=await r.json();
+  SCHEMA=d.schema; SAVED={...d.values}; CUR={...d.values}; FC=d.forecast;
+  $('#path').textContent=`config/knobs.json　·　采集速率 ${FC.inflow_per_day} 条/天（近 ${FC.window_days} 天实测）`;
+  render();
+}
+$('#reset').onclick=()=>{CUR={...SAVED};updateAll();};
+$('#save').onclick=async()=>{
+  $('#save').disabled=true;
+  try{
+    const r=await fetch('/api/knobs',{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({values:CUR,note:$('#note').value})});
+    const d=await r.json();
+    SAVED={...d.values}; CUR={...d.values}; FC=d.forecast; $('#note').value='';
+    updateAll();
+    toast(d.changed.length?`已保存 ${d.changed.length} 项，下一轮定时任务生效`:'没有改动');
+  }catch(e){toast('保存失败：'+e.message);}
+  $('#save').disabled=false;
+};
+load();
+</script>
+</body>
+</html>

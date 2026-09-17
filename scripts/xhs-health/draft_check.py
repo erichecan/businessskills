@@ -24,6 +24,10 @@ from difflib import SequenceMatcher
 from functools import lru_cache
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from knobs import K  # noqa: E402
+
+
 from style_metrics import measure
 
 SUCAI = Path(__file__).resolve().parents[2] / "xhs" / "素材库"
@@ -46,7 +50,7 @@ NOT_BUT = re.compile(r"不是[^，。；\n]{1,15}[，,]?[是而]")
 # 阈值 3 有数据支撑：8 月以来的稿都 ≤1 个，只有 7 月老稿出现过 3-4 个。
 # 定位是异常检测，不是质量评分 —— 完整规则见 必须命中清单.md 第 16 条，由审核员判。
 GENERIC_READER = re.compile(r"很多人|有些人|有的人|大部分人|大多数人|不少人|多数人|一些人|大家都")
-MAX_GENERIC = 2
+MAX_GENERIC = K("MAX_GENERIC")
 _EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿️]")
 
 # ---------- 清单第 15 条：引语可追溯性（⛔ 证据，不是闸门） ----------
@@ -273,7 +277,7 @@ def extract(text):
 # 0.50 是取空走廊的中点、两边留最大余量，不是说灰区已经查清楚了。
 # 后续若要更准，该做的是分级（≥0.70 硬拦、0.50-0.70 交给独立审核做语义判断），
 # 而不是继续在这个数字上来回猜。
-TITLE_DUP_THRESHOLD = 0.50
+TITLE_DUP_THRESHOLD = K("TITLE_DUP_THRESHOLD")
 
 
 def _title_norm(s: str) -> str:
@@ -393,8 +397,8 @@ def title_dup_issue(fname: str, title: str) -> str:
 # 那是合规底线（广告法第二十四条 / 小红书社区规范 4.1.4「无真实体验经历」属违规），
 # 不是质量分。素材库（评论区原话.csv / 案例库.csv）也没删 —— 它是**素材供给**，
 # 不是规则；写稿仍然要用真实素材，否则就是在编。
-MAX_AVG_SENT_LEN = 30
-MAX_PARALLEL = 1
+MAX_AVG_SENT_LEN = K("MAX_AVG_SENT_LEN")
+MAX_PARALLEL = K("MAX_PARALLEL")
 
 
 def style_issues(text):
@@ -468,8 +472,8 @@ _NEAR_MISS = re.compile(r"(结构|说服|示弱|边界|反馈|化解|破冰)\s*(
 # 于是正文最后一定是「你是哪一种？回个字母：A…B…C…」。
 # 两条规则争同一块空间时，让有数据支撑的那条赢。实测：新稿正文里确实点了「结构力」，
 # 只是被 CTA 挤到了 150 字窗口之外 —— 判它不合格是规则自己的问题。
-_TAIL_RATIO = 0.5          # 概念名必须出现在正文后 50% 内
-_MAX_CONCEPTS = 2
+_TAIL_RATIO = K("CONCEPT_TAIL_RATIO")          # 概念名必须出现在正文后 50% 内
+_MAX_CONCEPTS = K("MAX_CONCEPTS")
 
 
 def _concept_names():

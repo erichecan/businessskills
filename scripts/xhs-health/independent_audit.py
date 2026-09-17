@@ -20,6 +20,10 @@ from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from knobs import K  # noqa: E402
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from claude_limits import WEEKLY, classify_limit, limit_banner  # noqa: E402
 from headless_cli import OPUS, build_argv, ensure_cwd  # noqa: E402
 
@@ -54,7 +58,7 @@ DISPOSITION_COL_INDEX = 14  # 插入审核方之后，处置就落在这一列
 # 80 分档的 11 篇全部无红线，扣分集中在「正文复述卡片」这一处可定点修复的毛病，
 # 稿子本身能看。与其让它们全堵在返工队列（已 47 篇，每天只消化 2 篇），
 # 不如放出去拿真实数据 —— 反正 L3 主指标是搜索来源占比，那要发布了才测得到。
-PASS_SCORE = 80
+PASS_SCORE = K("PASS_SCORE")   # ⛔ 不再各写一遍，见 knobs.py
 
 
 def decide_disposition(score, redline, mech_ok=True):
@@ -257,8 +261,9 @@ def _read_or(path: Path, fallback: str) -> str:
 # 不该导致匹配失败。
 STRONG_N = 6
 WEAK_N = 4
-QUOTE_BUDGET = 40    # 评论区原话保留行数（整库 330 行）
-CASE_BUDGET = 25     # 案例库保留行数（整库 119 行）
+# ⛔ 2026-09-17 删除 QUOTE_BUDGET 与 relevant_quotes()/relevant_probe_quotes()：
+# 取消引语可追溯审核之后这三样已无人调用。死常量留着会被当成还在生效的旋钮。
+CASE_BUDGET = K("AUDIT_CASE_BUDGET")     # 案例库保留行数（整库 119 行）
 
 
 def _norm(s: str) -> str:
@@ -317,15 +322,6 @@ def _pick_by_draft(rows, cols, draft_text, budget, extra_hit=None):
     return out, len(strong)
 
 
-def relevant_quotes(draft_text: str, kw: str = ""):
-    """评论区原话：本稿引用/改写到的那些，不是整库 330 行。"""
-    rows = _csv_rows(SUCAI / "评论区原话.csv")
-    cols = ["用户原话", "暴露的处境", "候选词"]
-    sel, n_strong = _pick_by_draft(
-        rows, ["用户原话", "暴露的处境"], draft_text, QUOTE_BUDGET,
-        extra_hit=(lambda r: kw and (r.get("候选词") or "").strip() == kw))
-    return _as_block(sel, cols), len(sel), len(rows), n_strong
-
 
 def relevant_cases(draft_text: str, kw: str = ""):
     """案例库：本稿引用到的案例 + 疑似改写的，不是整库 119 行。"""
@@ -335,36 +331,6 @@ def relevant_cases(draft_text: str, kw: str = ""):
         rows, ["场景", "对方原话", "我的原话", "可迁移的那一句"], draft_text, CASE_BUDGET)
     return _as_block(sel, cols), len(sel), len(rows), n_strong
 
-
-def relevant_probe_quotes(draft_text: str):
-    """本稿引用的 probe 探测结果里的 quotes 块。
-
-    ⛔ 这一块以前根本没喂给审核员，是个真实的误判来源：成稿头部写着
-    「素材：`.result.json` 的 quotes 块 4 条」，正文里的原话其实来自探测结果，
-    **不在评论区原话.csv 里**。审核员在给定的库里查不到，只能按维度 6
-    「原话无法追溯」降级甚至判红线「编造原话」。
-    实测 成稿_2026-08-09_试用期没结果.md 对 评论区原话.csv 的强命中数是 0 ——
-    它的原话全部来自 probe。单个 result.json 只有约 4KB，喂进来几乎不花钱。
-    """
-    stems = set(re.findall(r"(probe_\d{8}_[^\s`）)]+?)\.(?:result\.)?json", draft_text))
-    blocks = []
-    for stem in sorted(stems):
-        p = SUCAI / "探测原始" / f"{stem}.result.json"
-        if not p.exists():
-            continue
-        try:
-            data = json.loads(p.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            continue
-        quotes = data.get("quotes") or []
-        if not quotes:
-            continue
-        lines = [f"# {stem}（keyword={data.get('keyword','')}）"]
-        for q in quotes:
-            lines.append(f"- 用户原话：{(q.get('用户原话') or '').replace(chr(10), ' ')}"
-                         f" ｜ 处境：{(q.get('暴露的处境') or '').replace(chr(10), ' ')}")
-        blocks.append("\n".join(lines))
-    return ("\n\n".join(blocks) if blocks else "（本稿头部未引用任何 probe 探测结果）"), len(stems)
 
 
 def relevant_ciku(draft_text: str):

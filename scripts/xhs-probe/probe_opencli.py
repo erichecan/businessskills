@@ -40,17 +40,21 @@ from datetime import date, datetime
 from functools import lru_cache
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from knobs import K  # noqa: E402
+
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import probe  # noqa: E402  复用 parse_likes / judge_density / slug / write_result
 
 OUT_DIR = probe.OUT_DIR
 STATE_FILE = probe.STATE_FILE
 
-TOP_N = 20          # 搜索位取样条数，与 probe.py 的 22 条量级对齐
-DEEP_N = 5          # 深挖正文+评论的条数（与 probe.py 的 note_bodies/engage_samples 一致）
-COMMENT_LIMIT = 12  # 单篇取几条评论
+TOP_N = K("PROBE_TOP_N")          # 搜索位取样条数，与 probe.py 的 22 条量级对齐
+DEEP_N = K("PROBE_DEEP_N")          # 深挖正文+评论的条数（与 probe.py 的 note_bodies/engage_samples 一致）
+COMMENT_LIMIT = K("PROBE_COMMENT_LIMIT")  # 单篇取几条评论
 OC_TIMEOUT = 180
-GAP = 2.5           # 每次 opencli 调用之间的间隔，别把日常 Chrome 打成风控目标
+GAP = K("PROBE_GAP")           # 每次 opencli 调用之间的间隔，别把日常 Chrome 打成风控目标
 
 
 @lru_cache(maxsize=1)

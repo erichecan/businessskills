@@ -30,6 +30,10 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from knobs import K  # noqa: E402
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import gemini_cli  # noqa: E402
 from claude_limits import WEEKLY, classify_limit, is_limit, limit_banner  # noqa: E402
 from headless_cli import OPUS, SONNET, build_argv, ensure_cwd  # noqa: E402
@@ -58,15 +62,15 @@ CLAUDE = Path.home() / ".local/bin/claude"
 # 改成按选题筛，而不是整库塞。⛔ 筛了就必须同步改 prompt 里
 # 「上面两个库是整库喂给你的」那句话 —— prompt 谎报自己的输入，
 # 比 prompt 大得多更糟：模型会以为「没有更合适的原话了」而将就用手上的。
-QUOTE_BUDGET = 60    # 评论区原话保留行数（整库 268 行）
-CASE_BUDGET = 30     # 案例库保留行数（整库 101 行）
+QUOTE_BUDGET = K("WRITE_QUOTE_BUDGET")    # 评论区原话保留行数（整库 268 行）
+CASE_BUDGET = K("WRITE_CASE_BUDGET")     # 案例库保留行数（整库 101 行）
 # 跨来源组合是 2026-08-05 Eric 定的口径，需要一定广度，所以不是只给命中那几条：
 # 命中的全留，剩下的名额用同场景域的补，还有空位再用其它场景域的补。
 
 # ⛔ 必须与 independent_audit.PASS_SCORE 是同一个数（那边有降档依据的完整说明）。
 # 两处不同步会重演 2026-08-05 那个 bug：达标稿被判「未过线」继续返工，越改越低。
 # 2026-08-14 由 85 降到 80（Eric 定）。
-PASS_SCORE = 80
+PASS_SCORE = K("PASS_SCORE")
 # ⛔ 2026-09-16 由 3 改 4。Eric 问「能不能改成 10 次」，查了 107 篇被审过 ≥2 次的
 # 稿子，看「第几轮第一次摸到 80 分」：
 #     第1轮 47 篇（44%）· 第2轮 40 篇（累计 81%）· 第3轮 4 篇（累计 85%）
@@ -75,7 +79,7 @@ PASS_SCORE = 80
 # 没有上升趋势（第 10 轮中位 72）。**加到 10 轮最多多救 2 篇 / 107 篇（1.9%），
 # 代价是每篇耗时翻三倍。** 收益全在第 1→2 轮那 +5 分，第 3 轮之后基本是在原地磨。
 # 定 4 是取「累计 86%」这个拐点，再往后纯属烧时间。要跑满随时 --rounds 10。
-MAX_ROUNDS = 4
+MAX_ROUNDS = K("MAX_ROUNDS")
 
 # ── 库存目标（2026-08-16 Eric 定，做法学 ximalaya 那条线）──────────────────
 #
@@ -92,7 +96,7 @@ MAX_ROUNDS = 4
 #     ② 返工   —— 把 79 分推到 80，prompt 几万字
 #     ③ 写新稿 —— 最贵，还要占用一个新关键词
 # 同样一份额度，先做 ① 能多放出好几篇。
-STOCK_TARGET = 50  # 2026-08-26 由 30 提到 50（配合发布配额 3→5，Eric 决定）
+STOCK_TARGET = K("STOCK_TARGET")  # 2026-08-26 由 30 提到 50（配合发布配额 3→5，Eric 决定）
 WRITE_TIMEOUT = 900
 RETRIES = 2          # claude -p 普通失败（格式跑偏/超时）的重试次数
 RETRY_WAIT = 45      # 普通失败重试前等待秒数
@@ -351,7 +355,7 @@ def _all_keywords() -> list:
 # （职场万用术 36.18 vs 说完方案领导没反应怎么办 0.10），而本账号已发 12 篇里
 # **8 篇的词前排日均赞中位 <2**，「汇报被领导打断怎么接」= 0.14，还在这个词上写了 3 篇。
 # 「词的前排强度」vs「我们的日均观看」相关 +0.335（n=12，样本小，方向性参考）。
-MIN_SLOT_STRENGTH = 1.0
+MIN_SLOT_STRENGTH = K("MIN_SLOT_STRENGTH")
 
 
 def slot_strength(keyword: str) -> float | None:
@@ -367,7 +371,7 @@ def slot_strength(keyword: str) -> float | None:
 
 
 GAP_SIGNAL = SUCAI / "缺词信号.csv"
-QUOTA_DAYS = 14                 # 配额窗口。与「周目标篇数 × 2」配套
+QUOTA_DAYS = K("QUOTA_DAYS")                 # 配额窗口。与「周目标篇数 × 2」配套
 
 # 本进程内已选中的场景。一次 loop 触发可能连写多篇（--stock N），而 scene_output()
 # 靠扫成稿文件算产出 —— 写盘之前的那几秒里缺口没变，于是连选同一格子。
@@ -445,8 +449,8 @@ def _rank_in_scene(r):
     return (tier, (r.get("竞争密度") or "").strip() in ("", "待探测"), -(s or 0))
 
 
-BLESSING_GAP_DAYS = 14      # 同一个场景多久之内不重复做祝福流
-BLESSING_PER_WEEK = 2       # 每周做几篇祝福流（Eric 2026-08-18 定，可改）
+BLESSING_GAP_DAYS = K("BLESSING_GAP_DAYS")      # 同一个场景多久之内不重复做祝福流
+BLESSING_PER_WEEK = K("BLESSING_PER_WEEK")       # 每周做几篇祝福流（Eric 2026-08-18 定，可改）
 
 # 标题档用哪个模型。抽成模块级常量是为了能做 A/B（T8 验收要比 Opus 与 Sonnet）——
 # 写死在调用处的话，测一次就得改一次源码。
@@ -820,9 +824,9 @@ def _frags(kw):
 # ⛔ 这里**不复用** n_rel，另算一个严格口径。两者口径不同是刻意的：
 #   · n_rel      = 喂给模型的料包里有多少条沾边 —— 宽一点无妨，多给几条不会写坏
 #   · material_backing = 这个词我手上有没有真东西 —— 要严，它决定**写不写**
-_MATERIAL_DF_MAX = 0.10     # 片段在库里出现超过这个比例 = 它是这个库的通用词，不携带相关性
-_MATERIAL_MIN_FRAGS = 2     # 要 ≥2 个不同片段命中同一行才算相关（单片段太容易）
-MATERIAL_MIN_CASES = 1      # 选题闸门：至少 1 条能对上的案例
+_MATERIAL_DF_MAX = K("MATERIAL_DF_MAX")     # 片段在库里出现超过这个比例 = 它是这个库的通用词，不携带相关性
+_MATERIAL_MIN_FRAGS = K("MATERIAL_MIN_FRAGS")     # 要 ≥2 个不同片段命中同一行才算相关（单片段太容易）
+MATERIAL_MIN_CASES = K("MATERIAL_MIN_CASES")      # 选题闸门：至少 1 条能对上的案例
 # ⛔ 2026-09-17 删除 MATERIAL_MIN_QUOTES / MATERIAL_QUOTES_ONLY（Eric 定）：
 # 评论区原话不再作为闸门口径，也不再作为审核判据。删常量不留着 ——
 # 留着下次有人会以为它还在生效（CTA 那三个死常量就是这么留了一个月的）。
@@ -904,8 +908,8 @@ def material_ok(kw: str) -> tuple[bool, int]:
 # 它的作用是把产能和供给绑在一根绳上，松紧随时可调。
 # 换口径后量级完全不同（近 14 天采集新增 735 条 vs 原话 129 行），所以阈值同步重定：
 # 735 ÷ 25 ≈ 29 篇/14天 ≈ 2 篇/天 —— 跟旧口径想要的产能水平对齐，不是悄悄放开。
-MATERIAL_WINDOW_DAYS = 14
-MATERIAL_PER_DRAFT = 25
+MATERIAL_WINDOW_DAYS = K("MATERIAL_WINDOW_DAYS")
+MATERIAL_PER_DRAFT = K("MATERIAL_PER_DRAFT")
 
 # ⛔ 2026-09-17 补：窗口配额必须配一个**每日上限**，否则它允许暴写。
 # 起因是拿真实数据推演了一遍未来 14 天：存量 80 篇滚出窗口之后，
@@ -914,7 +918,7 @@ MATERIAL_PER_DRAFT = 25
 # 14 天总量确实还是守恒的，但「一天写 25 篇」跟「两周匀速写 29 篇」完全不是一回事：
 # 那 25 篇共享同一批最近素材，正是这套配额本来要消灭的稀释，只是把它压缩到了一天。
 # 所以再加一道按天的闸：稳态速率是 采集/天 ÷ 25 ≈ 2-3 篇，留一点余量给补课，封顶 4。
-MATERIAL_PER_DAY = 4
+MATERIAL_PER_DAY = K("MATERIAL_PER_DAY")
 
 
 def _drafts_since(cutoff: str) -> int:
@@ -2165,7 +2169,7 @@ TITLE_DUP_MECH_RE = re.compile(r"标题与已产出的「.+?」相似度\s*\d+%"
 # 同一轮里最多重 roll 几次标题。2 次：一次没避开多半是模型又落回同一批模板
 # 句式，再给一次机会；还不行就说明这个角度的标题空间确实挤，该交回全量重写
 # 去换角度，而不是在标题上继续磨。
-TITLE_DEDUP_TRIES = 2
+TITLE_DEDUP_TRIES = K("TITLE_DEDUP_TRIES")
 
 
 def _mech_bullets(mech: str) -> list:
