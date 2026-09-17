@@ -179,7 +179,13 @@ def write_probe_log(day, probes, results, quotes_added, words_added, dry):
         "成功数": ok,
         "新增原话数": len(quotes_added),
         "新增候选词数": len(words_added),
-        "小红书状态": "触发安全验证" if captcha else "正常",
+        # ⛔ 2026-09-17：原来只有两态 —— 检出 CAPTCHA 就是「触发安全验证」，否则一律
+        # 写「正常」。于是 09-16 那轮 5 个词全 failed、笔记/正文/评论全是 0，
+        # 台账照样记着「小红书=正常」。**没检出问题 ≠ 正常**，而这个字段是给人看的：
+        # 它说正常，人就不会去查这一环。跟采集那句「多半是登录态失效」是同一个病 ——
+        # 台账里写一个没有依据的状态，比留空有害得多。
+        "小红书状态": ("触发安全验证" if captcha else
+                    "全部失败(原因见当日探测日志)" if ok == 0 and total else "正常"),
         "密度分布": " ".join(f"{k}:{v}" for k, v in sorted(dist.items())),
         "告警": "是" if captcha or ok == 0 else "否",
         "备注": f"已分析 {len(results)}/{total}" + ("；剩余词待 --resume" if captcha else ""),

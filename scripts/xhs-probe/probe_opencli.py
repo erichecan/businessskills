@@ -325,6 +325,19 @@ def main() -> int:
         print("没有待探测关键词", file=sys.stderr)
         return 1
 
+    # ── 开跑前先确认链路（2026-09-17 加，与 daily_collect 同一道闸）─────────────
+    # ⛔ 起因：09-16 那轮 5 个词全 failed，每条都写「笔记=0 正文=0 评论=0」
+    # 「有效点赞样本仅 0 条」，而链路日志收尾还写着「小红书=正常」。
+    # 真因跟采集是同一个：Browser Bridge 扩展没连上。
+    # 不先验链路的话，每个 failed 的词都会**落一份空的 probe_*.json**，
+    # 那些空文件后面会被当成「这个词探过了、没数据」，污染选词判据。
+    ok, why = preflight()
+    if not ok:
+        print(why, file=sys.stderr)
+        print("本轮不探测 —— 链路不通时每个词都会落一份空 probe_*.json，"
+              "而空结果会被下游当成「探过了，没数据」，污染选词。", file=sys.stderr)
+        return 1
+
     today = date.today().strftime("%Y%m%d")
     done, failed = [], []
     for i, kw in enumerate(keywords):
