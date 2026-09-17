@@ -155,16 +155,24 @@ def write_actions() -> str:
    每一段至少落一个。取不到就换个角度写，或者说明这篇素材不足 ——
    ⛔ 严禁自己编数字、编金额、编职位。编出来的会被审核按「编造原话」判红线，
    这一轮就白跑了；更要紧的是读者真会照着做决定。
-2. CTA：结尾必须给 2–4 个**带字母编号**的选项，让读者回一个字母就能参与，
-   句子说完就停、不接"我会…""你就能…"这类回报承诺。骨架长这样（开场那句
-   随手换个说法，别每篇都写"你是哪一种？回个字母就行："——那句已经被写烂了，
-   本次给你的参考开场是「{opener}」，也可以自己想一句更贴这篇语气的）：
+2. ⛔ **正文里该给的东西，一个字都不许扣下来换评论**（2026-09-17，Eric 定，最高优先级）。
+   正文提到的每一类处境，答案就写在正文里，**不许留到评论区**。
+   自检：把结尾每个选项念一遍，问「读者不回这个字母，他要的东西拿到了吗？」
+   有一个答不上来 → 回去把正文补全，不是去把 CTA 写得更诱人。
+   ⚠️ 这条推翻了 08-11 到 09-17 之间的旧规则（旧规则明文要求「把最常见的那类
+   留给评论区」以换评论数）。旧规则跟「读者带走了什么」直接对撞，已删除。
+
+3. CTA **可选**，不是必须。有真正的下一步就写，没有就让正文自然收尾 ——
+   硬凑一个互动钩子只是给读者添一道噪声。要写就用这个形态（评论成本最低）：
+   2–4 个**带字母编号**的选项，句子说完就停、不接"我会…""你就能…"这类回报承诺。
+   骨架长这样（开场那句随手换个说法，别每篇都写"你是哪一种？回个字母就行："
+   ——那句已经被写烂了，本次参考开场是「{opener}」，也可以自己想一句更贴的）：
        {opener}
        A. <一种具体处境>
        B. <另一种具体处境>
        C. <第三种>
-3. 这两项在一篇稿里同时成立才算过。别为了修其中一项把另一项改没了 ——
-   实测有稿在这两项之间来回震荡三轮，最后比第一轮还差。"""
+   ⛔ 仍然禁止：要读者回忆事件、组织一段话、或把领导原话公开贴出来（对他有真实
+   职场风险）；以及「回字母我给你 XX」这类评论换资源的句式（平台红线，吃过警告）。"""
 
 # ⛔ 别在 prompt 里让模型「自己数一遍」而不说清怎么数（2026-08-11 实测教训）。
 # 原文是「改完自己数一遍再输出」，模型把它理解成「去把机械检查跑一遍」，于是
@@ -188,7 +196,10 @@ def keep_passed() -> str:
     return """⚠️ 改的是被指出的问题，别把已经达标的地方改坏。尤其守住这几条：
 正文字数守住本篇口径的规格 · 平均句长≤30 · 排比≤1 处 · 「不是X是Y」≤2 处 ·
 泛指群体词（很多人/有些人/大多数人）≤2 处 · 全篇只对读者说话不换视角 ·
-结尾保留带字母编号的选项。改完在心里核一遍这几项再输出。""" + write_actions()
+正文该给的东西全部给完、一个字都没留到评论区。
+（⛔ 原来这里写「结尾保留带字母编号的选项」—— 2026-09-17 起 CTA 可选，
+不必为了保住它而返工；但**正文给满**这条是硬的。）
+改完在心里核一遍这几项再输出。""" + write_actions()
 
 
 # 两条流**共用一套流程和一个正文规格**，只在标题/首图/开头三处切口径。
@@ -214,6 +225,13 @@ LANE_SPEC = {
               **情绪价值本身就算带走了东西，没有话术也不扣分**
       ⚠️ 路径 B 的门槛是**精确**不是共情：要具体到他能认领（「报了数被顺着往下压」），
          「职场不易我懂你」这类谁都能写的安慰不算，仍是 0 分
+      ⛔ **路径 B 要满分，被你命名的那个处境必须来自上面给的评论区原话/案例库里
+         某一条真实记录**（2026-09-17 加）——审核会去库里找出处，指不到就只给半分。
+         要求的是**处境**有出处，不是措辞照抄：用你自己的话把某条读者原话暴露的
+         处境说得更准，正是这条路径要的东西。
+         为什么盯这一条：路径 A 有天然的证伪手段（那句话能不能直接抄去用，一读便知），
+         路径 B 没有，而"写得像很精确"恰恰是最容易糊弄过去的。手上没有真实处境
+         就别硬走路径 B，去走路径 A，或者在备注里写素材不足。
       0 分＝只多了一个正确观点或一句泛泛鼓励：既没拿到能用的，也没觉得被说中
   · 标题 20：他扫到这行字手指停不停，停的理由是「这说的是我」还是「这怎么可能」
   · 首图 5 / 开头 5 / CTA 5：各自仍要达标，但都不再是主项
@@ -600,11 +618,28 @@ def pick_topic() -> dict | None:
         for r in cand:
             r["_strength"] = slot_strength(r["关键词"].strip())
         cand.sort(key=_rank_in_scene)
-        best = cand[0]
-        st = best["_strength"]
+        st = cand[0]["_strength"]
         if st is not None and st < MIN_SLOT_STRENGTH:
             log_gap(srow, f"缺口 {gap:.1f} 篇，但该场景 {len(cand)} 个候选词"
                           f"搜索位都没人互动（最强 {st} < {MIN_SLOT_STRENGTH}）")
+            continue
+        # ⛔ 素材闸门（2026-09-17）：强度排序管的是"这个位有没有人看"，管不了
+        # "这个问题我有没有真东西可答"。素材凑不齐还硬写，差额只能由正确的废话填 ——
+        # 这是"制造垃圾"的生产机制，不是写手不努力。这里按强度序找第一个素材也够的词。
+        best, thin = None, []
+        for r in cand:
+            ok, nq, nc = material_ok(r["关键词"].strip())
+            if ok:
+                best = r
+                break
+            thin.append(f"{r['关键词']}(原话{nq}·案例{nc})")
+        if best is None:
+            log_gap(srow, f"缺口 {gap:.1f} 篇，但该场景 {len(cand)} 个候选词素材都不够"
+                          f"（门槛 原话≥{MATERIAL_MIN_QUOTES} 且"
+                          f"（案例≥{MATERIAL_MIN_CASES} 或 原话≥{MATERIAL_QUOTES_ONLY}））："
+                          + "、".join(thin[:5]))
+            print(f"   ⏭  【{srow['场景']}】{len(cand)} 个候选词素材都不够，跳过"
+                  f"（缺的是素材不是词，已记进 缺词信号.csv）")
             continue
         _PICKED_THIS_RUN[srow["场景"]] = _PICKED_THIS_RUN.get(srow["场景"], 0) + 1
         _announce(best, srow, gap)
@@ -615,18 +650,26 @@ def pick_topic() -> dict | None:
         if "_strength" not in r:
             r["_strength"] = slot_strength(r["关键词"].strip())
     pool.sort(key=_rank_in_scene)
-    best = pool[0]
-    st = best["_strength"]
+    st = pool[0]["_strength"]
     if st is not None and st < MIN_SLOT_STRENGTH:
         print(f"   ⛔ {len(pool)} 个候选词**没有一个**搜索位上有人互动"
-              f"（最强的「{best['关键词']}」也只有 {st} 日均赞 < {MIN_SLOT_STRENGTH}）。")
+              f"（最强的「{pool[0]['关键词']}」也只有 {st} 日均赞 < {MIN_SLOT_STRENGTH}）。")
         print("      本轮不写新稿 —— 写出来也会因为「搜索位没人互动」被扣分，"
               "这是选词的问题不是写稿的问题。")
         print("      去补词：python3 scripts/xhs-collect/daily_collect.py"
               " && python3 scripts/xhs-probe/probe_opencli.py --from-cikuku --limit 5")
         return None
+    # 兜底路径同样过素材闸门 —— 否则"所有缺口场景都没词"时会从这里绕过去，
+    # 闸门就白加了（配额那三重不饿死保护当初就是这么被绕过的，见函数头注释）。
+    best = next((r for r in pool if material_ok(r["关键词"].strip())[0]), None)
+    if best is None:
+        print(f"   ⛔ {len(pool)} 个候选词**没有一个**素材够写（门槛 原话≥"
+              f"{MATERIAL_MIN_QUOTES} 且（案例≥{MATERIAL_MIN_CASES} 或 原话≥{MATERIAL_QUOTES_ONLY}））。")
+        print("      本轮不写新稿 —— 手上没有真东西可答，硬写出来的只能是正确的废话。")
+        print("      去补素材：python3 scripts/xhs-collect/daily_collect.py")
+        return None
     print("   ⚠️ 所有有缺口的场景都没有可写的词 —— 缺口已记进 缺词信号.csv，"
-          "本轮退回全局最强")
+          "本轮退回全局最强（且已过素材闸门）")
     _announce(best, None, None)
     return best
 
@@ -764,6 +807,113 @@ def _frags(kw):
     return {kw[i:i + 2] for i in range(len(kw) - 1)} - _FRAG_STOP
 
 
+# ── 素材支撑度：「这个词我凭什么答」（2026-09-17 加，同时修掉一个从没响过的警告）──
+#
+# ⛔ 原来 relevant_quotes/relevant_cases 返回的 n_rel（prompt 里印成「其中相关 N 条」，
+# build_prompt 靠 `if hit_q < 8` 提示"素材偏薄"）**是坏的**：拿候选池 1148 个词实算，
+# 相关原话中位数 60、**连 p25 都是 60** —— 顶着 QUOTE_BUDGET 饱和，携带零信息，
+# 那句警告结构性地不可能触发过。根因两层：
+#   ① textual() 只要**任一** 2 字片段命中就算相关，而「领导」单独就命中库里 17% 的行；
+#   ② _pick 的预算（60/30）远小于松匹配命中的行数，于是 n_rel 恒等于预算。
+# 同一类病在本仓库出现过：审核校准按标题字符串匹配，220 篇只配上 1 篇
+# （见 docs/20260913-写稿策略进化路径.md 第一节）。工具都在、条件也满足，就是量错了东西。
+#
+# ⛔ 这里**不复用** n_rel，另算一个严格口径。两者口径不同是刻意的：
+#   · n_rel      = 喂给模型的料包里有多少条沾边 —— 宽一点无妨，多给几条不会写坏
+#   · material_backing = 这个词我手上有没有真东西 —— 要严，它决定**写不写**
+_MATERIAL_DF_MAX = 0.10     # 片段在库里出现超过这个比例 = 它是这个库的通用词，不携带相关性
+_MATERIAL_MIN_FRAGS = 2     # 要 ≥2 个不同片段命中同一行才算相关（单片段太容易）
+MATERIAL_MIN_QUOTES = 3     # 选题闸门：至少 3 条真的在讲这件事的读者原话
+MATERIAL_MIN_CASES = 1      # 选题闸门：至少 1 条能对上的案例
+MATERIAL_QUOTES_ONLY = 10   # 案例为 0 时，原话厚到这个数也放行（见 material_ok）
+_MATERIAL_CACHE: dict = {}
+
+
+def _material_blobs(path: Path, cols: tuple) -> list:
+    """库里每行拼成一条文本。缓存 —— pick_topic 会对一整个场景的候选词逐个算。"""
+    if (path, cols) not in _MATERIAL_CACHE:
+        _MATERIAL_CACHE[(path, cols)] = [
+            "".join((r.get(c) or "") for c in cols) for r in _csv_rows(path)]
+    return _MATERIAL_CACHE[(path, cols)]
+
+
+def _strict_hits(kw: str, blobs: list) -> int:
+    """库里有多少行**真的**在讲这个词说的那件事。
+
+    两道收紧，都是冲着上面那个饱和 bug 去的：
+    ① 按文档频率剔掉高频片段（df > 10% 丢掉）—— IDF 式停用词，比手写 _FRAG_STOP
+       更不会漏：「领导」「面试」这类没写进 STOP 的高频词照样被剔掉。
+    ② 要求 **≥2 个不同片段命中同一行**。单片段命中太松，「回答」一个字眼就能
+       把大半个库捞进来。
+    修完的分布（候选池 1148 词）：原话 p25=3 / p50=7 / p75=15，案例 p50=1 —— 能区分了。
+    """
+    if not blobs:
+        return 0
+    cap = _MATERIAL_DF_MAX * len(blobs)
+    fr = [f for f in _frags(kw) if sum(1 for b in blobs if f in b) <= cap]
+    if len(fr) < _MATERIAL_MIN_FRAGS:
+        return 0
+    return sum(1 for b in blobs if sum(1 for f in fr if f in b) >= _MATERIAL_MIN_FRAGS)
+
+
+def material_backing(kw: str) -> tuple[int, int]:
+    """(真的在讲这件事的读者原话数, 能对上的案例数)。"""
+    q = _strict_hits(kw, _material_blobs(SUCAI / "评论区原话.csv", ("用户原话", "暴露的处境")))
+    c = _strict_hits(kw, _material_blobs(SUCAI / "案例库.csv", ("场景", "对方原话", "可迁移的那一句")))
+    return q, c
+
+
+def material_ok(kw: str) -> tuple[bool, int, int]:
+    """选题闸门：素材凑不齐就别立项。
+
+    判据对应评分卡维度 5 的两条路径 —— **两种素材都算数**：
+      · 案例 ≥1  → 有一手经验，走得通路径 A（给能原样抄的话术）
+      · 原话 ≥10 → 案例为 0 也放行：读者原话厚到这个程度，说明这个处境被精确记录过，
+                   走得通路径 B（把说不出口的处境精确命名）。
+                   ⚠️ 这不是给路径 B 开后门 —— 维度 5 要求路径 B 命名的处境必须
+                   指得到库里某一条具体记录，没有这些原话反而写不出合格的路径 B。
+      例：「领导问我工资怎么回答」严格相关原话 29 条、案例 0 条 —— 处境清清楚楚，
+          只是 Eric 没有对应的亲历案例，那就走路径 B，不该判死。
+
+    实测（2026-09-17，候选池 1148 词）：放行 736 个 = 64%，38 个场景里 29 个仍有词可写；
+    被判死的 9 个场景，词池里原本就只有 0-1 个词（即 brief 里那批「零产出场景」），
+    **这道闸门不新增饿死的场景**。
+    被拦下的词不是丢掉，是 log_gap 记进 缺词信号.csv 交给采集端 —— 缺的是素材不是词。
+    """
+    q, c = material_backing(kw)
+    ok = q >= MATERIAL_MIN_QUOTES and (c >= MATERIAL_MIN_CASES or q >= MATERIAL_QUOTES_ONLY)
+    return ok, q, c
+
+
+# ── 产能闸门：写稿量锚到**素材流入**，不由模型产能定（2026-09-17）──────────────
+#
+# 2026-09-16 的实况：采集任务 exit 1 静默失败、近 3 天素材零新增，而写稿 loop
+# 照写 10 篇/天 —— 机器在空转，每转一圈内容就更稀一点。当时的稀释率是
+# 9.2 行新素材/天 ÷ 10 篇/天 = **每篇不到 1 行新鲜素材**，差额只能由正确的废话填。
+#
+# 所以产能不该是个常数，它是个**因变量**：手上有多少真东西，就写多少篇。
+# 素材零新增 → 配额 0 → 本轮不写，并把上游那条断掉的链路打印出来。
+# 这把「采集坏了但没人发现」从一个静默故障变成一个**会拦住生产的熔断**。
+#
+# ⚠️ MATERIAL_PER_DRAFT = 4 是**选择不是拟合**，没有样本支撑这个具体数字；
+# 它的作用是把产能和供给绑在一根绳上，松紧随时可调。按 09-17 的 129 行/14天 算，
+# 配额是 32 篇/14天 ≈ 2.3 篇/天（原来是 10 篇/天）。
+# ⚠️ 只数得到评论区原话的新增：案例库.csv 没有日期列。这让配额偏保守（漏算了案例），
+# 要更准就先给案例库补一列日期，别在这里瞎估。
+MATERIAL_WINDOW_DAYS = 14
+MATERIAL_PER_DRAFT = 4
+
+
+def material_quota() -> tuple[int, int, int]:
+    """(本窗口还能写几篇, 窗口内新增素材行, 窗口内已写稿数)。"""
+    cutoff = (date.today() - timedelta(days=MATERIAL_WINDOW_DAYS)).isoformat()
+    inflow = sum(1 for r in _csv_rows(SUCAI / "评论区原话.csv")
+                 if (r.get("日期") or "")[:10] >= cutoff)
+    written = sum(1 for d in list(SUCAI.glob("成稿_*.md")) + list((SUCAI / "归档稿").glob("成稿_*.md"))
+                  if (m := re.match(r"成稿_(\d{4}-\d{2}-\d{2})_", d.name)) and m.group(1) >= cutoff)
+    return max(0, inflow // MATERIAL_PER_DRAFT - written), inflow, written
+
+
 def relevant_quotes(kw, domain):
     """评论区原话：与本篇相关的那些，不是整库 268 行。
 
@@ -863,10 +1013,17 @@ def build_prompt(row: dict, feedback: str, round_no: int, lane: str = "搜索流
     case_block, n_case, tot_case, hit_c = relevant_cases(kw, row)
     # 打印相关行数而不只是总行数 —— 相关的只有个位数时，说明这个词的素材是真不够，
     # 那时写出来的稿八成要靠硬凑，早点看见比事后在审核里看见强。
-    print(f"   料包：评论区原话 {n_quote}/{tot_quote}（其中相关 {hit_q}）· "
-          f"案例库 {n_case}/{tot_case}（其中相关 {hit_c}）")
-    if hit_q < 8:
-        print(f"   ⚠️ 只有 {hit_q} 条相关原话（阈值 8），这个词的素材偏薄，成稿备注里要说明")
+    # ⛔ 2026-09-17：这里原来印的「其中相关 N」用的是 relevant_* 的 n_rel，那个数
+    # 顶着预算饱和（候选池实算中位 60/60），配的那句 `if hit_q < 8` 警告从没触发过。
+    # 现在改印 material_backing 的严格口径 —— 它就是 pick_topic 那道闸门用的数，
+    # 两边看同一个数，不会再出现"选题说够、写稿说不够"。
+    mq, mc = material_backing(kw)
+    print(f"   料包：评论区原话 {n_quote}/{tot_quote} · 案例库 {n_case}/{tot_case}"
+          f"　｜　严格相关：原话 {mq} · 案例 {mc}")
+    if not material_ok(kw)[0]:
+        print(f"   ⚠️ 素材低于选题闸门（原话≥{MATERIAL_MIN_QUOTES} 且（案例≥"
+              f"{MATERIAL_MIN_CASES} 或 原话≥{MATERIAL_QUOTES_ONLY}）），"
+              f"成稿备注里必须写明「素材不足：缺 XXX 类原话」，不许靠编凑满")
     rework = ""
     if feedback:
         rework = f"""
@@ -961,6 +1118,24 @@ draft_check.py 和 independent_audit.py 都靠这一行判断用哪套规格，�
 ② 不许把两个人的话合并成一个人说的；
 ③ 不许给组合出来的案例补一个素材里没有的结果或数字；
 ④ 不许把多段拼接叙述成「同一个人的一次连续经历」——分别交代"有人""另一个人"。
+
+⛔ 照做风险红线（2026-09-17 加，Eric 定）—— **这条是为读者加的，不是为账号加的**：
+
+你写的是职场话术，读者真的会照着说。说错了他要承担后果：被打低绩效、被穿小鞋、
+丢掉 offer。而这些代价**你不承担**。所以每给一句硬话术，先在心里推演一步：
+读者照着做了，对面（领导/HR/面试官）最坏会怎么反应？
+
+⛔ 判红线：**最坏后果由读者承担，而你只写了顺利的那一面。**
+典型是硬刚型建议 —— 当场怼回去／直接找大领导／把话挑明／拒绝背锅时点名同事／
+谈薪亮出别家 offer 逼价。问题不在建议强硬，**在于没交代它什么时候不成立、
+不成立时读者要付什么代价**。
+
+✅ 怎么写才算过：在那句话术**旁边**补一句代价或适用边界，一句就够 ——
+   「这话只在你手上真有另一个 offer 时才说得出口，没有的话他一问就穿帮」
+   「对方是你的直属领导时别用这句 —— 越级的账早晚要还」
+⛔ 不许单起一段写免责声明（那正好踩下面去 AI 味红线里的"结尾升华/声明段"）。
+   边界长在话术旁边，读起来是你在替他想，不是在撇清责任。
+⚠️ 这不是让你把稿子写怂。给强硬建议不扣分，**给强硬建议却不说代价才扣分**。
 
 ⛔ 去 AI 味红线（方法论来自 tramstop-skill，这里只取生成侧原则，不搬运它的
 坏例子清单——清单是诊断用的，写作时脑子里装着清单反而更容易写出清单里的毛病）：
@@ -2367,6 +2542,24 @@ def main() -> int:
     if args.rework_only:
         print(f"\n{'='*54}\n返工 {n_rework} 篇：过线 {tally['过线']} · 归档 {tally['归档']}")
         return 0
+
+    # ── 产能闸门：素材流入定上限（2026-09-17）──────────────────────────────
+    # 放在返工/机修**之后**：那两类是把已经写出来的稿推过线，不消耗新素材，
+    # 不该被这道闸门拦。只有「从零写一篇新的」才要问一句手上还有没有料。
+    if args.count > 0 and not args.topic:
+        left, inflow, written = material_quota()
+        print(f"\n素材配额：近 {MATERIAL_WINDOW_DAYS} 天新增原话 {inflow} 行 "
+              f"÷ {MATERIAL_PER_DRAFT} 行/篇 − 已写 {written} 篇 = **还能写 {left} 篇**")
+        if left <= 0:
+            print("⛔ 素材配额已用尽，本轮不写新稿。")
+            print("   这不是「今天没事干」，是上游断供了 —— 没有新素材还继续写，")
+            print("   差额只能由正确的废话填上，那正是「制造垃圾」的生产机制。")
+            print("   去补素材：python3 scripts/xhs-collect/daily_collect.py")
+            print("   （brief 里「采集 exit 1」那条就是这里断的）")
+            return 0
+        if left < args.count:
+            print(f"   本轮 {args.count} 篇 → 按配额压到 {left} 篇")
+            args.count = left
 
     lane_explicit = "--lane" in sys.argv
     for i in range(args.count):

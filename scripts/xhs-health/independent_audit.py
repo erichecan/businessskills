@@ -456,6 +456,46 @@ def concept_audit_rules(draft: Path) -> str:
     return _CONCEPT_RULES.format(names="、".join(scene_map.load_terms()))
 
 
+# ── 照做风险红线的生效日（2026-09-17 加，Eric 定）────────────────────────────
+# SKILL.md 的红线表是整份注入给审核员的，所以新加一条红线会**追溯**作用到全部库存
+# —— 而库存 200 篇是按旧标准写的，集体判红等于把库存清零（这正是
+# concept_audit_rules 那段注释里已经踩过并写下来的坑）。所以跟它同样的处理：
+# 按成稿日期门控，老稿显式告知"本条不适用"，别指望模型自己记住生效日。
+RISK_AUDIT_FROM = date(2026, 9, 17)
+
+_RISK_RULES = """
+【照做风险红线（2026-09-17 起生效，本篇**适用**）】
+
+把正文给的话术/动作放进真实的权力结构里推演一步：读者照着做了，对面最坏会怎么反应？
+
+⛔ 判红：**最坏后果由读者承担、作者不承担，而正文只写了顺利的那一面。**
+典型是硬刚型建议 —— 当场怼回去／直接找大领导／把话挑明／拒绝背锅时点名同事／
+谈薪亮出别家 offer 逼价。问题不在建议强硬，在于**没交代它什么时候不成立、
+不成立时读者要付什么代价**。
+
+✅ 算过：正文里有一句写明代价或适用边界即可，不必长，且必须**长在那句话术旁边**
+（单起一段写免责声明反而踩去 AI 味红线）。
+
+⚠️ 只判「有没有交代风险」，**不判「建议对不对」** —— 你没有资格裁定某个话术在真实
+职场里灵不灵，能判的只是这篇有没有把风险告诉读者。
+⚠️ 给强硬建议不扣分，给强硬建议却不说代价才扣分。别把稿子往变怂的方向推。
+"""
+
+_RISK_RULES_OLD = """
+【照做风险红线（2026-09-17 起生效）—— 本篇成稿于生效日之前，**不适用**】
+⛔ 不得因为「没交代照做风险」判本篇红线或扣分。若确实看到明显的风险缺口，
+写进报告的「其余建议」里作提示即可，不影响评级与处置。
+"""
+
+
+def risk_audit_rules(draft: Path) -> str:
+    """照做风险红线。生效日之后的稿判红，之前的稿显式告知不适用。"""
+    m = re.search(r"成稿_(\d{4}-\d{2}-\d{2})_", draft.name)
+    if not m or date.fromisoformat(m.group(1)) < RISK_AUDIT_FROM:
+        return _RISK_RULES_OLD
+    return _RISK_RULES
+
+
 def build_audit_prompt(draft: Path, lane: str = None):
     """拼审核 prompt。抽出来是为了能在不调模型的前提下测字数（--dry-run）。
 
@@ -488,6 +528,7 @@ def build_audit_prompt(draft: Path, lane: str = None):
     # 只能把维度 3 按未知降级给半分——2026-08-02 三篇稿都栽在这。
     # 2026-08-12 T7 后该维度问的是「第 3 秒手指停不停」，更依赖看到首图本身。
     concept_rules = concept_audit_rules(draft)
+    risk_rules = risk_audit_rules(draft)
     stem = draft.name.removeprefix("成稿_").removesuffix(".md")
     cards = _read_or(SUCAI / f"图文_{stem}_cards.json", "（本稿无卡片 JSON，首图无法核验）")
     text = draft.read_text(encoding="utf-8")
@@ -505,6 +546,7 @@ def build_audit_prompt(draft: Path, lane: str = None):
 【关于标杆/先例参照】
 {benchmark_note}
 {concept_rules}
+{risk_rules}
 
 ⛔ 关于下面三个库：给你的**不是整库，是按本篇正文反查出来的子集**。
 筛法：把正文和库里每一行做最长公共子串比对，≥{STRONG_N} 字连续相同的（＝正文照抄了它）

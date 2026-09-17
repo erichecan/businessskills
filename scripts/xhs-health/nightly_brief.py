@@ -320,15 +320,56 @@ def section_outcome():
 
     所以这一节不报「跑了没有」，只报**数字本身和它逼出来的那个决定**。
     数据的用处是改变行为；只要没有任何行为因它而变，采集和复盘就是在空转。
+
+    ⛔ 2026-09-17 换主指标（Eric 定，与 calibrate_audit.py 的 OUTCOMES 同一次改）：
+    **收藏率**上位，搜索来源占比降为渠道诊断。上面②那句「它是 L3 唯一主指标」
+    不再成立 —— 它测的是"有没有被搜到"，不是"有没有帮到人"，而账号自己的数据
+    已经把两者拆开了：31 篇合计 4716 观看 → 收藏 45、分享 5，**收藏最高的 8 篇
+    搜索来源占比全是 0**。brief 是 Eric 每天真正会看的那一屏，它跟校准脚本
+    必须报同一个主指标，否则又是一次「写手看一张卡、审核看另一张卡」。
     """
     lines, ok = ["📊 **数据说了什么**"], True
 
-    # ── 搜索来源占比：账号策略的成败就在这一列
+    # ── 收藏率：主指标（2026-09-17 起）。收藏＝我以后要用它，分享＝我拿它去帮别人。
+    # 这两个是读者被帮到时唯一会留下的痕迹；观看是标题骗来的，点赞很便宜。
+    stats, seen = read_csv(SUCAI / "发布数据.csv"), {}
+    for r in stats:                       # 同一篇会被抓多次，留发布天数最大的那行
+        nid, d = (r.get("笔记ID") or "").strip(), (r.get("发布天数") or "0").strip()
+        try:
+            d = float(d)
+        except ValueError:
+            continue
+        if nid and (nid not in seen or d > seen[nid][0]):
+            seen[nid] = (d, r)
+
+    def _n(v):
+        try:
+            return float(str(v or "").replace(",", "").replace("%", ""))
+        except ValueError:
+            return 0.0
+    tv = sum(_n(r.get("观看")) for _, r in seen.values())
+    ts = sum(_n(r.get("收藏")) for _, r in seen.values())
+    tsh = sum(_n(r.get("分享")) for _, r in seen.values())
+    zero = [r for _, r in seen.values() if _n(r.get("观看")) > 0 and _n(r.get("收藏")) == 0]
+    if tv > 0:
+        lines.append(f"　　· **收藏率 {ts / tv * 100:.2f}%**（主指标）：{len(seen)} 篇合计 "
+                     f"{tv:.0f} 观看 → 收藏 {ts:.0f} · 分享 {tsh:.0f}")
+        if zero:
+            zv = sum(_n(r.get("观看")) for r in zero)
+            lines.append(f"　　  ⚠️ **{len(zero)} 篇收藏=0，合计 {zv:.0f} 观看** —— "
+                         f"这些人点进来了，没有一个觉得值得存下来")
+        if ts / tv * 100 < 2:
+            lines.append("　　  ⚠️ 收藏率 <2% —— 读者没带走东西。该查的是正文"
+                         "（评分卡维度 5，30 分那一维），不是标题和封面")
+    else:
+        lines.append("　　· 收藏率：发布数据.csv 还没有可算的观看数")
+
+    # ── 搜索来源占比：渠道诊断（2026-09-17 由主指标降级），回答「有没有被搜到」
     rows = read_csv(SUCAI / "词库.csv")
     pub = [r for r in rows if (r.get("发布日") or "").strip()]
     got = [r for r in pub if (r.get("搜索来源占比") or "").strip()]
     if not got:
-        lines.append(f"　　· 搜索来源占比：{len(pub)} 篇已发布，**一篇都还没回填** —— 主指标全空")
+        lines.append(f"　　· 搜索来源占比（渠道诊断）：{len(pub)} 篇已发布，**一篇都还没回填**")
     else:
         vals = []
         for r in got:
@@ -337,7 +378,7 @@ def section_outcome():
             except ValueError:
                 pass
         avg = sum(vals) / len(vals) if vals else 0
-        lines.append(f"　　· 搜索来源占比：{len(got)}/{len(pub)} 篇有数 · 均值 **{avg:.1f}%**"
+        lines.append(f"　　· 搜索来源占比（渠道诊断）：{len(got)}/{len(pub)} 篇有数 · 均值 **{avg:.1f}%**"
                      f"（{'/'.join(f'{v:g}%' for v in sorted(vals, reverse=True)[:5])}）")
         # 判据写死在这里而不是让人自己看：搜索流的全部理由就是「靠搜索被找到」。
         # 占比常年个位数，说明流量不是搜来的，那么按搜索位强度选词这套打法就该重估。

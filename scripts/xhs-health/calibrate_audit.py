@@ -58,11 +58,28 @@ REPORT = SUCAI / "审核校准报告.md"
 NOTE_ID_RE = re.compile(r"/explore/([0-9a-f]+)")
 
 DIMS = ["选题", "标题", "首图", "开头", "正文", "可信度", "CTA"]
-# 搜索流的主指标就是搜索来源占比（见 eric-xhs-audit 决策 4），放在第一位。
-# 观看/点赞一并算，但它们受账号体量和时段污染，只作参照。
-OUTCOMES = ["搜索来源占比", "观看", "点赞", "收藏", "评论"]
+
+# ⛔ 2026-09-17 换主指标（Eric 定）：搜索来源占比 → **收藏率**，分享升为第二指标。
+#
+# 旧口径的依据是 07-31 决策 4「指标只盯搜索进入占比」。但那测的是**渠道效率**
+# （被搜到了没有），不是**读者有没有被帮到**，而账号自己的数据已经把两者拆开了：
+#   · 横向对比宽表 31 篇：合计 4716 观看 → 收藏 45 · 分享 5 · 评论 14，收藏率 0.95%
+#   · 其中 **14 篇收藏=0，合计 1609 观看** —— 1609 个人点进来，没一个觉得值得存
+#   · **收藏最高的 8 篇，搜索来源占比全是 0** —— 主指标和价值不只是弱相关，是脱钩
+#
+# 为什么是收藏和分享：读者被帮到时会留下的痕迹，按证明力排序是
+#   观看（标题骗进来的，与内容无关）< 点赞（礼貌，很便宜）
+#   < **收藏＝我以后要用它** < **分享＝我要拿它去帮另一个人**（读者替你做了利他）
+# 09-16 评分卡已经换成「读者带走了什么」，这里跟上 —— 否则卡在优化 A、
+# 校准在拟合 B，又是一次「写手看一张卡、审核看另一张卡」。
+#
+# 收藏率是**派生**指标：发布数据.csv 没有这一列，由 收藏/观看 现算（见 derive）。
+# 搜索来源占比不删，降级为渠道诊断项留在表里 —— 它仍然回答「有没有被搜到」这个问题，
+# 只是不再是"成功"的定义。
+MAIN_OUTCOME = "收藏率"
+OUTCOMES = ["收藏率", "分享", "收藏", "观看", "搜索来源占比", "评论"]
 MIN_DAYS = 7
-MIN_SAMPLE = 8          # 低于这个数不出系数。7 个维度 × 5 个指标 = 35 个数，n<8 时纯属噪声
+MIN_SAMPLE = 8          # 低于这个数不出系数。7 个维度 × 6 个指标 = 42 个数，n<8 时纯属噪声
 
 # 当前评分卡生效日——来源 skills/eric-xhs-audit/SKILL.md「当前权重（2026-09-16 起）」，
 # 这一行必须跟那份 skill 文件手动保持同步，它下次改权重时这里也要跟着改。
@@ -170,13 +187,33 @@ def build_pairs(min_days):
         # 口径一致。卡切换前审出的分数，维度满分/分布都不一样，不能直接拿来
         # 跟同期结果算相关系数（见文件头纪律 4）。
         same_card = bool(audit_date) and audit_date >= CURRENT_RUBRIC_SINCE
+        # 收藏率是派生列（发布数据.csv 里没有），观看为 0 时留 None 不留 0 ——
+        # 0 观看的篇收藏率是"算不出"，不是"0%"，当成 0 会把没曝光的稿混进最差档。
+        views, saves = num(s.get("观看")), num(s.get("收藏"))
+        derived = {"收藏率": (saves / views * 100) if views and saves is not None else None}
         row = {"成稿": name, "发布标题": title, "天数": days,
                "审核日": audit_date, "同卡": same_card,
                "总分": num(a.get("总分")),
                **{d: num(a.get(d)) for d in DIMS},
-               **{o: num(s.get(o)) for o in OUTCOMES}}
+               **{o: (derived[o] if o in derived else num(s.get(o))) for o in OUTCOMES}}
         (paired if days >= min_days else pending).append(row)
     return paired, pending
+
+
+def detail_table(paired) -> list:
+    """逐篇明细。纯追溯用，不参与任何结论 —— 所以样本够不够都该出。"""
+    L = ["## 逐篇明细（含跨卡样本，仅供追溯，卡口径见「卡」列）", "",
+         "| 标题 | 卡 | 天数 | 总分 | " + " | ".join(OUTCOMES) + " |",
+         "|---|---|---|---|" + "---|" * len(OUTCOMES)]
+    for r in sorted(paired, key=lambda x: -(x["总分"] or 0)):
+        card = "同卡" if r["同卡"] else "旧卡"
+        # 收藏率是算出来的，不截位会印成 1.26582 —— 两位小数够了，多的是假精度。
+        L.append(f"| {r['发布标题'][:24]} | {card} | {int(r['天数'])} | {r['总分']} | "
+                 + " | ".join("—" if r[o] is None else
+                              (f"{r[o]:.2f}%" if o == "收藏率" else f"{r[o]:g}")
+                              for o in OUTCOMES) + " |")
+    return L + ["", "---", "",
+                "⛔ 本报告不改任何 skill 文件。要不要按它改审核标准，由人决定。"]
 
 
 def render(paired, pending, min_days, relaxed):
@@ -204,16 +241,27 @@ def render(paired, pending, min_days, relaxed):
     if len(same_card) < MIN_SAMPLE:
         L += ["## ⛔ 同卡样本不足，本次不给任何相关系数", "",
               f"现有 {len(same_card)} 篇，门槛 {MIN_SAMPLE} 篇，还差 **{MIN_SAMPLE - len(same_card)} 篇**。", "",
-              "为什么不凑合着算：7 个维度 × 5 个指标 = 35 个系数，样本个位数时",
+              "为什么不凑合着算：7 个维度 × 6 个指标 = 42 个系数，样本个位数时",
               "必然会蹦出几个 |ρ|>0.8 的「强相关」，那是巧合不是规律。",
               "拿它去改审核标准，等于用噪声重写考试大纲 —— 比不改更糟，",
               "因为改完之后所有稿都会朝那个错方向优化，而且没人会怀疑它。", "",
               "**在此之前，审核标准的唯一依据仍是采集数据**"
               "（`docs/20260804-标题真实规律-采集数据实证.md`，330 条搜索位笔记），",
               "那份样本量够，且已写进 eric-xhs-audit 的维度 2。", ""]
+        # ⛔ 2026-09-17 修：这里原来直接 return，于是**逐篇明细一并被跳过** ——
+        # 而 CURRENT_RUBRIC_SINCE 那段注释白纸黑字写着「旧卡的分留在逐篇明细里作
+        # 历史参照」。说的和做的不一致：每次换评分卡之后，在攒够 MIN_SAMPLE 之前
+        # （按当前节奏 2-3 周），这份报告除了「还差 N 篇」什么都不显示，
+        # 连已经回填好的真实数据都看不到。不给系数是对的（样本不够），
+        # 不给**数据**没有理由 —— 明细本来就只是追溯用，不参与任何结论。
+        L += detail_table(paired)
         return "\n".join(L).rstrip() + "\n"
 
     L += ["## 各维度分 vs 真实表现（Spearman 秩相关，仅同卡样本）", "",
+          f"**主指标是「{MAIN_OUTCOME}」**（收藏＝我以后要用它），第二指标「分享」"
+          "（＝我要拿它去帮另一个人）。搜索来源占比留在表里作**渠道诊断**，"
+          "它回答的是「有没有被搜到」，不是「有没有帮到人」—— 2026-09-17 换锚，"
+          "依据见本文件头 OUTCOMES 那段。", "",
           "系数为正 = 这个维度打得高的稿，真实表现也好，判据有效。",
           "系数接近 0 = 这条判据和结果无关，白扣分。",
           "**系数为负 = 判据方向反了，越符合标准表现越差，必须改。**", "",
@@ -227,31 +275,24 @@ def render(paired, pending, min_days, relaxed):
             ys = [r[o] for r in same_card if r[d] is not None and r[o] is not None]
             rho = spearman(xs, ys) if len(xs) >= 3 else None
             cells.append("—" if rho is None else f"{rho:+.2f}")
-            if rho is not None and o == OUTCOMES[0] and rho < -0.3:
+            if rho is not None and o == MAIN_OUTCOME and rho < -0.3:
                 flags.append((d, rho))
         L.append(f"| {d} | " + " | ".join(cells) + " |")
     L.append("")
 
     if flags:
-        L += ["## ⚠️ 方向可疑的维度（与主指标负相关）", ""]
+        L += [f"## ⚠️ 方向可疑的维度（与主指标「{MAIN_OUTCOME}」负相关）", ""]
         for d, rho in flags:
-            L.append(f"- **{d}**：与「{OUTCOMES[0]}」秩相关 {rho:+.2f} —— "
-                     f"这条判据打得越高，搜索进入反而越少。去 `skills/eric-xhs-audit/SKILL.md` "
+            L.append(f"- **{d}**：与「{MAIN_OUTCOME}」秩相关 {rho:+.2f} —— "
+                     f"这条判据打得越高，读者反而越不觉得值得存下来。"
+                     f"去 `skills/eric-xhs-audit/SKILL.md` "
                      f"看维度「{d}」写了什么，对照实际稿子确认是不是判据本身错了。")
         L.append("")
     else:
         L += ["## 没有方向反了的维度", "",
               "所有维度与主指标的相关性都不为显著负，暂无需要推翻的判据（同卡样本范围内）。", ""]
 
-    L += ["## 逐篇明细（含跨卡样本，仅供追溯，卡口径见「卡」列）", "",
-          "| 标题 | 卡 | 天数 | 总分 | " + " | ".join(OUTCOMES) + " |",
-          "|---|---|---|---|" + "---|" * len(OUTCOMES)]
-    for r in sorted(paired, key=lambda x: -(x["总分"] or 0)):
-        card = "同卡" if r["同卡"] else "旧卡"
-        L.append(f"| {r['发布标题'][:24]} | {card} | {int(r['天数'])} | {r['总分']} | "
-                 + " | ".join("—" if r[o] is None else f"{r[o]:g}" for o in OUTCOMES) + " |")
-    L += ["", "---", "",
-          "⛔ 本报告不改任何 skill 文件。要不要按它改审核标准，由人决定。"]
+    L += detail_table(paired)
     return "\n".join(L).rstrip() + "\n"
 
 
