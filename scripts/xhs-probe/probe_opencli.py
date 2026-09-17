@@ -30,6 +30,7 @@ density 仍由 probe.judge_density() 这套确定性规则算，本文件只负�
 import argparse
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -80,21 +81,118 @@ def opencli_bin() -> str:
         "没装就跑 npm i -g @jackwener/opencli")
 
 
+# ── oc() 的失败原因（2026-09-17 加）────────────────────────────────────────────
+#
+# ⛔ 起因：2026-09-12 起采集连续 15 轮（5 天 × 3 轮）全部 0 条，日志每轮都写
+# 「0 条（搜索无结果或登录态失效）」、收尾写「多半是登录态失效」。
+# 真实原因是 **Browser Bridge 扩展没连上**（opencli doctor: Extension not connected），
+# 跟登录态毫无关系 —— 重启专用 Chromium 就好了。查错的人被日志指向了错误的方向。
+#
+# 根因就在下面这个函数：它把**所有**失败都压成 None ——
+#   扩展断连 / 登录失效 / 超时 / opencli 崩了 / 真的 0 条结果，调用方一律看到 None。
+# 信息在这里被丢掉，后面任何一层都补不回来。
+#
+# ⚠️ 还有一层坑：opencli 的**错误输出即使加了 `-f json` 也是 YAML**
+# （`ok: false` / `error:` / `  code: BROWSER_CONNECT`），所以 json.loads 直接抛
+# JSONDecodeError，连 `d.get("ok") is False` 那个分支都走不到 —— 那行代码
+# 从来没有生效过。现在从文本里把 code 抠出来。
+LAST_ERROR: dict = {}
+
+# 基础设施故障：重试没有意义，整轮应该立刻停手（继续跑只是白烧 8-20 分钟）
+INFRA_CODES = {"BROWSER_CONNECT", "DAEMON", "DAEMON_NOT_RUNNING", "BROWSER_NOT_FOUND"}
+# 登录态问题：需要人扫码，不是脚本能自愈的
+AUTH_CODES = {"AUTH_REQUIRED", "LOGIN_REQUIRED", "AUTH"}
+
+_ERR_CODE_RE = re.compile(r"^\s*code:\s*([A-Z_]+)\s*$", re.M)
+
+
+def _record_error(kind: str, code: str = "", msg: str = ""):
+    LAST_ERROR.clear()
+    LAST_ERROR.update({"kind": kind, "code": code, "message": msg})
+
+
 def oc(args, timeout=OC_TIMEOUT):
-    """调 opencli 并解析 JSON。失败返回 None（由调用方决定降级还是抛）。"""
-    r = subprocess.run([opencli_bin(), "xiaohongshu", *args, "-f", "json"],
-                       capture_output=True, text=True, timeout=timeout)
+    """调 opencli 并解析 JSON。失败返回 None，**失败原因记进 LAST_ERROR**。
+
+    LAST_ERROR["kind"] 取值：infra / auth / empty / parse / crash / timeout。
+    调用方该怎么用：infra 和 auth 立刻停整轮（见 preflight），其余才是「这条词没数据」。
+    """
+    try:
+        r = subprocess.run([opencli_bin(), "xiaohongshu", *args, "-f", "json"],
+                           capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _record_error("timeout", msg=f"opencli {' '.join(args[:2])} 超过 {timeout}s")
+        return None
     out = (r.stdout or "").strip()
     if not out:
+        _record_error("crash", msg=(r.stderr or "").strip()[:200] or "opencli 无输出")
         return None
     try:
         d = json.loads(out)
     except json.JSONDecodeError:
+        # 错误分支走的就是这里 —— opencli 的错误是 YAML，不是 JSON
+        m = _ERR_CODE_RE.search(out)
+        code = m.group(1) if m else ""
+        kind = ("infra" if code in INFRA_CODES else
+                "auth" if code in AUTH_CODES else "parse")
+        _record_error(kind, code, out[:200])
         return None
-    # 错误形态：{"ok": false, "error": {...}}
     if isinstance(d, dict) and d.get("ok") is False:
+        err = d.get("error") or {}
+        code = str(err.get("code") or "")
+        kind = ("infra" if code in INFRA_CODES else
+                "auth" if code in AUTH_CODES else "parse")
+        _record_error(kind, code, str(err.get("message") or "")[:200])
         return None
+    _record_error("empty" if not d else "", "")
     return d
+
+
+# preflight 的探针词。⛔ 不要写死一个 —— 每天固定用同一个词去探，本身就是可识别的
+# 特征，而这个账号的整条链路对主站风控相当敏感（2026-08-16 因此降过频）。
+# 选的都是搜索量大、跟本账号赛道无关紧要的通用词，探不到就是真有问题。
+_PREFLIGHT_WORDS = ["面试", "职场", "offer", "简历", "跳槽", "加薪"]
+
+
+def preflight() -> tuple[bool, str]:
+    """开跑前确认这条链是通的。通 → (True, "")；不通 → (False, 该怎么修)。
+
+    ⛔ **不用 `opencli auth status`**：CLAUDE.md 明写它只做 quick check（看 cookie 在不在），
+    实测出现过它报 logged_in: true 而真实请求直接 AUTH_REQUIRED。判据必须是真实命令。
+
+    放在每轮开头跑一次，成本是一次 search（几秒），换掉的是「8 个词各跑一遍、
+    20 分钟之后才发现整条链断了」，而且报的原因还是错的。
+    """
+    word = random.choice(_PREFLIGHT_WORDS)
+    hits = oc(["search", word, "--limit", "1"])
+    if hits:
+        return True, ""
+    kind = LAST_ERROR.get("kind", "")
+    code = LAST_ERROR.get("code", "")
+    if kind == "infra":
+        return False, (
+            f"⛔ 浏览器桥断了（{code or 'BROWSER_CONNECT'}）—— 不是登录态问题，别去扫码。\n"
+            "   查：opencli doctor\n"
+            "   修：launchctl kickstart -k gui/$(id -u)/com.eric.xhschrome"
+            "（重启 XHS 专用 Chromium，cookie 在 profile 里不会掉）\n"
+            "   还不行再：opencli daemon restart")
+    if kind == "auth":
+        return False, (
+            f"⛔ 登录态失效（{code}）—— 需要人扫码，脚本自愈不了。\n"
+            "   跑：opencli xiaohongshu login（会开登录页等扫码，先告知 Eric）\n"
+            "   注意主站与创作者中心 cookie 相互独立，按需分别验。")
+    if kind == "timeout":
+        return False, f"⛔ opencli 超时：{LAST_ERROR.get('message', '')}"
+    if kind in ("crash", "parse"):
+        return False, (f"⛔ opencli 异常（{kind}）：{LAST_ERROR.get('message', '')[:160]}\n"
+                       "   先跑 opencli doctor 看是哪一环。")
+    # 链路通、真的搜不到东西 —— 这才是风控该考虑的那种情况。
+    # ⚠️ 注意这跟「浏览器桥断了」是两回事：桥是好的，是站点不给数据。
+    # 调用方报警时别把这两种混成一句话（health_check 第一版就混了）。
+    return False, (f"⚠️ 风控：浏览器桥正常、创作者中心多半也正常，但主站搜「{word}」"
+                   f"这种通用词返回 0 条。\n"
+                   "   参考 2026-08-16 那次：降频错峰，别继续投，硬投一整天都会空。\n"
+                   "   （连续密集请求最容易触发 —— 刚手动验证过就跑采集尤其容易撞上。）")
 
 
 def note_id_of(url: str) -> str:

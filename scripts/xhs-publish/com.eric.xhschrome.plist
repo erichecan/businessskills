@@ -19,15 +19,25 @@
          用独立 ‑‑user-data-dir：不碰你日常那个 Chrome 的 profile、书签、登录态和窗口。
          代价是小红书要在这个 profile 里**单独登录一次**，之后 cookie 就留在里面。
 
-         端口用 9333 而不是 9222：9222 被日常 Chrome 占着（虽然它不应答）。 -->
+         端口用 9333 而不是 9222：9222 被日常 Chrome 占着（虽然它不应答）。
+
+         ⛔ 2026-09-17 同步：这份文件一直停在 Google Chrome + ~/.xhs-chrome-profile，
+         而线上从 2026-08-21 起就换成了 **Chromium + ~/.xhs-chromium-profile
+         + --load-extension**（见 CLAUDE.md「联网抓取规则」）。仓库这份漂了将近一个月，
+         照它重装等于把故障装回来：没有 --load-extension，opencli 的 Browser Bridge
+         就连不上，采集/探测/发布/数据回收全部静默返回空 —— 09-12~09-17 的采集
+         连续 15 轮 0 条，就是扩展没连上（不是登录态问题）。 -->
     <key>ProgramArguments</key>
     <array>
-        <string>/Applications/Google Chrome.app/Contents/MacOS/Google Chrome</string>
+        <string>/Users/eric/.chromium-org/Chromium.app/Contents/MacOS/Chromium</string>
         <string>--remote-debugging-port=9333</string>
-        <string>--user-data-dir=/Users/eric/.xhs-chrome-profile</string>
+        <string>--user-data-dir=/Users/eric/.xhs-chromium-profile</string>
         <string>--remote-allow-origins=http://127.0.0.1:9333</string>
         <string>--no-first-run</string>
         <string>--no-default-browser-check</string>
+        <!-- opencli 的 Browser Bridge 扩展。⛔ 漏了这行 = 扩展连不上，
+             而所有依赖 opencli 的链路（采集/探测/发布/数据回收）都会静默返回空。 -->
+        <string>--load-extension=/Users/eric/.xhs-chromium-opencli-ext</string>
         <!-- 不要加 ‑‑headless：小红书创作平台对无头浏览器有风控，且预填后的页面
              还需要能被人看见（自动选时间失败时得有人接手）。 -->
     </array>

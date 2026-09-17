@@ -289,8 +289,68 @@ def check_draft_quality(alerts):
         alerts.append(f"成稿机械检查无法执行：{e}")
 
 
+def check_browser_bridge(alerts):
+    """浏览器桥通不通 —— 采集/探测/发布/数据回收全挂在它上面。
+
+    ⛔ 2026-09-17 加。起因：09-12~09-17 采集连续 15 轮 0 条（5 天 × 3 轮），
+    根因是 opencli 的 Browser Bridge 扩展没连上（专用 Chromium 连跑 15 天，
+    service worker 死了），重启浏览器即好。
+    **而健康检查从来没有体检过这一环** —— 它只看到「采集 exit 1」这个结果，
+    看不到原因，于是 brief 天天报一条没人知道怎么修的红灯，一报 5 天。
+
+    ⛔ 判据是**真实命令**，不是 `opencli auth status`：CLAUDE.md 明写后者只做
+    quick check，实测出现过它报 logged_in: true 而真实请求直接 AUTH_REQUIRED。
+    """
+    sys.path.insert(0, str(REPO / "scripts" / "xhs-probe"))
+    try:
+        import probe_opencli
+        ok, why = probe_opencli.preflight()
+    except Exception as e:                                  # noqa: BLE001
+        alerts.append(f"浏览器桥检查跑不起来：{e}")
+        return
+    if not ok:
+        # ⛔ 别把「桥断了」和「风控」报成同一句话：修法完全不同（重启浏览器 vs 停手降频），
+        # 而报错误的原因正是这次查了 5 天的根源。preflight 已经分好类了，照它说的转述。
+        head = ("**主站风控 —— 桥是通的，是站点不给数据**" if why.startswith("⚠️ 风控")
+                else "**取数链路不通 —— 采集/探测/发布/数据回收会全线静默返回空**")
+        alerts.append(head + "\n\n" + "\n".join("    " + ln for ln in why.splitlines()))
+
+
+def check_first_comment_compliance(alerts):
+    """首评草稿有没有踩「评论换资源」那条平台红线。
+
+    ⛔ 2026-09-17 加。起因：账号 2026-08-20 因「诱导互动」被平台判违规、收到警告，
+    知识框架和评分卡当天都改了，**但真正生成首评文案的那个 prompt 没改** ——
+    它硬性要求「承诺一个具体回报：回了这个字母能得到什么」，于是判违规之后
+    又照着违规句式生成了整整一个月：64 份草稿里 34 份命中，29 份在判例之后。
+    而 first-send 是**自动发送**的，读到哪份就发哪份，中间一道检查都没有。
+
+    改 prompt 只管以后，这条体检管的是「以后有没有再漂回去」。
+    """
+    sys.path.insert(0, str(REPO / "scripts" / "xhs-comment"))
+    try:
+        import draft_comments
+    except Exception as e:                                  # noqa: BLE001
+        alerts.append(f"首评合规检查跑不起来：{e}")
+        return
+    d = SUCAI / "首评草稿"
+    if not d.exists():
+        return
+    hits = [(p.name, draft_comments.exchange_hit(p.read_text(encoding="utf-8")))
+            for p in sorted(d.glob("*.txt"))]
+    hits = [(n, b) for n, b in hits if b]
+    if hits:
+        detail = "；".join(f"{n}（「{b}」）" for n, b in hits[:5])
+        alerts.append(
+            f"**{len(hits)} 份首评草稿踩「评论换资源」平台红线**（2026-08-20 已因同类表达"
+            f"收到警告，first-send 会自动发出去）：{detail}\n"
+            "    修：python3 scripts/xhs-comment/draft_comments.py first-audit --fix")
+
+
 def main() -> int:
     alerts = []
+    check_browser_bridge(alerts)     # 排在第一：它不通的话，下面那些告警多半是它的下游
+    check_first_comment_compliance(alerts)
     check_log_freshness(alerts)
     check_run_completeness(alerts)
     check_quote_harvest(alerts)

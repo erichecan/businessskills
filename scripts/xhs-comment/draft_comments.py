@@ -139,37 +139,64 @@ def write_ledger(rows):
 
 # ── 子命令 first：首评草稿 ──────────────────────────────────────────────────
 
-FIRST_PROMPT = """你在给一条已发布的小红书笔记写「首评」——由博主本人发在自己笔记下的第一条评论。
+FIRST_PROMPT = """你在给一条已发布的小红书笔记写「首评」——由博主本人发在自己笔记下的第一条评论，
+会被置顶，是一块高曝光位。
 
-## 这条首评要解决的问题
+## ⛔⛔ 先读这一条，它推翻了这个 prompt 的旧版本（2026-09-17 重写）
 
-这个账号 18 篇笔记合计 1992 次观看、**只有 6 条评论**（评论率 0.30%）。
-最好的一篇 1050 观看、30 赞、39 收藏、**0 评论**。
-收藏 > 点赞 > 评论 = 读者觉得「有用，存起来」然后就走了。
+**旧版硬性要求「承诺一个具体回报：回了这个字母能得到什么」。那正是账号
+2026-08-20 被平台判违规的那个句式，而这条要求在被判违规之后又跑了整整一个月。**
 
-根因不是没有 CTA，是**CTA 的成本太高**。现在正文结尾长这样：
-- 「你被打断过最难接的一次是哪句话？评论区说说。」
-- 「把他当时那句原话发评论区，我帮你看他在试探哪一层。」
-要读者回忆具体事件、组织一段话、还要把领导的原话公开贴出来。
-话题又是被孤立、不想转正、下属不服管这种——公开发这些对读者有真实风险。
+平台判例原文（存档在 知识框架.md 第十六节）：
+> 你踩的是哪一格？评论区回个字母： A 两轮讲了同一版经历——**我给你** HR 那轮该砍掉
+> 哪一段。B 反问问错了人——**我给你**两轮各自该问的那一句。
 
-所以首评的任务是：**把评论成本降到打一个字**。
+判的是「福利换互动」+「抽奖噱头」两条：**以互动换取资源**这个结构本身违规，
+不管换的是资料、模板还是一句话术。实测本目录 64 份草稿里 **34 份命中**，
+其中 **29 份是 08-20 判例之后生成的**。
+
+⛔ **所以：任何「回了 X 就给你 Y」的结构一律禁止。** 包括但不限于——
+「回字母我给你…」「我把那句甩你」「回 A 我帮你补全」「扣 1 领模板」「关注看第二弹」。
+判断方法：读完整条首评，问「读者拿到这个东西，需不需要先做一个互动动作？」
+需要 → 重写。
+
+## 这条首评真正该干的事：把单篇读者变成账号读者
+
+账号 18 篇合计 1992 观看只有 6 条评论，最好的一篇 1050 观看 / 39 收藏 / 0 评论。
+旧版据此把目标定成「把评论成本降到打一个字」——**但评论数是个虚荣指标，
+而且为它设计的机制正好踩了红线。**
+
+置顶位真正值钱的用法是**引流**：让读到这一篇的人，变成会回来看下一篇的人。
+所以按下面三件事写，优先级从高到低：
 
 ## 硬要求
 
-1. 给出 2–4 个**编号选项**，让读者只需回一个字母或数字。
-   选项必须来自这篇笔记正文里真实出现过的分类，不许现编。
-2. 选项之间要真的互斥、且都像自己——读者能一眼认出「我是 B」。
-   ⛔ 选项描述的是**读者的处境**，不是你打算给他的东西。回报只在第 3 条那句里说一次，
-   不许拆进选项里。（2026-08-18 实测：Sonnet 两次都在这里偏，两次都把选项写成了回报，
-   结果读者根本认不出自己是哪个字母。）
+1. **第一句：直接给一个正文里没有的、能用的东西。无条件给，不要任何前提。**
+   通常是「下一层」——正文教了怎么开口，首评就给「他要是不接你这句，接着说什么」；
+   或者是边界——「这句在什么情况下别用」。
+   ⛔ 这一句**不许**跟任何互动动作挂钩。它是白给的。
+   　为什么白给：读者关注一个账号的理由是「这人给得多」，不是「回字母有奖」。
+   　这也是账号评分卡维度 5 的要求——读者关掉页面时手上得多点东西。
+
+2. **第二句：指一篇自己写过的相关笔记。**
+   下面会给你一份本账号已发布笔记的清单（标题 + 链接）。挑**最相关的一篇**，
+   用一句话说清「那一篇答的是什么情况」，让此刻用不上的人知道该去看哪篇。
+   ⛔ 只能挑清单里真实存在的，不许编标题。清单里没有合适的就**跳过这一句**，
+   不许硬凑一个不相关的。
+   ✅「另一种情况——他当场不接话、等散会再找你——写在《XXX》那篇里。」
+
+3. **第三句（可选）：低门槛表态。**
+   可以给 2-4 个编号选项让读者回一个字母，选项必须来自正文里真实出现过的分类。
+   ⛔ **句子写到选项为止，就停。** 后面不接「我会…」「你就能…」「我给你…」任何一个字。
+   ⛔ 选项描述的是**读者的处境**，不是你打算给他的东西。
    ✅「A 抢着表忠心、B 他压你价、C 他全程在说你插不进话」
-   ⛔「A 他追问期望薪资你怎么接、B 压价那刻怎么把范围推回去」
-3. 承诺一个**具体回报**：回了这个字母能得到什么（对应那一种的第一句话怎么说 / 判据是什么）。
-   不许承诺结果（「保过」「一定能」），不许引流付费。
-4. 全长 ≤ 80 字。这是评论不是正文。
+   ⛔「A 他追问期望薪资你怎么接——我给你那一句」
+   没有合适的分类就**不写这一句**。首评宁可只有前两句，不许为了凑互动硬编。
+
+4. 全长 ≤ 100 字。这是评论不是正文。
 5. 口语，像人随手补一句，不像运营话术。禁止「宝子」「家人们」「绝绝子」。
-6. 不出现任何身份头衔（前腾讯 / 资深 / 专家 / 总监）。
+6. 不出现任何身份头衔（前腾讯 / 资深 / 专家 / 总监 / 十年面试官）。
+7. 不承诺结果（「保过」「一定能」），不引流付费，不出现「表达力」三个字。
 
 ## 输出格式
 
@@ -181,7 +208,66 @@ FIRST_PROMPT = """你在给一条已发布的小红书笔记写「首评」—�
 
 笔记正文：
 {body}
+
+## 本账号已发布笔记（第 2 句从这里挑，只能挑这里真实存在的）
+{related}
 """
+
+# ── 「评论换资源」的机械判据（2026-09-17 加）────────────────────────────────
+#
+# ⛔ 光改 prompt 不够 —— 旧 prompt 被判违规之后又跑了一个月没人发现，靠的正是
+# 「没有任何机械检查在看这些草稿」。模型偶尔会绕回旧句式（它见过太多这种文案），
+# 所以落盘前硬拦一道：命中就重试，再命中就不落盘。
+#
+# 判据来自平台判例的结构：**互动动作 + 给予承诺**。不逐字匹配，匹配那个结构。
+# ⚠️ 动词表要按「给予」这个语义收，不要按具体词面收 —— 第一版漏掉了
+# 「我把那句开场白按你这种情况**改出来**」（动词是"改出来"不在表里），
+# 而它和「我给你写好」是同一个承诺。收不干净的判据比没有判据更危险：
+# 它会让人以为这一环已经有人看着了。
+EXCHANGE_RE = re.compile(
+    r"我(给|帮|替)你"
+    r"|我把[^。\n]{0,20}(给你|甩你|发你|补全|写好|写出来|改出来|改好|列出来|整理好|弄好)"
+    r"|给你(补|写|发|甩|整理|改)[^，。\n]{0,8}"
+    r"|扣\s*[A-D1-4]|领(资料|模板|清单)|私信我(发|给)"
+    r"|(关注|点赞|转发)[^。\n]{0,6}(就|即可|才)[^。\n]{0,8}(看|拿|给|领)")
+
+
+def exchange_hit(text: str) -> str:
+    """返回命中的那一段；没命中返回 ""。"""
+    m = EXCHANGE_RE.search(text or "")
+    return m.group() if m else ""
+
+
+RETRY_NOTE = """
+
+⛔⛔ 上一次你写的首评里出现了「{bad}」—— 这就是**以互动换取资源**的结构，
+正是账号 2026-08-20 被平台判违规的那一条。重写，这次：
+把「回了就给你 X」整个删掉。第 1 句那个东西**无条件给**，不挂任何互动前提；
+第 3 句写到选项为止就停，后面一个字都不要再接。
+"""
+
+
+def related_published(title: str, limit: int = 12) -> str:
+    """挑与本篇最相关的已发布笔记，给模型做站内互链。
+
+    相关性用标题的 2 字片段重叠度算 —— 简单但够用：首评只需要挑出 1 篇像样的，
+    挑错了模型会自己跳过第 2 句（prompt 允许跳过），比引一个不存在的标题安全。
+    ⛔ 只给**真实发布过**（有笔记链接）的，否则模型会引到一篇根本搜不到的笔记上。
+    """
+    rows = []
+    with (SUCAI / "发布日志.csv").open(encoding="utf-8-sig") as f:
+        for r in csv.DictReader(f):
+            t, link = (r.get("标题") or "").strip(), (r.get("笔记链接") or "").strip()
+            if t and link and t != title:
+                rows.append((t, link))
+    seen, uniq = set(), []
+    for t, link in rows:
+        if t not in seen:
+            seen.add(t)
+            uniq.append((t, link))
+    frags = {title[i:i + 2] for i in range(len(title) - 1)}
+    uniq.sort(key=lambda x: -sum(1 for f in frags if f in x[0]))
+    return "\n".join(f"- {t}　{link}" for t, link in uniq[:limit]) or "（暂无已发布笔记）"
 
 
 def cmd_first(args):
@@ -210,15 +296,33 @@ def cmd_first(args):
             print(f"⛔ {p.name}：解析不出正文")
             continue
         print(f"\n▶ {title}")
-        out, err = run_claude(FIRST_PROMPT.format(title=title, body=body[:2500]))
-        if not out:
-            print(f"  ⛔ {err}")
+        prompt = FIRST_PROMPT.format(title=title, body=body[:2500],
+                                     related=related_published(title))
+        # ⛔ 合规重试（2026-09-17）：模型见过太多「回字母我给你X」的文案，偶尔会绕回去。
+        # prompt 改了还不够 —— 旧 prompt 被判违规之后又跑了一整个月没人发现，
+        # 靠的正是「没有任何机械检查在看这些草稿」。这里补上那道检查。
+        first, bad = "", ""
+        for attempt in (1, 2):
+            out, err = run_claude(prompt if attempt == 1 else prompt + RETRY_NOTE.format(bad=bad))
+            if not out:
+                print(f"  ⛔ {err}")
+                break
+            # ⛔ 不能 split("\n")[0]。首评天然是多行 —— 「他在等的那件旧账，多半是这三种：」
+            # 后面跟着 A/B/C 三个选项，只取第一行等于把选项全扔了，剩下一句没头没尾的话。
+            # （2026-08-08 第一版就是这么错的。）只剥掉代码围栏和整体引号。
+            cand = re.sub(r"^```[a-z]*\n|\n```$", "", out.strip()).strip().strip('"“”')
+            cand = normalize_punct(cand)
+            bad = exchange_hit(cand)
+            if not bad:
+                first = cand
+                break
+            print(f"  ⚠️ 第 {attempt} 次命中「评论换资源」句式（「{bad}」），"
+                  f"{'重试' if attempt == 1 else '放弃'}")
+        if not first:
+            if bad:
+                print("  ⛔ 两次都写成了交换句式，**不落盘** —— "
+                      "这是 2026-08-20 平台判违规的结构，宁可这篇没有首评。")
             continue
-        # ⛔ 不能 split("\n")[0]。首评天然是多行 —— 「他在等的那件旧账，多半是这三种：」
-        # 后面跟着 A/B/C 三个选项，只取第一行等于把选项全扔了，剩下一句没头没尾的话。
-        # （2026-08-08 第一版就是这么错的。）只剥掉代码围栏和整体引号。
-        first = re.sub(r"^```[a-z]*\n|\n```$", "", out.strip()).strip().strip('"“”')
-        first = normalize_punct(first)
         n = len(first.replace("\n", ""))
         print(f"  首评草稿（{n} 字）：")
         print("".join(f"  │ {l}\n" for l in first.split("\n")), end="")
@@ -696,6 +800,37 @@ def drafts_by_title():
     return out
 
 
+def cmd_first_audit(args):
+    """扫存量首评草稿，列出命中「评论换资源」的那些。
+
+    ⛔ 为什么需要这个：prompt 改对了只管住**以后**生成的，磁盘上躺着的存量照样会被
+    first-send 读出来发掉。2026-09-17 首次扫出 34/64 份命中，其中 29 份是
+    08-20 判例之后生成的 —— 也就是说判违规之后这条链又跑了整整一个月。
+    --fix 只是删掉（不是改写）：这些是草稿，删了下次会按新 prompt 重新生成，
+    而改写它们等于在违规文本上做手术，不如重来。
+    """
+    d = SUCAI / "首评草稿"
+    files = sorted(d.glob("*.txt"))
+    hits = [(p, exchange_hit(p.read_text(encoding="utf-8"))) for p in files]
+    hits = [(p, b) for p, b in hits if b]
+    print(f"首评草稿 {len(files)} 份 · 命中「评论换资源」**{len(hits)} 份**")
+    if not hits:
+        print("✅ 没有草稿踩 2026-08-20 那条平台红线")
+        return 0
+    late = [p for p, _ in hits if p.stem[3:13] >= "2026-08-20"]
+    print(f"其中 {len(late)} 份生成于 08-20 判例之后\n")
+    for p, b in hits:
+        print(f"  ⛔ {p.name}")
+        print(f"     命中「{b}」　{p.read_text(encoding='utf-8').strip()[:56]}")
+    if args.fix:
+        for p, _ in hits:
+            p.unlink()
+        print(f"\n已删除 {len(hits)} 份 —— 下次 first / first-send 会按新 prompt 重新生成")
+    else:
+        print(f"\n加 --fix 删掉它们（下次会按新 prompt 重新生成）")
+    return 3
+
+
 def cmd_first_send(args):
     """给已发布、还没发过首评的笔记自动发首评。
 
@@ -743,15 +878,30 @@ def cmd_first_send(args):
             print("   · 没有首评草稿，现生成")
             from case_entry import parse_draft
             d = parse_draft(draft.read_text(encoding="utf-8"))
-            out, err = run_claude(FIRST_PROMPT.format(title=d.get("title", ""),
-                                                      body=(d.get("body") or "")[:2500]))
+            dt = (d.get("title") or "").strip()
+            out, err = run_claude(FIRST_PROMPT.format(title=dt,
+                                                      body=(d.get("body") or "")[:2500],
+                                                      related=related_published(dt)))
             if not out:
                 print(f"   ⛔ {err}")
                 continue
             first = normalize_punct(re.sub(r"^```[a-z]*\n|\n```$", "", out.strip()).strip())
+            if exchange_hit(first):
+                print(f"   ⛔ 现生成的首评命中「评论换资源」（「{exchange_hit(first)}」），不落盘也不发")
+                continue
             txt_path.parent.mkdir(exist_ok=True)
             txt_path.write_text(first + "\n", encoding="utf-8")
         text = txt_path.read_text(encoding="utf-8").strip()
+        # ⛔⛔ 发送前最后一道合规闸（2026-09-17 加）。这是最要紧的一道 ——
+        # 磁盘上**现存 34/64 份草稿命中「评论换资源」**，其中 29 份是 2026-08-20
+        # 平台判违规之后生成的。在此之前这条路径直接读文件就发，一道检查都没有。
+        # 账号已经因为同类表达吃过一次警告，再来一次代价不是扣分是封号。
+        bad = exchange_hit(text)
+        if bad:
+            print(f"   ⛔⛔ 跳过：这份草稿命中「评论换资源」句式（「{bad}」）—— "
+                  f"2026-08-20 平台判违规的结构，账号已吃过一次警告。")
+            print(f"      删掉 {txt_path.name} 重新生成（新版 prompt 已经不会这么写）")
+            continue
         print(f"   首评（{len(text.replace(chr(10),''))} 字）：{text[:60]}")
         if args.dry_run:
             print("   [dry-run] 不发送")
@@ -806,9 +956,12 @@ def main():
     rp.add_argument("--send", dest="dry_run", action="store_false",
                     help="真的点发送（默认只填不发）")
 
+    fa = sub.add_parser("first-audit", help="扫存量首评草稿，查「评论换资源」红线")
+    fa.add_argument("--fix", action="store_true", help="删掉命中的（下次按新 prompt 重生成）")
+
     a = ap.parse_args()
     return {"first": cmd_first, "watch": cmd_watch, "reply": cmd_reply,
-            "first-send": cmd_first_send}[a.cmd](a)
+            "first-send": cmd_first_send, "first-audit": cmd_first_audit}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -331,6 +331,10 @@ def update_pool(pool, stats, today):
     return promoted
 
 
+# 「0 条」的三种无害原因，照实说。infra/auth 不在这里 —— 那两种要停整轮，不是记一笔。
+ZERO_REASON = {"timeout": "超时", "crash": "opencli 异常", "parse": "返回解析不了"}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -358,6 +362,20 @@ def main():
     seen_ids, seen_titles = memory_keys(mem)
     picked = pick_keywords(pool, args.limit)
     rn = run_no(today)
+
+    # ── 开跑前先确认这条链是通的（2026-09-17 加）────────────────────────────
+    # ⛔ 起因：09-12 起连续 15 轮（5 天 × 3 轮）全部 0 条，每轮把 8 个词都跑一遍、
+    # 花掉 8-20 分钟，最后报「多半是登录态失效」。真实原因是 Browser Bridge 扩展
+    # 没连上，跟登录态无关，重启专用 Chromium 就好 —— 而这句错误的诊断
+    # 把排查方向指错了整整 5 天。
+    # 现在：一次 search 就能判出链路通不通（几秒），不通就立刻停手并报**准确**的修法。
+    ok, why = probe_opencli.preflight()
+    if not ok:
+        print(why, file=sys.stderr)
+        print("本轮不采集 —— 链路不通时继续投词只会白烧时间，并把「0 新增」写进台账，"
+              "让下游误以为是「采到了但没新东西」。", file=sys.stderr)
+        return 1
+
     print(f"===== {today} {rn} 采集开始 · {len(picked)} 词 · 记忆库 {len(mem)} 条 =====")
 
     all_new, stats, total_hit, failed = [], {}, 0, []
@@ -372,7 +390,19 @@ def main():
             failed.append(kw)
             continue
         if not n:
-            print("    → 0 条（搜索无结果或登录态失效）")
+            # ⛔ 别再把所有 0 条都写成「搜索无结果或登录态失效」（2026-09-17 改）：
+            # 那句话把三种完全不同的情况糊在一起，而修法南辕北辙。
+            # oc() 现在把失败原因记在 LAST_ERROR 里，照实说。
+            kind = probe_opencli.LAST_ERROR.get("kind", "")
+            code = probe_opencli.LAST_ERROR.get("code", "")
+            if kind in ("infra", "auth"):
+                # 开跑前 preflight 通过、跑到一半断了 —— 剩下的词没有必要再投
+                print(f"    ⛔ 链路中途断了（{kind} {code}）—— 停止本轮，"
+                      f"不再投剩下 {len(picked) - i} 个词", file=sys.stderr)
+                _, why2 = probe_opencli.preflight()
+                print(why2, file=sys.stderr)
+                return 1
+            print(f"    → 0 条（{ZERO_REASON.get(kind, '这个词真的搜不到')}）")
             failed.append(kw)
             continue
         total_hit += n
@@ -431,8 +461,13 @@ def main():
     if promoted:
         print(f"候选升活跃：{'、'.join(promoted)}")
     if broken:
-        print("⛔ 所有词都没抓到 —— 多半是登录态失效，"
-              "跑 `opencli xiaohongshu search 测试 --limit 1` 验一下", file=sys.stderr)
+        # ⛔ 这里原来写「多半是登录态失效」—— 2026-09-17 删掉这个猜测。
+        # 开跑前的 preflight 已经把链路验过一遍了，能走到这里说明链路是通的，
+        # 那么全军覆没就**不是**登录态，而是这批词本身在风控下搜不出东西。
+        # 猜一个具体原因写进日志，比说「不知道」有害得多：这次就是这么误导了 5 天。
+        print("⛔ 所有词都没抓到，而开跑前的链路检查是通过的 —— 排除掉扩展断连和登录态，"
+              "剩下最可能的是主站风控（参考 2026-08-16 那次：降频错峰，当天别再投）。",
+              file=sys.stderr)
         return 1
     return 0
 
