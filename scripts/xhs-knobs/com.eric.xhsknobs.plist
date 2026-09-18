@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.eric.xhsknobs</string>
+    <!-- 旋钮配置台的后端。页面（config/knobs.html）只是个壳，读写 config/knobs.json
+         全靠它，服务不在的时候页面看起来一切正常、点保存却什么也没发生。
+         2026-09-17 就是这么坏的：上一个会话里手动 `python3 scripts/knobs_server.py` 起了一次，
+         进程随那个终端一起没了，浏览器标签页还开着 —— Eric 拖完旋钮点保存，
+         拿到一句「保存失败」，而 knobs-changelog.csv 里一条记录都没有，
+         说明从头到尾没有任何一次保存成功过。
+         DEV-PLAN 当时就把这条列成风险（「本地服务没人开，页面形同虚设」）并押后了 launchd，
+         这就是押后的代价。跟 cdpproxy 同一个病根：靠人在会话里手动跑一次，人一走它就没了。 -->
+    <key>ProgramArguments</key>
+    <array>
+        <!-- ⛔ 必须是 homebrew 这个 python：本仓库在外置卷上，launchd 要读它得有
+             「完全磁盘访问权限」，而拿到授权的是 /opt/homebrew/bin/python3。
+             用 /usr/bin/python3 实测直接 [Errno 1] Operation not permitted。 -->
+        <string>/opt/homebrew/bin/python3</string>
+        <string>/Volumes/datacenter/04-eric/AIcoding/businessskills/scripts/knobs_server.py</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- 不带它日志是块缓冲的，出了事日志里什么都没有 -->
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- KeepAlive：常驻服务，不是定时任务。挂了就拉起来，这样页面永远是能用的。 -->
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhsknobs.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/eric/Library/Logs/xhs/launchd-com.eric.xhsknobs.log</string>
+</dict>
+</plist>

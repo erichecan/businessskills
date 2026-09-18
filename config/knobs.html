@@ -33,6 +33,11 @@ header .path{font-size:12px;color:var(--dim);margin-top:8px}
 .note{background:var(--accent-soft);border:1px solid var(--line);border-left:3px solid var(--accent);
   border-radius:8px;padding:12px 14px;margin:20px 0;font-size:13px;color:var(--ink)}
 .note b{color:var(--accent)}
+.note.down{background:transparent;border-left-color:var(--warn);display:none}
+.note.down.on{display:block}
+.note.down b{color:var(--warn)}
+.note.down code{background:var(--accent-soft);padding:2px 6px;border-radius:4px;
+  display:inline-block;margin-top:6px}
 
 h2{font-size:15px;margin:32px 0 2px;letter-spacing:.02em;
   display:flex;align-items:baseline;gap:10px}
@@ -110,6 +115,14 @@ button:disabled{opacity:.5;cursor:default}
     这两种在页面上长得一样，但可靠程度差很远。
   </div>
 
+  <div class="note down" id="down">
+    <b>配置服务没在跑，改动保存不了。</b>
+    这个页面只是个壳，值读写的是本机 <code>config/knobs.json</code>，得由 knobs_server 代劳。
+    它平时由 launchd（<code>com.eric.xhsknobs</code>）常驻拉起，现在没应答 —— 终端里跑一次：
+    <br><code>launchctl kickstart -k gui/$(id -u)/com.eric.xhsknobs</code>
+    <br>然后刷新本页。页面上已经改的值不会丢，刷新前先记一下。
+  </div>
+
   <div id="groups"></div>
 </div>
 
@@ -127,8 +140,20 @@ const $=s=>document.querySelector(s);
 const isInt=k=>SCHEMA[k].type==='int';
 const fmt=(k,v)=>isInt(k)?String(v):(Math.round(v*100)/100).toFixed(2).replace(/\.?0+$/,'')||'0';
 
-function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';
-  clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',2600);}
+function toast(m,ms){const t=$('#toast');t.textContent=m;t.style.display='block';
+  clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',ms||2600);}
+
+/* ⛔ 失败必须说清楚是哪一种失败。第一版所有异常都吐同一句「保存失败」，
+   而实际发生的是服务根本没在跑（进程随开它的那个终端一起没了），
+   页面看起来一切正常、点保存只得到一句没信息量的话 —— 静默降级的老毛病。 */
+async function api(opts){
+  let r;
+  try{ r=await fetch('/api/knobs',opts); }
+  catch(e){ const err=new Error('配置服务没在跑'); err.down=true; throw err; }
+  if(!r.ok) throw new Error(`服务返回 ${r.status}：${(await r.text()).slice(0,120)}`);
+  return r.json();
+}
+function serviceDown(down){ $('#down').classList.toggle('on',down); }
 
 /* ── 后果预估：把旋钮换算成看得懂的后果 ───────────────────────────────────
    底数全部来自服务端读出的真实数据（采集台账/审核记录/词库），前端只做换算。 */
@@ -235,22 +260,33 @@ function updateAll(){
 }
 
 async function load(){
-  const r=await fetch('/api/knobs'); const d=await r.json();
-  SCHEMA=d.schema; SAVED={...d.values}; CUR={...d.values}; FC=d.forecast;
-  $('#path').textContent=`config/knobs.json　·　采集速率 ${FC.inflow_per_day} 条/天（近 ${FC.window_days} 天实测）`;
-  render();
+  try{
+    const d=await api();
+    SCHEMA=d.schema; SAVED={...d.values}; CUR={...d.values}; FC=d.forecast;
+    $('#path').textContent=`config/knobs.json　·　采集速率 ${FC.inflow_per_day} 条/天（近 ${FC.window_days} 天实测）`;
+    serviceDown(false);
+    render();
+  }catch(e){
+    // 第一版这里没有 catch：服务不在时整页空白，连「为什么空」都不说。
+    serviceDown(!!e.down);
+    if(!e.down) $('#groups').innerHTML=`<div class="note"><b>读不到旋钮：</b>${e.message}</div>`;
+  }
 }
 $('#reset').onclick=()=>{CUR={...SAVED};updateAll();};
 $('#save').onclick=async()=>{
   $('#save').disabled=true;
   try{
-    const r=await fetch('/api/knobs',{method:'PUT',headers:{'Content-Type':'application/json'},
+    const d=await api({method:'PUT',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({values:CUR,note:$('#note').value})});
-    const d=await r.json();
     SAVED={...d.values}; CUR={...d.values}; FC=d.forecast; $('#note').value='';
+    serviceDown(false);
     updateAll();
     toast(d.changed.length?`已保存 ${d.changed.length} 项，下一轮定时任务生效`:'没有改动');
-  }catch(e){toast('保存失败：'+e.message);}
+  }catch(e){
+    serviceDown(!!e.down);
+    // 改动全留在 CUR 里，没写盘也没被清掉 —— 服务拉起来后再点一次保存即可。
+    toast(e.down?'保存失败：配置服务没在跑，页面顶部有拉起它的命令':'保存失败：'+e.message,6000);
+  }
   $('#save').disabled=false;
 };
 load();

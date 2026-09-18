@@ -177,10 +177,19 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     url = f"http://{HOST}:{PORT}"
-    print(f"旋钮配置台 → {url}    （Ctrl-C 停）")
-    print(f"配置文件：{CONFIG}")
+    print(f"旋钮配置台 → {url}    （Ctrl-C 停）", flush=True)
+    print(f"配置文件：{CONFIG}", flush=True)
+    # ⛔ 只在人手动跑时开浏览器。launchd 里它是常驻服务，开机自动弹一个窗口是骚扰。
+    if sys.stdout.isatty():
+        try:
+            webbrowser.open(url)
+        except Exception:                             # noqa: BLE001
+            pass
     try:
-        webbrowser.open(url)
-    except Exception:                                 # noqa: BLE001
-        pass
-    ThreadingHTTPServer((HOST, PORT), H).serve_forever()
+        ThreadingHTTPServer((HOST, PORT), H).serve_forever()
+    except OSError as e:
+        if e.errno != 48:                             # EADDRINUSE
+            raise
+        # 常驻服务已经在了。再起一个只会占着终端却不服务，说清楚而不是甩 traceback。
+        print(f"⚠️ {PORT} 端口已被占用 —— 配置台多半已在跑，直接开 {url}", flush=True)
+        sys.exit(0)
