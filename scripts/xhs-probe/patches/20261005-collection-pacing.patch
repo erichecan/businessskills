@@ -1,0 +1,113 @@
+--- a/media_platform/xhs/core.py
++++ b/media_platform/xhs/core.py
+@@ -100,8 +100,11 @@
+                 # stealth.min.js is a js script to prevent the website from detecting the crawler.
+                 await self.browser_context.add_init_script(path="libs/stealth.min.js")
+ 
+-            self.context_page = await self.browser_context.new_page()
+-            await self.context_page.goto(self.index_url)
++            from tools.collection_pacing import async_session, random_delay as pacing_delay
++            async with async_session("check") as pacing:
++                self.context_page = await self.browser_context.new_page()
++                await self.context_page.goto(self.index_url)
++                await asyncio.sleep(pacing_delay("search_dwell_seconds", pacing))
+ 
+             # Create a client to interact with the Xiaohongshu website.
+             self.xhs_client = await self.create_xhs_client(httpx_proxy_format)
+@@ -138,6 +141,9 @@
+                 pass
+ 
+             utils.logger.info("[XiaoHongShuCrawler.start] Xhs Crawler finished ...")
++            # Only our own successful work tab; failed login/captcha tabs stay open.
++            await asyncio.sleep(pacing_delay("close_delay_seconds"))
++            await self.context_page.close()
+ 
+     async def search(self) -> None:
+         """Search for notes and retrieve their comment information."""
+@@ -278,6 +284,7 @@
+         Note: Must specify note_id, xsec_source, xsec_token
+         """
+         get_note_detail_task_list = []
++        detail_semaphore = asyncio.Semaphore(1)
+         for full_note_url in config.XHS_SPECIFIED_NOTE_URL_LIST:
+             note_url_info: NoteUrlInfo = parse_note_info_from_note_url(full_note_url)
+             utils.logger.info(f"[XiaoHongShuCrawler.get_specified_notes] Parse note url info: {note_url_info}")
+@@ -285,7 +292,7 @@
+                 note_id=note_url_info.note_id,
+                 xsec_source=note_url_info.xsec_source,
+                 xsec_token=note_url_info.xsec_token,
+-                semaphore=asyncio.Semaphore(config.MAX_CONCURRENCY_NUM),
++                semaphore=detail_semaphore,
+             )
+             get_note_detail_task_list.append(crawler_task)
+ 
+--- a/media_platform/xhs/client.py
++++ b/media_platform/xhs/client.py
+@@ -30,10 +30,12 @@
+     retry_if_not_exception_type,
+     stop_after_attempt,
+     wait_fixed,
++    wait_random,
+ )
+ from tools.httpx_util import make_async_client
+ 
+ import config
++from tools.collection_pacing import paced_request
+ from base.base_crawler import AbstractApiClient
+ from proxy.proxy_mixin import ProxyRefreshMixin
+ from tools import utils
+@@ -126,11 +128,12 @@
+ 
+     @retry(
+         stop=stop_after_attempt(3),
+-        wait=wait_fixed(1),
++        wait=wait_random(min=20, max=40),
+         retry=retry_if_not_exception_type(
+             (NoteNotFoundError, IPBlockError, PlatformAccessError)
+         ),
+     )
++    @paced_request
+     async def request(self, method, url, **kwargs) -> Union[str, Any]:
+         """
+         Wrapper for httpx common request method, processes request response
+@@ -161,7 +164,7 @@
+             verify_uuid = response.headers["Verifyuuid"]
+             msg = f"CAPTCHA appeared, request failed, Verifytype: {verify_type}, Verifyuuid: {verify_uuid}, Response: {response}"
+             utils.logger.error(msg)
+-            raise Exception(msg)
++            raise PlatformAccessError(msg)
+ 
+         response_data: Optional[Dict] = None
+         try:
+@@ -204,6 +207,7 @@
+             parts.append(f"{key}={quote(value_str, safe=',')}")
+         return "&".join(parts)
+ 
++    @paced_request
+     async def get(self, uri: str, params: Optional[Dict] = None) -> Dict:
+         """
+         GET request, signs request headers
+@@ -226,6 +230,7 @@
+             method="GET", url=full_url, headers=headers
+         )
+ 
++    @paced_request
+     async def post(self, uri: str, data: dict, **kwargs) -> Dict:
+         """
+         POST request, signs request headers
+@@ -246,6 +251,7 @@
+             **kwargs,
+         )
+ 
++    @paced_request
+     async def query_self(self) -> Optional[Dict]:
+         """
+         Query self user info to check login state
+@@ -693,6 +699,7 @@
+             (RetryError, IPBlockError, PlatformAccessError)
+         ),
+     )
++    @paced_request
+     async def get_note_by_id_from_html(
+         self,
+         note_id: str,

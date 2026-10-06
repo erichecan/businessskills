@@ -61,7 +61,7 @@ STATE_FILE = probe.STATE_FILE
 TOP_N = K("PROBE_TOP_N")            # 广搜取样条数，与 opencli 版本对齐
 DEEP_N = K("PROBE_DEEP_N")          # 深挖正文+评论的条数
 COMMENT_LIMIT = K("PROBE_COMMENT_LIMIT")  # 单篇取几条评论
-MC_TIMEOUT = 180
+MC_TIMEOUT = 3600  # 逐条限速与跨项目排队，避免正常慢采集被 180 秒杀掉
 
 MEDIACRAWLER_DIR = Path.home() / ".mediacrawler"
 
@@ -90,44 +90,11 @@ def _uv_bin() -> str:
                             "https://astral.sh/uv/install.sh | sh")
 
 
-# ── 开跑前用 opencli 探一次真实登录态（2026-09-25 加）──────────────────────────
-#
-# ⛔ 起因：daily_collect/daily_probe 是 launchd 定时任务，没人盯着。MediaCrawler
-# 自己的 pong() 登录检测这次是准的（主站+创作者中心确实都 AUTH_REQUIRED），但它
-# 判定没登录之后直接调 PIL 的 Image.show()（~/.mediacrawler/tools/crawler_util.py
-# show_qrcode()）把二维码解码成临时 PNG 丢给系统看图工具弹出来，然后进 retry 循环
-# 等最多 120-600 秒的扫码——launchd 任务里没人会去扫。一天 3 轮 collect + 2 轮
-# probe，每轮开头 preflight() 都会独立起一次 MediaCrawler 子进程，登录没恢复之前
-# 等于每天好几次「无声无息弹窗、等到 180s 子进程超时被杀、报 MediaCrawler 超时」——
-# 这正是 2026-09-25 15:00/20:30 两轮日志里 timeout 的真实来源，不是频率限制。
-#
-# opencli 的 AUTH_REQUIRED 判断在 2026-09-17 那次事故后就是验证过的真实信号（不是
-# `opencli auth status` 那种会说谎的 quick check），借用它在触发 MediaCrawler 前
-# 先拦一道：真掉线就直接报 auth、不再启动 MediaCrawler，把「要不要弹窗等人扫码」
-# 这个决定交还给人，而不是让它对着一个没人看的 cron 会话自作主张弹一次。
-def _opencli_auth_required() -> bool:
-    """用一次轻量 opencli 探测判断是不是真的没登录。探测本身失败不当作没登录——
-    那种情况交给下面 MediaCrawler 自己的 pong() 判断，避免这道闸门本身变成新的误判源。
-    """
-    try:
-        import probe_opencli
-        r = subprocess.run([probe_opencli.opencli_bin(), "xiaohongshu", "search",
-                           "测试", "--limit", "1", "-f", "json"],
-                          capture_output=True, text=True, timeout=30)
-    except Exception:                                         # noqa: BLE001
-        return False
-    combined = (r.stdout or "") + (r.stderr or "")
-    return "AUTH_REQUIRED" in combined or "LOGIN_REQUIRED" in combined
-
 
 def _run(extra_args: list, timeout: int = MC_TIMEOUT):
     """跑一次 MediaCrawler。成功返回 (save_dir, True)，save_dir 用完调用方必须自己清理；
     失败返回 (None, False)，原因记在 LAST_ERROR。
     """
-    if _opencli_auth_required():
-        _record_error("auth", "opencli 探测到 AUTH_REQUIRED —— 登录态真的掉了，"
-                              "不启动 MediaCrawler（避免它自己弹二维码等一个没人看的窗口）")
-        return None, False
     save_dir = tempfile.mkdtemp(prefix="mc_probe_")
     cmd = [_uv_bin(), "run", "main.py",
            "--platform", "xhs", "--lt", "qrcode",
@@ -135,7 +102,8 @@ def _run(extra_args: list, timeout: int = MC_TIMEOUT):
            *extra_args]
     try:
         r = subprocess.run(cmd, cwd=str(MEDIACRAWLER_DIR), capture_output=True,
-                           text=True, encoding="utf-8", errors="replace", timeout=timeout)
+                           text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                           env={**os.environ, "XHS_AUTOMATED_JOB": "1"})
     except subprocess.TimeoutExpired:
         _record_error("timeout", f"mediacrawler {' '.join(extra_args[:4])} 超过 {timeout}s")
         shutil.rmtree(save_dir, ignore_errors=True)
@@ -145,7 +113,11 @@ def _run(extra_args: list, timeout: int = MC_TIMEOUT):
         _record_error("captcha", "命中小红书验证码墙")
         shutil.rmtree(save_dir, ignore_errors=True)
         return None, False
-    if "CDPBrowserManager" in combined and "Successfully connected" not in combined:
+    if "XHS_AUTH_CHECK_FAILED" in combined:
+        _record_error("auth", "登录检查未通过（可能过期或验证拦截），原 Chromium 页面已保留。运行 python3 scripts/xhs-comment/show_login.py 进行人工登录")
+        shutil.rmtree(save_dir, ignore_errors=True)
+        return None, False
+    if "CDPBrowserManager" in combined and "Successfully connected to browser" not in combined and "Successfully connected to existing browser" not in combined:
         _record_error("infra", "连不上 xhschrome（CDP 9333）——确认 xhschrome 在跑，"
                                "或 launchctl kickstart -k gui/$(id -u)/com.eric.xhschrome")
         shutil.rmtree(save_dir, ignore_errors=True)
@@ -220,16 +192,10 @@ def preflight() -> tuple:
 
     kind = LAST_ERROR.get("kind", "")
     if kind == "auth":
-        return False, ("⛔ 登录态失效（opencli 探测到 AUTH_REQUIRED）—— 需要人扫码，"
-                       "脚本自愈不了，本轮不会再弹 MediaCrawler 自己的二维码窗口。\n"
-                       "   跑：opencli xiaohongshu login（会开登录页等扫码，先告知 Eric）\n"
-                       "   注意主站与创作者中心 cookie 相互独立，按需分别验。")
+        return False, f"⛔ {LAST_ERROR.get('message', '')}"
     if kind == "captcha":
-        return False, ("⛔ 命中小红书验证码墙——这不是 MediaCrawler 能自己解的，需要人工去 "
-                       "xhschrome 窗口过一次验证（大概率是扫码）。\n"
-                       "   跟 opencli 那堵是不是同一堵：opencli 走的 URL 特征已知会被拦，"
-                       "这里如果也被拦，说明是账号级别的信号，不只是 URL 特征问题了，"
-                       "两条独立技术路线都被拦意味着风险等级要重新评估，不要自动重试。")
+        return False, ("⛔ 小红书要求安全验证，本轮停止。原 Chromium 页面已保留，"
+                       "请在该窗口完成验证；不能据此断定登录态已过期。")
     if kind == "infra":
         return False, f"⛔ {LAST_ERROR.get('message', '')}"
     if kind == "timeout":

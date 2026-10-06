@@ -42,6 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from knobs import K  # noqa: E402
+from collection_pacing import session as pacing_session, opencli_env
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -122,8 +123,10 @@ def oc(args, timeout=OC_TIMEOUT):
     调用方该怎么用：infra 和 auth 立刻停整轮（见 preflight），其余才是「这条词没数据」。
     """
     try:
-        r = subprocess.run([opencli_bin(), "xiaohongshu", *args, "-f", "json"],
-                           capture_output=True, text=True, timeout=timeout)
+        with pacing_session("search" if args and args[0] == "search" else "note"):
+            r = subprocess.run([opencli_bin(), "xiaohongshu", *args, "-f", "json"],
+                               capture_output=True, text=True, timeout=max(timeout, 180),
+                               env=opencli_env())
     except subprocess.TimeoutExpired:
         _record_error("timeout", msg=f"opencli {' '.join(args[:2])} 超过 {timeout}s")
         return None

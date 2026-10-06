@@ -49,6 +49,16 @@ def ev(tid, js):
     return cdp(f"/eval?target={tid}", js).get("value")
 
 
+def session_ready(tid):
+    """Reject login overlays, captcha and guest pages; require the account UI."""
+    return ev(tid, r"""(() => {
+        if (/\/login|website-login\/captcha/.test(location.href)) return false;
+        if (document.querySelector('.login-container')) return false;
+        return [...document.querySelectorAll('a[href*="/user/profile/"]')]
+            .some(a => a.innerText.trim() === '我');
+    })()""") is True
+
+
 def logged_in():
     """真的打开一次主页来判断，不看 cookie。
 
@@ -59,7 +69,7 @@ def logged_in():
     try:
         time.sleep(10)
         url = ev(tid, "location.href") or ""
-        return "/login" not in url
+        return session_ready(tid)
     finally:
         try:
             cdp("/close?target=" + tid)
@@ -138,7 +148,7 @@ def main():
         except Exception:                                   # noqa: BLE001
             print("登录标签页被关了 —— 重新跑一次确认登录态")
             return 1
-        if "/login" not in url:
+        if session_ready(tid):
             print(f"✅ 登录成功（页面已跳到 {url[:50]}）")
             return 0
     print("⏰ 等超时了，还在登录页")

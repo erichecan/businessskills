@@ -1,0 +1,9 @@
+{
+  "request_gap_seconds": 15,
+  "search_dwell_seconds": 20,
+  "note_dwell_seconds": 30,
+  "close_delay_seconds": 8,
+  "keyword_gap_seconds": 45,
+  "scroll_step_seconds": 5,
+  "jitter_ratio": 0.5
+}

@@ -28,6 +28,17 @@ from datetime import date, datetime
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "scripts"))
+from collection_pacing import session as pacing_session, random_delay as pacing_delay
+from functools import wraps
+
+def paced_probe(func):
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        with pacing_session("search"):
+            return func(*args, **kwargs)
+    return wrapped
+
 SUCAI = REPO / "xhs" / "素材库"
 CIKU = SUCAI / "词库.csv"
 OUT_DIR = SUCAI / "探测原始"
@@ -343,6 +354,7 @@ JS_BACK = """(()=>{history.back();return "back"})()"""
 
 # ---------- 主流程 ----------
 
+@paced_probe
 def probe_keyword(keyword):
     result = {
         "keyword": keyword,
@@ -383,6 +395,7 @@ def probe_keyword(keyword):
             result["completeness"] = "failed" if state.get("empty") else "partial"
             return result
 
+        time.sleep(pacing_delay("search_dwell_seconds"))
         cards = proxy_eval(target, JS_CARDS)
         for c in cards:
             c["likes"] = parse_likes(c.pop("likes_raw", None))
@@ -410,6 +423,7 @@ def probe_keyword(keyword):
             try:
                 proxy_click(target, f'section.note-item a.cover[href*="{c["note_id"]}"]')
                 time.sleep(PAGE_LOAD_WAIT)
+                time.sleep(pacing_delay("note_dwell_seconds"))
                 data = proxy_eval(target, JS_COMMENTS)
                 if "/explore/" not in (data.get("url") or ""):
                     continue
@@ -450,6 +464,7 @@ def probe_keyword(keyword):
                         "note_url": data["url"],
                         "text": text,
                     })
+                time.sleep(pacing_delay("close_delay_seconds"))
                 proxy_eval(target, JS_BACK)
                 time.sleep(PAGE_LOAD_WAIT)
             except Exception as e:
@@ -462,7 +477,9 @@ def probe_keyword(keyword):
 
     finally:
         try:
-            proxy_get(f"/close?target={target}")
+            if result.get("_error") not in ("login_required", "captcha_triggered"):
+                time.sleep(pacing_delay("close_delay_seconds"))
+                proxy_get(f"/close?target={target}")
         except Exception:
             pass
 
