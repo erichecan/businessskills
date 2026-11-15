@@ -58,11 +58,16 @@ def bj_now():
     return datetime.now(BEIJING).replace(tzinfo=None)
 
 REPO = Path(__file__).resolve().parents[2]
-SUCAI = REPO / "xhs" / "素材库"
+_PIPELINE_SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
+import sys as _pipeline_sys
+_pipeline_sys.path.insert(0, str(_PIPELINE_SCRIPTS))
+from xhs_pipeline.runtime import data_root as _pipeline_data_root, proxy_base as _pipeline_proxy_base, browser_settings as _pipeline_browser_settings
+from xhs_pipeline.runtime import active_context as _active_pipeline_context
+SUCAI = _pipeline_data_root(REPO / "xhs" / "素材库")
 AUDIT_LOG = SUCAI / "审核记录.csv"
 CIKU = SUCAI / "词库.csv"
 PUB_LOG = SUCAI / "发布日志.csv"
-PROXY_BASE = "http://localhost:3456"
+PROXY_BASE = _pipeline_proxy_base()
 HEALTH_DIR = REPO / "scripts" / "xhs-health"
 
 # 闸门线的唯一来源 —— 别在本文件里再写一次数字（2026-08-15 查出全仓有四处
@@ -75,11 +80,16 @@ except Exception:
 # 闸门发现缺成品图时现场补渲染用。与 refine_loop.CARDS_SCRIPT 是同一个脚本。
 CARDS_SCRIPT = SUCAI / "图文模板" / "make_cards.py"
 
+sys.path.insert(0, str(REPO / "scripts"))
+from knobs import K  # noqa: E402
+from pipeline_halt import guard  # noqa: E402
+
 sys.path.insert(0, str(REPO / "scripts" / "case-entry"))
 
 PUB_LOG_COLS = ["日期", "成稿文件", "标题", "闸门", "预填", "定时", "发布", "笔记链接", "备注"]
 
-XHS_CHROME_PORT = 9333
+_BROWSER_CONFIG = _pipeline_browser_settings()
+XHS_CHROME_PORT = int(_BROWSER_CONFIG["cdp_port"]) if _BROWSER_CONFIG else 9333
 
 
 def ensure_cdp_proxy_healthy(retries=3):
@@ -98,15 +108,22 @@ def ensure_cdp_proxy_healthy(retries=3):
     import urllib.request
 
     bad = None
+    expected_pipeline = os.environ.get("XHS_PIPELINE_ID")
     for attempt in range(retries):
         try:
             with urllib.request.urlopen(f"{PROXY_BASE}/health", timeout=3) as r:
                 h = json.loads(r.read())
-            if h.get("chromePort") == XHS_CHROME_PORT:
+            if (h.get("chromePort") == XHS_CHROME_PORT
+                    and (not expected_pipeline or h.get("pipelineId") == expected_pipeline)):
                 return True, ""
             bad = h.get("chromePort")
         except Exception as e:
             bad = f"health 读取失败：{e}"
+        if expected_pipeline:
+            # Never kill another pipeline's bridge or relaunch the legacy
+            # LaunchAgent to repair a private pipeline endpoint.
+            time.sleep(0.5)
+            continue
         r = subprocess.run(["lsof", "-nP", "-iTCP:3456", "-sTCP:LISTEN", "-t"],
                             capture_output=True, text=True)
         for pid in r.stdout.split():
@@ -115,12 +132,12 @@ def ensure_cdp_proxy_healthy(retries=3):
         subprocess.run(["launchctl", "kickstart", "-k",
                         f"gui/{os.getuid()}/com.eric.cdpproxy"], capture_output=True)
         time.sleep(3)
-    return False, f"cdp-proxy 连到错误的 Chrome（chromePort={bad}，应为 {XHS_CHROME_PORT}），自愈 {retries} 次仍未恢复"
+    return False, f"CDP bridge 状态不匹配（chromePort={bad}，应为 {XHS_CHROME_PORT}），检查对应流水线浏览器服务"
 
 # 发布时段轮换池 — 每次发布取下一个，用来测出哪个时段搜索进入占比最高。
 # 一轮 7 个点跑完，配合词库的「搜索来源占比」回填即可横向比较。
 SLOT_HOURS = [9, 11, 12, 17, 18, 20, 22]
-DAILY_QUOTA = 5          # 2026-08-26 由 3 提到 5（Eric 决定）；7 个时段够用，不占满
+DAILY_QUOTA = K("PUBLISH_DAILY_QUOTA")   # 2026-10-02 收进旋钮台，见 knobs.py 同名条目
 SCHED_LEAD = timedelta(minutes=30)   # 小红书定时发布需要提前量，太近会被拒
 # 谁的「处置」算数。gate 取的是这些审核方里**最后一条**，所以少列一个，
 # 那一方的结论就等于没写过。
@@ -597,7 +614,9 @@ def set_schedule(tid, at, do_publish=False):
     cmd = [node, str(js), "--at", at, "--target", tid]
     if do_publish:
         cmd.append("--publish")
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    child_env = os.environ.copy()
+    child_env["CHROME_DEBUG_PORT"] = str(XHS_CHROME_PORT)
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=180, env=child_env)
     return r.returncode == 0, (r.stdout or "") + (r.stderr or "")
 
 
@@ -736,8 +755,10 @@ def publish_one(name, dry_run, immediate=False, full_auto=False):
     # （2026-08-05 实测，Eric 找不到页面，最后一步没人点，稿就卡在那）。
     # full_auto 且已点完发布时就不用切了 —— 没人需要看它。
     if not (full_auto and sched_ok):
+        child_env = os.environ.copy()
+        child_env["CHROME_DEBUG_PORT"] = str(XHS_CHROME_PORT)
         focus = subprocess.run([sys.executable, str(Path(__file__).parent / "focus_tab.py"),
-                                "--target", pre["tid"]], capture_output=True, text=True)
+                                "--target", pre["tid"]], capture_output=True, text=True, env=child_env)
         print((focus.stdout or focus.stderr or "").strip())
 
     if full_auto and sched_ok:
@@ -804,6 +825,16 @@ def main():
                     help="连最后那下「定时发布」也自己点，全程无人。默认不开 —— "
                          "默认只把时间选好，红色按钮留给你点，人还在回路里")
     args = ap.parse_args()
+
+    # ⚠️ --list 看起来只读，但 candidates() 内部缺图会现场渲染卡片（见下方
+    # CARDS_SCRIPT 调用），不是真的无副作用 —— 只有 --slots 完全不碰 candidates()。
+    if not args.slots:
+        guard("auto_publish.py")
+
+    pipeline_context = _active_pipeline_context()
+    if pipeline_context and not pipeline_context.publishing.get("identity_verified"):
+        print("⛔ 发布已拦截：请先在本地配置页扫码登录、核对 Postory 账号名并确认账号身份。")
+        return 2
 
     if args.approve:
         return approve(args.approve)

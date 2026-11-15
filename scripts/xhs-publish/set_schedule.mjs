@@ -155,6 +155,19 @@ async function clickBy(cdp, exprReturningEl, label) {
     await evaluate(cdp, `(() => {
       const el = ${exprReturningEl};
       if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+      // The current creator editor has its own .publish-page scroll container.
+      // scrollIntoView can leave the date field below the viewport when an
+      // ancestor has overflow:auto; move each scrollable ancestor just enough
+      // to expose the target before using elementFromPoint as the click guard.
+      if (el) {
+        for (let a = el.parentElement; a; a = a.parentElement) {
+          const s = getComputedStyle(a);
+          if (!/(auto|scroll)/.test(s.overflowY) || a.scrollHeight <= a.clientHeight) continue;
+          const e = el.getBoundingClientRect(), r = a.getBoundingClientRect();
+          if (e.bottom > r.bottom) a.scrollTop += e.bottom - r.bottom + 24;
+          else if (e.top < r.top) a.scrollTop -= r.top - e.top + 24;
+        }
+      }
       return !!el;
     })()`);
     await sleep(260);                       // 让滚动与重排落定，再取坐标

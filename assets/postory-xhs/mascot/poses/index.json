@@ -1,0 +1,18 @@
+{
+  "identity": "postory-guide-v1",
+  "source_of_truth": "assets/postory-xhs/mascot/postory-guide.png",
+  "rendering_rule": "Reuse approved PNG poses. Never regenerate the mascot during CLI rendering.",
+  "poses": {
+    "point-right": {"purpose": "引导读者看向右侧图解", "asset": "point-right.png"},
+    "explain": {"purpose": "解释一个经营判断或做法", "asset": "explain.png"},
+    "think": {"purpose": "提出问题、分析原因或留白思考", "asset": "think.png"},
+    "review-chart": {"purpose": "查看数据、表格或检查结果", "asset": "review-chart.png"},
+    "caution": {"purpose": "提醒边界、误区或风险", "asset": "caution.png"},
+    "celebrate": {"purpose": "呈现完成动作或小成果", "asset": "celebrate.png"},
+    "welcome": {"purpose": "封面欢迎、开篇引导", "asset": "welcome.png"},
+    "listen": {"purpose": "顾客咨询、倾听店主问题", "asset": "listen.png"},
+    "point-down": {"purpose": "引导读者看下方清单或下一步", "asset": "point-down.png"},
+    "compare": {"purpose": "讲两种选择、做法或顾客类型的差异", "asset": "compare.png"},
+    "inspect": {"purpose": "查看服务样品、设备或细节", "asset": "inspect.png"}
+  }
+}

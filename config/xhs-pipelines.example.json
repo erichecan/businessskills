@@ -1,0 +1,471 @@
+{
+  "schema_version": 1,
+  "pipelines": [
+    {
+      "id": "postory-xhs",
+      "name": "PoStory 小红书宣传账号（未启用模板）",
+      "enabled": false,
+      "workspace": {
+        "data_root": "~/.local/share/xhs-pipelines/postory-xhs"
+      },
+      "collection": {
+        "content_scope": "中小企业经营者在营销中遇到的问题、值得关注的指标、有效动作及其背后的经营逻辑",
+        "request_delay_seconds": 1.5,
+        "sources": [
+          {
+            "id": "wangcen_public",
+            "name": "王岑｜消费、开店与投资判断",
+            "kind": "teacher_ip",
+            "provider": "google_news_rss",
+            "enabled": true,
+            "tags": [
+              "开店",
+              "消费行业",
+              "门店投入",
+              "投资判断"
+            ],
+            "usage_note": "提取经营判断和案例线索；投资观点需保留时点与适用条件。",
+            "settings": {
+              "query": "王岑 (开店 OR 粉店 OR 消费 OR 投资)",
+              "language": "zh-CN",
+              "region": "CN",
+              "max_items": 2,
+              "published_within_days": 730
+            }
+          },
+          {
+            "id": "zhangqi_public",
+            "name": "张琦｜中小企业经营与增长",
+            "kind": "teacher_ip",
+            "provider": "google_news_rss",
+            "enabled": true,
+            "tags": [
+              "中小企业经营",
+              "增长逻辑",
+              "管理",
+              "营销动作"
+            ],
+            "usage_note": "提取问题拆解与经营框架；不承接流量或收入保证。",
+            "settings": {
+              "query": "张琦 (中小企业 OR 老板 OR 经营 OR 增长 OR 营销)",
+              "language": "zh-CN",
+              "region": "CN",
+              "max_items": 2,
+              "exclude_title_terms": [
+                "受贿",
+                "反腐",
+                "腐败",
+                "纪委",
+                "落马",
+                "市委书记",
+                "省委原常委"
+              ],
+              "published_within_days": 730
+            }
+          },
+          {
+            "id": "zhengxiangzhou_public",
+            "name": "郑翔洲｜商业模式与经营策略",
+            "kind": "teacher_ip",
+            "provider": "google_news_rss",
+            "enabled": true,
+            "tags": [
+              "商业模式",
+              "经营策略",
+              "增长逻辑",
+              "投资判断"
+            ],
+            "usage_note": "将模式观点转换为小企业可检查的问题；保留出处，不沿用讲师口吻。",
+            "settings": {
+              "query": "郑翔洲 (商业模式 OR 企业经营 OR 消费 OR 增长)",
+              "language": "zh-CN",
+              "region": "CN",
+              "max_items": 2,
+              "exclude_title_terms": [
+                "受邀",
+                "授课",
+                "招商引资",
+                "座谈",
+                "峰会",
+                "圆满落幕",
+                "冠名"
+              ],
+              "published_within_days": 730
+            }
+          },
+          {
+            "id": "canyan_data",
+            "name": "窄门餐眼｜餐饮品牌、门店与品类",
+            "kind": "industry_data",
+            "provider": "google_news_rss",
+            "enabled": true,
+            "tags": [
+              "餐饮",
+              "开店",
+              "门店投入",
+              "品类",
+              "投资判断"
+            ],
+            "usage_note": "只采公开网页可访问内容；小程序或付费数据不视为可自动获取。",
+            "settings": {
+              "query": "site:canyandata.com (餐饮 OR 门店 OR 品类 OR 选址 OR 开店)",
+              "language": "zh-CN",
+              "region": "CN",
+              "max_items": 2,
+              "exclude_title_terms": [
+                "平台",
+                "工具",
+                "创建",
+                "名片",
+                "关于窄门",
+                "窄门餐谋"
+              ],
+              "published_within_days": 730
+            }
+          },
+          {
+            "id": "watcn_restaurant_owner",
+            "name": "餐饮老板内参｜门店经营与品牌案例",
+            "kind": "industry_media",
+            "provider": "google_news_rss",
+            "enabled": true,
+            "tags": [
+              "餐饮经营",
+              "门店实战",
+              "品牌案例",
+              "管理与营销动作"
+            ],
+            "usage_note": "保留案例背景和时间，不把单店结果写成行业普遍结论。",
+            "settings": {
+              "query": "site:watcn.com (门店 OR 餐饮经营 OR 品牌案例 OR 获客 OR 复购)",
+              "language": "zh-CN",
+              "region": "CN",
+              "max_items": 2,
+              "published_within_days": 730
+            }
+          },
+          {
+            "id": "hongcan_research",
+            "name": "红餐网｜行业报告、品类与企业访谈",
+            "kind": "industry_research",
+            "provider": "google_news_rss",
+            "enabled": true,
+            "tags": [
+              "餐饮行业",
+              "消费趋势",
+              "品类",
+              "经营案例"
+            ],
+            "usage_note": "区分报告数据、采访观点和个案；时效性数据保留发布日期。",
+            "settings": {
+              "query": "site:canyin88.com (餐饮报告 OR 品类 OR 门店经营 OR 企业访谈 OR 案例)",
+              "language": "zh-CN",
+              "region": "CN",
+              "max_items": 2,
+              "published_within_days": 730
+            }
+          },
+          {
+            "id": "42zhangjing",
+            "name": "42章经｜创业、消费与线下业态",
+            "kind": "business_media",
+            "provider": "google_news_rss",
+            "enabled": true,
+            "tags": [
+              "创业",
+              "消费行业",
+              "商业模式",
+              "投资判断"
+            ],
+            "usage_note": "偏商业与投资分析，转成小店经营问题前需补充实际场景。",
+            "settings": {
+              "query": "\"42章经\" (消费 OR 创业 OR 线下业态 OR 商业模式 OR 投资)",
+              "language": "zh-CN",
+              "region": "CN",
+              "max_items": 2,
+              "published_within_days": 730
+            }
+          },
+          {
+            "id": "youzan_cases",
+            "name": "有赞案例中心｜多行业商家经营案例",
+            "kind": "merchant_cases",
+            "provider": "google_news_rss",
+            "enabled": true,
+            "tags": [
+              "实体门店",
+              "获客",
+              "私域复购",
+              "会员运营",
+              "多行业案例"
+            ],
+            "usage_note": "服务商案例带有产品宣传视角；案例数据仅代表该案例，不作为行业基准。",
+            "settings": {
+              "query": "site:youzan.com/anli (门店 OR 商家 OR 获客 OR 复购 OR 会员)",
+              "language": "zh-CN",
+              "region": "CN",
+              "max_items": 2,
+              "published_within_days": 730
+            }
+          },
+          {
+            "id": "bdc_sme",
+            "name": "BDC｜加拿大中小企业营销、定价与销售",
+            "kind": "public_sme_guidance",
+            "provider": "google_news_rss",
+            "enabled": true,
+            "tags": [
+              "加拿大中小企业",
+              "营销",
+              "定价",
+              "销售",
+              "客户留存"
+            ],
+            "usage_note": "加拿大来源；翻译和转述时保留当地市场、法规及数据适用范围。",
+            "settings": {
+              "query": "site:bdc.ca small business (marketing OR pricing OR sales OR customer retention)",
+              "language": "en-CA",
+              "region": "CA",
+              "max_items": 2,
+              "published_within_days": 1825
+            }
+          },
+          {
+            "id": "small_business_cross_industry",
+            "name": "跨行业中小企业经营公开报道",
+            "kind": "public_business_media",
+            "provider": "google_news_rss",
+            "enabled": true,
+            "tags": [
+              "中小企业经营",
+              "实体门店",
+              "增长",
+              "营销动作",
+              "行业案例"
+            ],
+            "usage_note": "用于发现餐饮以外的本地服务和小企业案例，需核实报道原始来源。",
+            "settings": {
+              "query": "(中小企业 OR 小微企业 OR 实体店 OR 本地商家) (经营 OR 营销 OR 定价 OR 复购 OR 客户)",
+              "language": "zh-CN",
+              "region": "CN",
+              "max_items": 2,
+              "exclude_title_terms": [
+                "就任",
+                "院长",
+                "研修班",
+                "活动举行",
+                "会议举行"
+              ],
+              "published_within_days": 365
+            }
+          }
+        ],
+        "dedupe": {
+          "keys": [
+            "canonical_url",
+            "content_hash"
+          ],
+          "normalize_tracking_parameters": true
+        },
+        "editorial_matrix": {
+          "topics": [
+            {
+              "id": "open_shop_investment",
+              "label": "开店与投入判断",
+              "terms": [
+                "开店",
+                "选址",
+                "租金",
+                "装修",
+                "启动资金",
+                "回本",
+                "加盟",
+                "开业",
+                "门店投入",
+                "餐饮品类",
+                "投资回报",
+                "capital investment",
+                "startup costs"
+              ]
+            },
+            {
+              "id": "customer_demand",
+              "label": "顾客需求与选择",
+              "terms": [
+                "顾客需求",
+                "消费决策",
+                "复购",
+                "口碑",
+                "消费体验",
+                "客群",
+                "购买理由",
+                "customer retention",
+                "customer loyalty",
+                "customer lifetime value"
+              ]
+            },
+            {
+              "id": "marketing_metrics",
+              "label": "营销指标与判断",
+              "terms": [
+                "获客",
+                "转化率",
+                "客单价",
+                "营销",
+                "广告投放",
+                "流量",
+                "客户留存",
+                "到店",
+                "线索",
+                "点击率",
+                "marketing",
+                "conversion rate",
+                "customer acquisition cost",
+                "marketing plan",
+                "target marketing"
+              ]
+            },
+            {
+              "id": "good_actions",
+              "label": "管理与营销动作",
+              "terms": [
+                "门店运营",
+                "定价",
+                "会员运营",
+                "促销",
+                "营销动作",
+                "销售转化",
+                "客户服务",
+                "成本控制",
+                "management",
+                "pricing",
+                "sales follow-up",
+                "small business financing"
+              ]
+            },
+            {
+              "id": "business_model",
+              "label": "商业模式与增长逻辑",
+              "terms": [
+                "商业模式",
+                "利润",
+                "营业收入",
+                "经营成本",
+                "毛利",
+                "现金流",
+                "连锁经营",
+                "单店模型",
+                "盈利模式",
+                "单位经济",
+                "business model",
+                "profit margin",
+                "revenue",
+                "retained earnings",
+                "segmentation"
+              ]
+            }
+          ]
+        }
+      },
+      "generation": {
+        "material_sources": [],
+        "rewrite": {
+          "style_profile": "postory_smb_marketing_authority",
+          "prompt_file": "~/.local/share/xhs-pipelines/postory-xhs/prompts/rewrite.md",
+          "preserve_source_facts": true,
+          "allow_first_person_for_third_party_material": false
+        },
+        "review": {
+          "required_before_publish": true
+        }
+      },
+      "model_routes": {
+        "collection_relevance": {
+          "primary": {
+            "provider": "chatgpt",
+            "transport": "codex_cli",
+            "executable": "codex",
+            "model_source": "codex_config_default",
+            "auth_source": "chatgpt_login",
+            "billing_expectation": "chatgpt_plan",
+            "execution": {
+              "sandbox": "read-only",
+              "ephemeral": true,
+              "cwd_source": "pipeline_workspace",
+              "skip_git_repo_check": true
+            }
+          }
+        },
+        "first_draft": {
+          "primary": {
+            "provider": "chatgpt",
+            "transport": "codex_cli",
+            "executable": "codex",
+            "model_source": "codex_config_default",
+            "auth_source": "chatgpt_login",
+            "billing_expectation": "chatgpt_plan",
+            "execution": {
+              "sandbox": "read-only",
+              "ephemeral": true,
+              "cwd_source": "pipeline_workspace",
+              "skip_git_repo_check": true
+            }
+          }
+        },
+        "rewrite": {
+          "primary": {
+            "provider": "chatgpt",
+            "transport": "codex_cli",
+            "executable": "codex",
+            "model_source": "codex_config_default",
+            "auth_source": "chatgpt_login",
+            "billing_expectation": "chatgpt_plan",
+            "execution": {
+              "sandbox": "read-only",
+              "ephemeral": true,
+              "cwd_source": "pipeline_workspace",
+              "skip_git_repo_check": true
+            }
+          }
+        },
+        "review": {
+          "primary": {
+            "provider": "chatgpt",
+            "transport": "codex_cli",
+            "executable": "codex",
+            "model_source": "codex_config_default",
+            "auth_source": "chatgpt_login",
+            "billing_expectation": "chatgpt_plan",
+            "execution": {
+              "sandbox": "read-only",
+              "ephemeral": true,
+              "cwd_source": "pipeline_workspace",
+              "skip_git_repo_check": true
+            }
+          }
+        },
+        "speech_to_text": {
+          "enabled": false
+        }
+      },
+      "publishing": {
+        "platform": "xiaohongshu",
+        "account_id": "postory-xhs",
+        "identity_verified": false,
+        "verified_account_label": "",
+        "browser": {
+          "engine": "chromium",
+          "executable": "auto",
+          "user_data_dir": "~/.local/share/xhs-pipelines/browser-sessions/postory-xhs",
+          "cdp_port": 19341,
+          "proxy_port": 19342
+        },
+        "timezone": "Asia/Shanghai",
+        "schedule": {
+          "inherit_existing_policy": true
+        },
+        "final_submit_requires_approval": true
+      }
+    }
+  ]
+}
