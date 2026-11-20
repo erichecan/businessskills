@@ -7,7 +7,6 @@ import json
 import os
 import re
 import sys
-from shutil import copy2, rmtree
 from datetime import datetime
 from pathlib import Path
 
@@ -17,9 +16,6 @@ sys.path.insert(0, str(SCRIPTS))
 from codex_cli import run_prompt  # noqa: E402
 from xhs_pipeline.runtime import active_context  # noqa: E402
 from xhs_pipeline.collect import _matrix_matches  # noqa: E402
-from xhs_pipeline.editorial import (  # noqa: E402
-    editorial_prompt, plan_cover, recent_editorial_drafts, validate_cover_story,
-)
 from xhs_pipeline.render_cards import render_note, required_mascot_poses  # noqa: E402
 
 TEXT_SUFFIXES = {".md", ".txt", ".csv", ".json"}
@@ -184,7 +180,7 @@ def read_materials(context, brief: str = "") -> tuple[str, list[str]]:
     return "\n".join(chunks), used
 
 
-def build_prompt(context, brief: str, recent: list[dict] | None = None) -> tuple[str, list[str]]:
+def build_prompt(context, brief: str) -> tuple[str, list[str]]:
     rewrite = context.generation["rewrite"]
     prompt_path = Path(os.path.expandvars(rewrite["prompt_file"])).expanduser().resolve()
     if not prompt_path.is_file():
@@ -214,7 +210,8 @@ def build_prompt(context, brief: str, recent: list[dict] | None = None) -> tuple
 {scope}
 【本条内容任务】
 {brief.strip()}
-{editorial_prompt(recent or [])}
+【固定视觉资产】
+PoStory 引导角色已经固定在渲染器中；不要生成、改写或描述新的角色图片。图卡使用一张固定透明 PNG。你只需为封面和每张内页提供图解类型与短标签，渲染器会根据内容绘制步骤、分组、对比或检查清单。
 【素材事实】
 {material_text}
 
@@ -223,14 +220,13 @@ def build_prompt(context, brief: str, recent: list[dict] | None = None) -> tuple
 区分事实、案例和观点，保留案例边界。不要编造数据、客户案例、效果、价格或承诺。
 请只输出一个合法 JSON 对象，不要 Markdown 代码围栏或额外解释，结构如下：
 {{
-  "editorial_line": "market_proactively|count_the_funnel|brand_in_every_consultation",
   "title_candidates": [{{"title":"...","angle":"...","promise":"..."}}],
   "selected_title": "...",
   "title_selection_reason": "...",
   "opening": "...",
   "caption": "发布时的正文说明，不含标题和话题标签",
   "hashtags": ["#..."],
-  "cover": {{"label":"行业/场景标签","title":"...","subtitle":"...","visual":{{"title_anchor":"标题中的具体词组"}},"diagram":{{"type":"scene|journey|steps|segments|compare|matrix|funnel|script|checklist|story","title":"...","items":["短标签","短标签","短标签"]}}}},
+  "cover": {{"label":"行业/场景标签","title":"...","subtitle":"...","visual":{{"mascot_pose":"welcome|explain|point-right|none"}},"diagram":{{"type":"scene|journey|steps|segments|compare|matrix|funnel|script|checklist|story","title":"...","items":["短标签","短标签","短标签"]}}}},
   "pages": [
     {{"kind":"scene|insight|steps|comparison|metric|checklist|boundary","label":"...","title":"...","body":"...","points":["..."],"callout":"...","footnote":"...","visual":{{"mascot_pose":"listen|think|review-chart|caution|celebrate|welcome|point-down|compare|inspect|none","mascot_side":"left|right"}},"diagram":{{"type":"scene|journey|steps|segments|compare|matrix|funnel|script|checklist|story","title":"短图解标题","items":["短标签","短标签","短标签"]}}}}
   ],
@@ -238,7 +234,7 @@ def build_prompt(context, brief: str, recent: list[dict] | None = None) -> tuple
   "review_notes": []
 }}
 
-要求：标题候选 3–5 个，使用具体行业场景和店主会说的话术，避免咨询报告腔；正文图卡 4–7 页，每页只讲一个要点。每页都要有视觉承载物，但不要强迫每页放人物；内页仅在角色能帮助讲解、倾听、提醒或展示时指定一个姿态，否则省略 visual.mascot_pose 或设为 none。整篇最多在 2–3 张内页出现角色，不得连续重复同一姿态；封面人物动作和位置由程序安排。根据页面内容在场景、旅程、步骤、分组、对比、矩阵、漏斗、对话、清单、故事板等图形语法中选择，避免整篇重复一种结构。items 每项尽量控制在 12 个汉字内。封面标题以首选标题为基础，可为视觉阅读压缩但不能改变承诺。图形标签必须来自本页真实内容；不要请求生成临时图片。source url 必须逐字来自输入素材，不得编造。完整提供读者需要的信息，不以评论/私信换答案。输出适合加拿大及北美华人店主阅读的自然中文；不要声称已发布或保证爆款。"""
+要求：标题候选 3–5 个，使用具体行业场景和店主会说的话术，避免咨询报告腔；正文图卡 4–7 页，每页只讲一个要点。每页都要有视觉承载物，但不要强迫每页放人物；内页仅在角色能帮助讲解、倾听、提醒或展示时指定一个姿态，否则省略 visual.mascot_pose 或设为 none。整篇最多在 2–3 张内页出现角色，不得连续重复同一姿态；封面可选一个合适姿态。根据页面内容在场景、旅程、步骤、分组、对比、矩阵、漏斗、对话、清单、故事板等图形语法中选择，避免整篇重复一种结构。items 每项尽量控制在 12 个汉字内。封面标题以首选标题为基础，可为视觉阅读压缩但不能改变承诺。图形标签必须来自本页真实内容；不要请求生成临时图片。source url 必须逐字来自输入素材，不得编造。完整提供读者需要的信息，不以评论/私信换答案。输出适合加拿大及北美华人店主阅读的自然中文；不要声称已发布或保证爆款。"""
     return prompt, material_files
 
 
@@ -290,8 +286,7 @@ def _extract_json(raw: str) -> dict:
         page_diagrams.append(diagram_type)
     if sum(pose not in {"", "none", "off", "false"} for pose in page_poses) > 3:
         raise ValueError("内页最多在 3 张卡片中使用引导角色")
-    validate_cover_story(note)
-    all_poses = page_poses
+    all_poses = [cover_pose or "welcome", *page_poses]
     for current, following in zip(all_poses, all_poses[1:]):
         if current not in {"", "none", "off", "false"} and current == following:
             raise ValueError(f"相邻卡片重复使用同一角色姿态：{current}")
@@ -304,9 +299,7 @@ def _extract_json(raw: str) -> dict:
 
 def generate(brief: str) -> Path:
     context = active_context(required=True)
-    drafts_dir = context.data_root / "drafts"
-    recent = recent_editorial_drafts(drafts_dir)
-    prompt, material_files = build_prompt(context, brief, recent)
+    prompt, material_files = build_prompt(context, brief)
     raw = run_prompt(prompt, route="first_draft", timeout=900)
     note = _extract_json(raw)
     # Keep citations tied to URLs actually present in the supplied material.
@@ -317,6 +310,7 @@ def generate(brief: str) -> Path:
     for source in note.get("sources", []):
         if not isinstance(source, dict) or source.get("url", "").rstrip(".,;:，。；：）】") not in allowed_urls:
             raise ValueError("来源链接不在本次输入素材中；请移除或改用原文链接")
+    drafts_dir = context.data_root / "drafts"
     drafts_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     stamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S-%f")
     slug = re.sub(r"[^\w\u4e00-\u9fff-]+", "-", brief.strip())[:30].strip("-") or "post"
@@ -330,31 +324,25 @@ def generate(brief: str) -> Path:
         "material_files": material_files,
         "status": "needs_human_review",
         "visual_identity": "postory-guide-v1",
-        "design_version": "postory-visual-system-v3",
-        "deliverables": ["note.json", "caption.txt", "cards/*.png"],
+        "design_version": "postory-visual-system-v2",
+        "deliverables": ["note.json", "caption.txt", "cards/*.png", "mascot/postory-guide.png", "mascot/poses/*.png"],
     })
     package_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
     try:
-        library = POSTORY_MASCOT_PATH.parent / "poses"
-        available_poses = {
-            pose for pose in ALLOWED_MASCOT_POSES if (library / f"{pose}.png").is_file()
-        }
-        plan_cover(note, recent, available_poses)
-        for page in note["pages"]:
-            visual = page.get("visual")
-            if isinstance(visual, dict):
-                pose = str(visual.get("mascot_pose") or "").strip().lower().replace("_", "-")
-                visual["mascot_pose"] = pose if pose in available_poses else "none"
+        import shutil
+        if not POSTORY_MASCOT_PATH.is_file():
+            raise FileNotFoundError(f"PoStory 固定引导形象不存在：{POSTORY_MASCOT_PATH}")
+        mascot_dir = package_dir / "mascot"
+        mascot_dir.mkdir(exist_ok=True)
+        shutil.copy2(POSTORY_MASCOT_PATH, mascot_dir / POSTORY_MASCOT_PATH.name)
+        pose_dir = mascot_dir / "poses"
+        pose_dir.mkdir(exist_ok=True)
         note["mascot_poses"] = required_mascot_poses(note)
-        if note["mascot_poses"]:
-            pose_dir = package_dir / "mascot" / "poses"
-            pose_dir.mkdir(parents=True)
-            for pose in note["mascot_poses"]:
-                copy2(library / f"{pose}.png", pose_dir / f"{pose}.png")
-            note["deliverables"].append("mascot/poses/*.png")
-            if POSTORY_MASCOT_PATH.is_file():
-                copy2(POSTORY_MASCOT_PATH, pose_dir.parent / POSTORY_MASCOT_PATH.name)
-                note["deliverables"].append("mascot/postory-guide.png")
+        for pose in note["mascot_poses"]:
+            pose_asset = POSTORY_MASCOT_PATH.parent / "poses" / f"{pose}.png"
+            if not pose_asset.is_file():
+                raise FileNotFoundError(f"PoStory 姿态素材不存在：{pose_asset}")
+            shutil.copy2(pose_asset, pose_dir / pose_asset.name)
         card_paths = render_note(note, package_dir / "cards")
         note["card_files"] = [str(path.relative_to(package_dir)) for path in card_paths]
         (package_dir / "note.json").write_text(
@@ -363,7 +351,7 @@ def generate(brief: str) -> Path:
         caption_text = f"{note['selected_title']}\n\n{note['caption']}\n\n{' '.join(note['hashtags'])}\n"
         (package_dir / "caption.txt").write_text(caption_text, encoding="utf-8")
     except Exception:
-        rmtree(package_dir, ignore_errors=True)
+        shutil.rmtree(package_dir, ignore_errors=True)
         raise
     return package_dir
 
