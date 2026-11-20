@@ -335,6 +335,7 @@ def _render_cover(note: dict[str, Any], total: int, asset_root: Path) -> Image.I
     draw = ImageDraw.Draw(image)
     draw.rectangle((0, 0, WIDTH, 22), fill=PINK)
     draw.rectangle((WIDTH // 2, 0, WIDTH, 22), fill=ORANGE)
+    # Keep the same cover grid on every post; only the industry scene changes.
     draw.ellipse((810, 948, 1420, 1558), fill=PALE_ORANGE)
     draw.ellipse((-190, 990, 245, 1425), fill=PALE_PINK)
     draw.rounded_rectangle((68, 74, 1174, 1442), radius=56, fill="#FFFFFF", outline=LINE, width=2)
@@ -369,12 +370,10 @@ def _render_cover(note: dict[str, Any], total: int, asset_root: Path) -> Image.I
     if art_y > 930:
         raise ValueError("封面标题或副标题过长；请缩短后再排入固定插画封面")
     visual = note.get("visual") if isinstance(note.get("visual"), dict) else {}
-    cover_pose = str(visual.get("mascot_pose") or "none")
+    cover_pose = str(visual.get("mascot_pose") or "welcome")
     if cover_pose.lower() not in {"none", "off", "false"}:
-        figure_right = visual.get("mascot_side") == "right"
-        figure_x = 794 if figure_right else 104
-        _place_mascot(image, asset_root, (figure_x, art_y, 340, 1350 - art_y), cover_pose)
-        diagram_box = (112 if figure_right else 478, art_y + 34, 650, 360)
+        _place_mascot(image, asset_root, (104, art_y, 360, 1350 - art_y), cover_pose)
+        diagram_box = (478, art_y + 44, 650, 360)
     else:
         diagram_box = (112, art_y + 24, 1018, 390)
     _draw_diagram(draw, note.get("diagram"), diagram_box,
@@ -514,7 +513,7 @@ def required_mascot_poses(note: dict[str, Any]) -> list[str]:
     poses: set[str] = set()
     cover = note.get("cover") if isinstance(note.get("cover"), dict) else {}
     cover_visual = cover.get("visual") if isinstance(cover.get("visual"), dict) else {}
-    cover_pose = str(cover_visual.get("mascot_pose") or "none").strip().lower().replace("_", "-")
+    cover_pose = str(cover_visual.get("mascot_pose") or "welcome").strip().lower().replace("_", "-")
     if cover_pose not in {"none", "off", "false"}:
         poses.add(cover_pose)
     for page in note.get("pages", []):
